@@ -2,144 +2,126 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="A browser-based operating system following Apple's Human Interface Guidelines">
-    <title>Vibe Web OS 2.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Nova OS - A premium browser-based operating system">
+    <title>Nova OS</title>
+
+    <!-- Google Fonts: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <!-- CSS -->
-    <link rel="stylesheet" href="css/variables.css">
-    <link rel="stylesheet" href="css/base.css">
-    <link rel="stylesheet" href="css/layout.css">
-    <link rel="stylesheet" href="css/components/window.css">
-    <link rel="stylesheet" href="css/components/menubar.css">
-    <link rel="stylesheet" href="css/components/dock.css">
-    <link rel="stylesheet" href="css/components/spotlight.css">
-    <link rel="stylesheet" href="css/components/notifications.css">
-    <link rel="stylesheet" href="css/components/context-menu.css">
-    <link rel="stylesheet" href="css/utilities.css">
-    <link rel="stylesheet" href="css/glass-ui-enhanced.css">
+    <link rel="stylesheet" href="css/nova-theme.css">
+    <link rel="stylesheet" href="css/nova-layout.css">
+    <link rel="stylesheet" href="css/nova-window.css">
 
     <!-- Favicon -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍎</text></svg>">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='40' fill='%236366F1'/></svg>">
 </head>
 <body>
+    <!-- Nova Background -->
+    <div id="nova-background">
+        <!-- Fluid meshes/blobs injected via CSS -->
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+        <div class="noise-overlay"></div>
+    </div>
+
     <!-- Boot Screen -->
     <div id="boot-screen" class="boot-screen">
-        <div class="boot-content">
-            <div class="boot-logo">
-                <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 80px; height: 80px;">
-                    <path d="M42 10C42 10 40 8 38 8C36 8 34 10 32 10C30 10 28 8 26 8C24 8 22 10 22 10C22 10 18 12 18 18C18 24 22 32 24 36C26 40 28 42 30 42C32 42 32 40 34 40C36 40 36 42 38 42C40 42 42 40 44 36C46 32 50 24 50 18C50 12 46 10 42 10Z"
-                        fill="white"/>
-                    <path d="M36 8C36 8 36 4 32 4C28 4 28 8 28 8"
-                        stroke="white" stroke-width="2" fill="none" stroke-linecap="round"/>
-                </svg>
-            </div>
-            <div class="boot-progress-container">
-                <div id="boot-progress" class="boot-progress"></div>
-            </div>
-            <div id="boot-text" class="boot-text">Initializing...</div>
+        <div class="boot-logo">
+            <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 80px; height: 80px;">
+                <circle cx="50" cy="50" r="40" stroke="url(#gradient)" stroke-width="8"/>
+                <circle cx="50" cy="50" r="20" fill="white"/>
+                <defs>
+                    <linearGradient id="gradient" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+                        <stop stop-color="#4F46E5" />
+                        <stop offset="1" stop-color="#EC4899" />
+                    </linearGradient>
+                </defs>
+            </svg>
+        </div>
+        <div class="boot-progress-bar">
+            <div id="boot-progress" class="boot-progress-fill"></div>
         </div>
     </div>
 
-    <!-- Desktop -->
+    <!-- Main Desktop -->
     <div id="desktop" class="desktop" style="display: none;">
-        <!-- Menu Bar -->
-        <div id="menubar" class="menubar">
-            <div class="menubar-left">
-                <button class="menubar-item apple-menu" aria-label="Apple menu">
-                    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 16px; height: 16px;">
-                        <path d="M42 10C42 10 40 8 38 8C36 8 34 10 32 10C30 10 28 8 26 8C24 8 22 10 22 10C22 10 18 12 18 18C18 24 22 32 24 36C26 40 28 42 30 42C32 42 32 40 34 40C36 40 36 42 38 42C40 42 42 40 44 36C46 32 50 24 50 18C50 12 46 10 42 10Z"
-                            fill="currentColor"/>
-                        <path d="M36 8C36 8 36 4 32 4C28 4 28 8 28 8"
-                            stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
-                    </svg>
-                </button>
-                <span id="menubar-app-name" class="menubar-app-name">Finder</span>
-            </div>
-            <div class="menubar-right">
-                <button id="spotlight-trigger" class="menubar-item" aria-label="Spotlight Search" title="⌘Space">
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 14px; height: 14px;">
-                        <circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="2" fill="none"/>
-                        <path d="M15 15L21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    </svg>
-                </button>
-                <button id="notifications-trigger" class="menubar-item" aria-label="Notifications">
-                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="width: 14px; height: 14px;">
-                        <path d="M18 8C18 6.4087 17.3679 4.88258 16.2426 3.75736C15.1174 2.63214 13.5913 2 12 2C10.4087 2 8.88258 2.63214 7.75736 3.75736C6.63214 4.88258 6 6.4087 6 8C6 15 3 17 3 17H21C21 17 18 15 18 8Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-                        <path d="M13.73 21C13.5542 21.3031 13.3019 21.5547 12.9982 21.7295C12.6946 21.9044 12.3504 21.9965 12 21.9965C11.6496 21.9965 11.3054 21.9044 11.0018 21.7295C10.6982 21.5547 10.4458 21.3031 10.27 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                </button>
-                <span id="menubar-clock" class="menubar-clock">12:00</span>
-            </div>
-        </div>
-
-        <!-- Desktop Content Area -->
-        <div id="desktop-content" class="desktop-content">
-            <!-- Windows will be inserted here -->
-        </div>
-
-        <!-- Dock -->
-        <div id="dock-container" class="dock-container">
-            <div id="dock" class="dock">
-                <!-- Dock icons will be inserted here -->
-            </div>
-        </div>
-
-        <!-- Spotlight Search Overlay -->
-        <div id="spotlight-overlay" class="spotlight-overlay" style="display: none;">
-            <div class="spotlight-modal">
-                <input
-                    type="text"
-                    id="spotlight-input"
-                    class="spotlight-input"
-                    placeholder="Spotlight Search"
-                    autocomplete="off"
-                    spellcheck="false"
-                />
-                <div id="spotlight-results" class="spotlight-results">
-                    <!-- Search results will appear here -->
+        
+        <!-- Top System Island -->
+        <div id="nova-island-container">
+            <div id="nova-island" class="nova-island">
+                <div class="island-left">
+                    <span id="island-app-name" class="island-app-name">Nova</span>
+                </div>
+                <div class="island-center">
+                    <span id="island-clock" class="island-clock">---</span>
+                </div>
+                <div class="island-right">
+                    <button class="island-btn" id="btn-search" aria-label="Search">
+                        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    </button>
+                    <button class="island-btn" id="btn-notify" aria-label="Notifications">
+                         <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- Notifications Container -->
-        <div id="notifications-container" class="notifications-container">
-            <!-- Toast notifications will appear here -->
+        <!-- Desktop Content Area for Windows -->
+        <div id="desktop-content" class="window-layer">
+            <!-- Dynamic windows injected here -->
         </div>
 
-        <!-- Context Menu -->
-        <div id="context-menu" class="context-menu" style="display: none;">
-            <!-- Context menu items will be inserted here -->
+        <!-- Spotlight Search Overlay -->
+        <div id="spotlight-overlay" class="spotlight-overlay" style="display:none;">
+            <div class="spotlight-modal">
+                <input type="text" id="spotlight-input" class="spotlight-input" placeholder="Search Nova..." autocomplete="off" spellcheck="false" />
+                <div id="spotlight-results" class="spotlight-results"></div>
+            </div>
         </div>
+
+        <!-- Bottom Command Shelf -->
+        <div id="nova-shelf-container">
+            <div id="nova-shelf" class="nova-shelf">
+                <!-- Shelf items (apps) injected here -->
+            </div>
+        </div>
+
+        <!-- Notifications -->
+        <div id="notifications-container" class="notifications-container"></div>
+        
+        <!-- Context Menu -->
+        <div id="context-menu" class="context-menu" style="display: none;"></div>
     </div>
 
     <!-- Utilities -->
     <script src="js/utils/icons.js"></script>
 
-    <!-- Core JavaScript -->
+    <!-- Core OS Logic -->
     <script src="js/core/bus.js"></script>
     <script src="js/core/fs.js"></script>
     <script src="js/core/window-manager.js"></script>
     <script src="js/core/app-registry.js"></script>
-    <script src="js/core/menubar.js"></script>
-    <script src="js/core/dock.js"></script>
+    <script src="js/core/shelf.js"></script>
+    <script src="js/core/island.js"></script>
     <script src="js/core/spotlight.js"></script>
-    <script src="js/core/notifications.js"></script>
-    <script src="js/core/context-menu.js"></script>
     <script src="js/core/shell.js"></script>
     <script src="js/core/boot.js"></script>
 
-    <!-- Applications -->
+    <!-- Apps -->
     <script src="js/apps/finder.js"></script>
+    <script src="js/apps/settings.js"></script>
+    <script src="js/apps/calculator.js"></script>
+    <script src="js/apps/game2048.js"></script>
     <script src="js/apps/textedit.js"></script>
     <script src="js/apps/codeedit.js"></script>
     <script src="js/apps/notes.js"></script>
-    <script src="js/apps/settings.js"></script>
-    <script src="js/apps/preview.js"></script>
-    <script src="js/apps/safari.js"></script>
-    <script src="js/apps/doom.js"></script>
 
-    <!-- Main initialization -->
+    <!-- Main Initialization -->
     <script src="js/main.js"></script>
 </body>
 </html>

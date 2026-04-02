@@ -1,94 +1,38 @@
-/* ============================================
-   Event Bus System
-   Pub/sub pattern for decoupled communication
-   ============================================ */
-
-const Bus = (() => {
-  const topics = new Map();
-
-  /**
-   * Subscribe to a topic
-   * @param {string} topic - Event topic name
-   * @param {Function} handler - Callback function
-   * @returns {Function} Unsubscribe function
-   */
-  function on(topic, handler) {
-    if (!topics.has(topic)) {
-      topics.set(topic, new Set());
+// Event Bus for decoupled communication in Nova OS
+class EventBus {
+    constructor() {
+        this.listeners = new Map();
     }
 
-    topics.get(topic).add(handler);
-
-    // Return unsubscribe function
-    return () => {
-      const handlers = topics.get(topic);
-      if (handlers) {
-        handlers.delete(handler);
-        if (handlers.size === 0) {
-          topics.delete(topic);
+    on(event, callback) {
+        if (!this.listeners.has(event)) {
+            this.listeners.set(event, new Set());
         }
-      }
-    };
-  }
+        this.listeners.get(event).add(callback);
 
-  /**
-   * Subscribe to a topic once (auto-unsubscribe after first call)
-   * @param {string} topic - Event topic name
-   * @param {Function} handler - Callback function
-   * @returns {Function} Unsubscribe function
-   */
-  function once(topic, handler) {
-    const unsubscribe = on(topic, (payload) => {
-      handler(payload);
-      unsubscribe();
-    });
-    return unsubscribe;
-  }
-
-  /**
-   * Emit an event to all subscribers
-   * @param {string} topic - Event topic name
-   * @param {*} payload - Data to pass to handlers
-   */
-  function emit(topic, payload) {
-    const handlers = topics.get(topic);
-    if (!handlers) return;
-
-    handlers.forEach(handler => {
-      try {
-        handler(payload);
-      } catch (error) {
-        console.error(`Error in event handler for topic "${topic}":`, error);
-      }
-    });
-  }
-
-  /**
-   * Get number of subscribers for a topic
-   * @param {string} topic - Event topic name
-   * @returns {number} Number of subscribers
-   */
-  function count(topic) {
-    return topics.get(topic)?.size || 0;
-  }
-
-  /**
-   * Clear all handlers for a topic
-   * @param {string} topic - Event topic name
-   */
-  function clear(topic) {
-    if (topic) {
-      topics.delete(topic);
-    } else {
-      topics.clear();
+        // Return unsubscribe function
+        return () => {
+            const callbacks = this.listeners.get(event);
+            if (callbacks) {
+                callbacks.delete(callback);
+                if (callbacks.size === 0) {
+                    this.listeners.delete(event);
+                }
+            }
+        };
     }
-  }
 
-  return {
-    on,
-    once,
-    emit,
-    count,
-    clear
-  };
-})();
+    emit(event, data) {
+        if (this.listeners.has(event)) {
+            for (const callback of this.listeners.get(event)) {
+                try {
+                    callback(data);
+                } catch (e) {
+                    console.error(`Error in EventBus listener for event '${event}':`, e);
+                }
+            }
+        }
+    }
+}
+
+window.Bus = new EventBus();

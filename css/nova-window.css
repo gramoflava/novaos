@@ -1,0 +1,147 @@
+/* ==========================================================================
+   Nova OS Window System
+   ========================================================================== */
+
+.window-layer {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    pointer-events: none;
+    z-index: 100;
+}
+
+.nova-window {
+    position: absolute;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface-glass);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border: 1px outset rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    box-shadow: var(--shadow-ambient), var(--shadow-inset);
+    overflow: hidden;
+    will-change: transform, width, height, top, left;
+    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+    opacity: 0;
+    transform: scale(0.95);
+    animation: windowOpen 0.4s var(--curve-spring) forwards;
+}
+
+@keyframes windowOpen {
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.nova-window.is-closing {
+    animation: windowClose 0.2s ease-in forwards;
+}
+
+@keyframes windowClose {
+    to {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+}
+
+.nova-window.is-active {
+    box-shadow: var(--shadow-elevated), var(--shadow-inset);
+    border-color: var(--border-glass-strong);
+    z-index: 150 !important;
+}
+
+/* ==========================================================================
+   Window Titlebar
+   ========================================================================== */
+.window-titlebar {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    user-select: none;
+    border-bottom: 1px solid var(--border-glass);
+    cursor: grab;
+    flex-shrink: 0;
+}
+
+.window-titlebar:active {
+    cursor: grabbing;
+}
+
+.window-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.window-btn {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.15);
+    transition: background 0.2s ease, transform 0.2s var(--curve-spring);
+    color: transparent;
+}
+
+.window-btn svg {
+    width: 8px;
+    height: 8px;
+    stroke-width: 3;
+}
+
+.window-layer:hover .window-btn {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.window-btn:hover {
+    transform: scale(1.1);
+    color: #fff;
+}
+
+.window-btn.close:hover { background: #EF4444; }
+.window-btn.minimize:hover { background: #F59E0B; }
+.window-btn.maximize:hover { background: #10B981; }
+
+.window-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-primary);
+    flex-grow: 1;
+    text-align: center;
+    pointer-events: none;
+}
+
+.window-placeholder {
+    width: 60px; /* Balance for controls */
+}
+
+/* ==========================================================================
+   Window Content Area
+   ========================================================================== */
+.window-content {
+    flex-grow: 1;
+    position: relative;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.2); /* Slightly darker inner area */
+    border-bottom-left-radius: 16px;
+    border-bottom-right-radius: 16px;
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Resize Handles */
+.resize-handle {
+    position: absolute;
+    z-index: 10;
+}
+.resize-e { right: 0; top: 0; bottom: 0; width: 6px; cursor: e-resize; }
+.resize-s { bottom: 0; left: 0; right: 0; height: 6px; cursor: s-resize; }
+.resize-se { bottom: 0; right: 0; width: 10px; height: 10px; cursor: se-resize; }

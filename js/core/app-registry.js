@@ -1,109 +1,51 @@
-/* ============================================
-   App Registry
-   Central registry for all applications
-   ============================================ */
-
-const Apps = (() => {
-  const registry = new Map();
-
-  /**
-   * Register an application
-   */
-  function register({ id, name, icon, description = '', category = '', launch, keepInDock = false }) {
-    if (registry.has(id)) {
-      console.warn(`App with id "${id}" is already registered`);
-      return;
+// Application Registry
+class AppRegistry {
+    constructor() {
+        this.apps = new Map();
+        this.running = new Set(); // Map window ID to App ID maybe? Or just a set of running app IDs
+        // For simplicity, running holds the app IDs that have at least one window open
     }
 
-    registry.set(id, {
-      id,
-      name,
-      icon,
-      description,
-      category,
-      launch,
-      keepInDock,
-      windows: []
-    });
-
-    Bus.emit('app:registered', { id, name, icon });
-  }
-
-  /**
-   * Unregister an application
-   */
-  function unregister(id) {
-    if (!registry.has(id)) {
-      console.warn(`App with id "${id}" is not registered`);
-      return;
+    register(appConfig) {
+        this.apps.set(appConfig.id, appConfig);
+        Bus.emit('app:registered', appConfig);
     }
 
-    registry.delete(id);
-    Bus.emit('app:unregistered', { id });
-  }
-
-  /**
-   * Get application by ID
-   */
-  function get(id) {
-    return registry.get(id);
-  }
-
-  /**
-   * Get all registered applications
-   */
-  function list() {
-    return Array.from(registry.values());
-  }
-
-  /**
-   * Get apps by category
-   */
-  function listByCategory(category) {
-    return list().filter(app => app.category === category);
-  }
-
-  /**
-   * Open/launch an application
-   */
-  function open(id, args = {}) {
-    const app = registry.get(id);
-    if (!app) {
-      console.error(`App with id "${id}" not found`);
-      return;
+    getAll() {
+        return Array.from(this.apps.values());
     }
 
-    try {
-      // Call the app's launch function
-      app.launch(args);
-
-      // Emit event
-      Bus.emit('app:opened', { id, args });
-    } catch (error) {
-      console.error(`Failed to launch app "${id}":`, error);
-      Bus.emit('app:error', { id, error: error.message });
+    get(appId) {
+        return this.apps.get(appId);
     }
-  }
 
-  /**
-   * Check if app is running (has open windows)
-   */
-  function isRunning(id) {
-    const app = registry.get(id);
-    if (!app) return false;
+    launch(appId, args = {}) {
+        const app = this.apps.get(appId);
+        if (!app) {
+            console.error(`App ${appId} not found!`);
+            return;
+        }
+        
+        this.running.add(appId);
+        Bus.emit('app:launching', appId);
+        
+        try {
+            app.launch(args);
+        } catch (e) {
+            console.error(`Error launching app ${appId}:`, e);
+        }
+    }
 
-    // Check if app has any windows open
-    const allWindows = WindowManager.getAll();
-    return allWindows.some(w => w.id.startsWith(id));
-  }
+    markClosed(appId) {
+        // If no more windows belongs to this app, remove from running
+        // Detailed window-to-app tracking happens in WindowManager
+        this.running.delete(appId);
+        Bus.emit('app:closed', appId);
+    }
 
-  return {
-    register,
-    unregister,
-    get,
-    list,
-    listByCategory,
-    open,
-    isRunning
-  };
-})();
+    isRunning(appId) {
+        return this.running.has(appId);
+    }
+}
+
+window.Apps = new AppRegistry();

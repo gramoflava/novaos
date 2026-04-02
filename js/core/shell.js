@@ -1,78 +1,35 @@
-/* ============================================
-   Shell
-   Desktop environment controller
-   ============================================ */
-
-const Shell = (() => {
-  /**
-   * Initialize the desktop shell
-   */
-  function init() {
-    setupWallpaper();
-    setupTheme();
-  }
-
-  /**
-   * Setup wallpaper
-   */
-  function setupWallpaper() {
-    const wallpaper = localStorage.getItem('webos.wallpaper');
-    if (wallpaper && wallpaper !== 'none') {
-      setWallpaper(wallpaper);
-    } else if (!wallpaper) {
-      // Set default wallpaper on first load
-      const defaultWallpaper = 'https://picsum.photos/1920/1080';
-      setWallpaper(defaultWallpaper);
+// Nova OS Shell (System context and settings)
+class Shell {
+    constructor() {
+        this.clockEl = document.getElementById('island-clock');
+        this.initClock();
+        
+        Bus.on('system:ready', () => {
+            this.welcome();
+        });
     }
-  }
 
-  /**
-   * Setup theme
-   */
-  function setupTheme() {
-    const theme = localStorage.getItem('webos.theme') || 'dark';
-    setTheme(theme);
-  }
-
-  /**
-   * Set wallpaper
-   */
-  function setWallpaper(url) {
-    const desktop = document.getElementById('desktop');
-    if (url && url !== 'none') {
-      desktop.style.backgroundImage = `url(${url})`;
-      desktop.setAttribute('data-wallpaper', 'true');
-    } else {
-      desktop.style.backgroundImage = '';
-      desktop.removeAttribute('data-wallpaper');
+    initClock() {
+        const update = () => {
+            const now = new Date();
+            let h = now.getHours();
+            let m = now.getMinutes();
+            const ampm = h >= 12 ? 'PM' : 'AM';
+            h = h % 12 || 12;
+            m = m < 10 ? '0' + m : m;
+            
+            if (this.clockEl) {
+                this.clockEl.textContent = `${h}:${m} ${ampm}`;
+            }
+        };
+        update();
+        setInterval(update, 10000); // Check every 10s
     }
-    localStorage.setItem('webos.wallpaper', url);
-  }
 
-  /**
-   * Set theme
-   */
-  function setTheme(theme) {
-    if (theme === 'light') {
-      document.documentElement.setAttribute('data-theme', 'light');
-    } else {
-      document.documentElement.removeAttribute('data-theme');
+    welcome() {
+        // Automatically open the Welcome text file
+        Apps.launch('textedit', { fileId: 'welcome' });
     }
-    localStorage.setItem('webos.theme', theme);
-    Bus.emit('theme:changed', { theme });
-  }
+}
 
-  /**
-   * Get current theme
-   */
-  function getTheme() {
-    return localStorage.getItem('webos.theme') || 'dark';
-  }
-
-  return {
-    init,
-    setWallpaper,
-    setTheme,
-    getTheme
-  };
-})();
+window.OSShell = new Shell();
