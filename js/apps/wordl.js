@@ -222,7 +222,7 @@ Apps.register({
             toast.style.left = '50%';
             toast.style.transform = 'translateX(-50%)';
             toast.style.background = 'var(--text-primary)';
-            toast.style.color = 'var(--bg-primary)';
+            toast.style.color = 'var(--surface-base)';
             toast.style.padding = '8px 16px';
             toast.style.borderRadius = '8px';
             toast.style.fontWeight = '600';
