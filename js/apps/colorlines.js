@@ -333,7 +333,7 @@ Apps.register({
             isGameOver = true;
             const isHighScore = Scores.isHighScore('colorlines', score);
             if (window.AudioMng) AudioMng.play(isHighScore ? 'win' : 'lose');
-            Scores.showScorePrompt('colorlines', score, isHighScore, initBoard, winId);
+            Scores.showScorePrompt('colorlines', score, isHighScore, null, winId);
         };
 
         const initBoard = async () => {

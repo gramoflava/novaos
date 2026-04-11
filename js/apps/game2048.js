@@ -125,11 +125,7 @@ Apps.register({
                  hasWon = true;
                  isGameOver = true;
                  if (window.AudioMng) AudioMng.play('win');
-                 Scores.showScorePrompt('game2048', score, true, () => {
-                     activeTiles.forEach(t => t.deleted = true); render();
-                     score = 0; isGameOver = false; hasWon = false;
-                     addRandom(); addRandom(); render();
-                 }, winId);
+                 Scores.showScorePrompt('game2048', score, true, null, winId);
                  return;
              }
              if(getEmpty().length > 0) return;
@@ -142,16 +138,12 @@ Apps.register({
                      if(r<3 && val === activeTiles.find(t=>!t.deleted && t.r===r+1 && t.c===c).val) return;
                  }
              }
-
+ 
              // Game over
              isGameOver = true;
              const isHighScore = Scores.isHighScore('game2048', score);
              if (window.AudioMng) AudioMng.play(isHighScore ? 'win' : 'lose');
-             Scores.showScorePrompt('game2048', score, isHighScore, () => {
-                 activeTiles.forEach(t => t.deleted = true); render();
-                 score = 0; isGameOver = false; hasWon = false;
-                 addRandom(); addRandom(); render();
-             }, winId);
+             Scores.showScorePrompt('game2048', score, isHighScore, null, winId);
         };
 
         const getLine = (i, dir) => {

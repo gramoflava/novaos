@@ -382,7 +382,7 @@ Apps.register({
             setTimeout(() => {
                 const isHighScore = Scores.isHighScore('wordl', score);
                 // Passing true for 'isWin' ensures the prompt shows "Board Cleared!" branding
-                Scores.showScorePrompt('wordl', score, true, initGame, winId);
+                Scores.showScorePrompt('wordl', score, true, null, winId);
             }, 1500);
         }
 

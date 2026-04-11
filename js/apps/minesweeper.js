@@ -233,10 +233,10 @@ Apps.register({
             
             if(win) {
                 if (window.AudioMng) AudioMng.play('win');
-                setTimeout(() => Scores.showScorePrompt(levelId, finalScore, true, initBoard, winId), 500);
+                setTimeout(() => Scores.showScorePrompt(levelId, finalScore, true, null, winId), 500);
             } else {
                 if (window.AudioMng) AudioMng.play('lose');
-                setTimeout(() => Scores.showScorePrompt(levelId, 0, false, initBoard, winId), 1000);
+                setTimeout(() => Scores.showScorePrompt(levelId, 0, false, null, winId), 1000);
             }
         };
 
