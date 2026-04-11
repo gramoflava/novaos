@@ -388,20 +388,8 @@ Apps.register({
             
             showMessage('GENIUS!');
             
-            if (window.NovaEffects) {
-                // Individual small bursts on win as well as the global one
-                NovaEffects.burst(window.innerWidth/2, window.innerHeight/2, { 
-                    colors: ['#22C55E', '#EAB308', '#fff'],
-                    count: 30,
-                    isScreenSpace: true
-                });
-            }
-
-            setTimeout(() => {
-                const isHighScore = Scores.isHighScore('wordl', score);
-                // Passing true for 'isWin' ensures the prompt shows "Board Cleared!" branding
-                Scores.showScorePrompt('wordl', score, true, null, winId);
-            }, 1500);
+            // Winning now immediately triggers the unified OS-level celebration prompt
+            Scores.showScorePrompt('wordl', score, true, null, winId);
         }
 
         function handleKeypress(key) {
