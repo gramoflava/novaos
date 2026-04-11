@@ -107,8 +107,15 @@ class WindowManagerClass {
                 rem.currentOpacity += (rem.targetOpacity - rem.currentOpacity) * 0.02;
                 
                 rem.el.style.opacity = Math.max(0, rem.currentOpacity);
-                const offsetFactor = -0.95 * rem.currentDepth;
-                rem.el.style.transform = `translate3d(${this.cameraX * offsetFactor}px, ${this.cameraY * offsetFactor}px, 0) scale(${1 - rem.currentDepth * 0.3})`;
+                
+                const M = 0.95 * rem.currentDepth;
+                const dx = (this.cameraX - rem.initCameraX);
+                const dy = (this.cameraY - rem.initCameraY);
+                
+                const offsetX = -M * dx / this.cameraZ;
+                const offsetY = -M * dy / this.cameraZ;
+
+                rem.el.style.transform = `translate3d(${offsetX}px, ${offsetY}px, 0) scale(${1 - rem.currentDepth * 0.3})`;
                 
                 if (rem.targetOpacity <= 0 && rem.currentOpacity <= 0.01) {
                     if (rem.el.parentNode) rem.el.remove();
@@ -195,8 +202,14 @@ class WindowManagerClass {
             this.backgroundLayer.style.transform = `translate3d(${this.cameraX * 0.05}px, ${this.cameraY * 0.05}px, 0)`;
         }
         this.activeRemnants.forEach(rem => {
-            const offsetFactor = -0.95 * rem.currentDepth;
-            rem.el.style.transform = `translate3d(${this.cameraX * offsetFactor}px, ${this.cameraY * offsetFactor}px, 0) scale(${1 - rem.currentDepth * 0.3})`;
+            const M = 0.95 * rem.currentDepth;
+            const dx = (this.cameraX - rem.initCameraX);
+            const dy = (this.cameraY - rem.initCameraY);
+            
+            const offsetX = -M * dx / this.cameraZ;
+            const offsetY = -M * dy / this.cameraZ;
+
+            rem.el.style.transform = `translate3d(${offsetX}px, ${offsetY}px, 0) scale(${1 - rem.currentDepth * 0.3})`;
         });
     }
 
@@ -497,8 +510,10 @@ class WindowManagerClass {
                 el: remContainer,
                 targetOpacity: 1.1, // 1.1 so it takes 1 initial closing to hit 1.0
                 currentOpacity: 1.1,
-                targetDepth: -0.1,
-                currentDepth: -0.1
+                targetDepth: 0,
+                currentDepth: 0,
+                initCameraX: this.cameraX,
+                initCameraY: this.cameraY
             });
             
             // Incrementally fade all active remnants by 10%
