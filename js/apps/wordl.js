@@ -333,6 +333,7 @@ Apps.register({
                 gameOver = true;
                 showMessage(target.toUpperCase());
                 if (window.AudioMng) AudioMng.play('lose');
+                setTimeout(() => Scores.showScorePrompt('wordl', 0, false, null, winId), 1500);
             } else {
                 updateBoard();
             }
@@ -375,7 +376,8 @@ Apps.register({
                 // Individual small bursts on win as well as the global one
                 NovaEffects.burst(window.innerWidth/2, window.innerHeight/2, { 
                     colors: ['#22C55E', '#EAB308', '#fff'],
-                    count: 30 
+                    count: 30,
+                    isScreenSpace: true
                 });
             }
 

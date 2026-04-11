@@ -219,7 +219,9 @@ Apps.register({
         
         const winObj = WindowManager.windows.get(winId);
         if(winObj) {
+            const originalCleanup = winObj.cleanup;
             winObj.cleanup = () => {
+                if (originalCleanup) originalCleanup();
                 document.removeEventListener('keydown', keyHandler);
             };
         }

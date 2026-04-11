@@ -128,7 +128,7 @@ Apps.register({
                     
                     <h2>Controls</h2>
                     <ul>
-                        <li>Use the **Arrow Keys** to slide all tiles simultaneously.</li>
+                        <li>Use the <b>Arrow Keys</b> to slide all tiles simultaneously.</li>
                         <li>Tiles merge into their sum when two identical numbers collide.</li>
                     </ul>
                     
@@ -139,7 +139,7 @@ Apps.register({
                     <p>The goal is to reach the 2048 tile, but the game continues as long as moves are possible. High scores are automatically synced to the Global Leaderboard.</p>
                 `
             },
-            'game-mines': {
+            'minesweeper': {
                 title: 'Minesweeper',
                 html: `
                     <h1>Minesweeper</h1>
@@ -170,7 +170,7 @@ Apps.register({
                     <div class="cx-nav-item" data-page="wordl">Wordl</div>
                     <div class="cx-nav-item" data-page="colorlines">Color Lines</div>
                     <div class="cx-nav-item" data-page="game2048">2048</div>
-                    <div class="cx-nav-item" data-page="game-mines">Minesweeper</div>
+                    <div class="cx-nav-item" data-page="minesweeper">Minesweeper</div>
                 </div>
                 <div class="cx-content" id="cx-content-${winId}">
                     ${pages['novaos'].html}

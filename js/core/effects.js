@@ -8,7 +8,18 @@ class NovaEffectsClass {
     }
 
     init() {
-        this.container = document.getElementById('desktop-content');
+        this.canvasContainer = document.getElementById('desktop-content');
+        // Fixed overlay for screen-space effects like celebrations
+        this.overlay = document.createElement('div');
+        this.overlay.style.position = 'fixed';
+        this.overlay.style.top = '0';
+        this.overlay.style.left = '0';
+        this.overlay.style.width = '100vw';
+        this.overlay.style.height = '100vh';
+        this.overlay.style.pointerEvents = 'none';
+        this.overlay.style.zIndex = '7000';
+        this.overlay.style.overflow = 'hidden';
+        document.body.appendChild(this.overlay);
     }
 
     /**
@@ -18,8 +29,16 @@ class NovaEffectsClass {
      * @param {Object} options - Customization options.
      */
     burst(x, y, options = {}) {
-        if (!this.container) this.init();
-        if (!this.container) return;
+        if (!this.overlay) this.init();
+        if (!this.overlay) return;
+
+        // Convert world coordinates to screen coordinates
+        const wm = window.WindowManager;
+        let screenX = x, screenY = y;
+        if (wm && !options.isScreenSpace) {
+            screenX = wm.cameraX + x * wm.cameraZ;
+            screenY = wm.cameraY + y * wm.cameraZ;
+        }
 
         const count = options.count || Math.floor(Math.random() * 25) + 30;
         const colors = options.colors || ['var(--accent-primary)', 'var(--accent-secondary)', '#fff'];
@@ -29,11 +48,10 @@ class NovaEffectsClass {
         for (let i = 0; i < count; i++) {
             const wrapper = document.createElement('div');
             wrapper.style.position = 'absolute';
-            wrapper.style.left = x + 'px';
-            wrapper.style.top = y + 'px';
+            wrapper.style.left = screenX + 'px';
+            wrapper.style.top = screenY + 'px';
             wrapper.style.width = '0';
             wrapper.style.height = '0';
-            wrapper.style.zIndex = '5000', // Above windows
             wrapper.style.transformStyle = 'preserve-3d';
             wrapper.style.pointerEvents = 'none';
 
@@ -52,7 +70,7 @@ class NovaEffectsClass {
             const radius = Math.random() * spread + 100;
 
             wrapper.appendChild(part);
-            this.container.appendChild(wrapper);
+            this.overlay.appendChild(wrapper);
 
             part.animate([
                 { transform: 'translate(0px, 0px) scale(0)', opacity: 1 },
@@ -106,12 +124,11 @@ class NovaEffectsClass {
      * @param {number} intensity - 0 to 1 intensity factor.
      */
     shake(intensity = 0.5) {
-
-        if (!this.container) this.init();
+        if (!this.canvasContainer) this.init();
         const duration = 500;
         const magnitude = intensity * 20;
 
-        this.container.animate([
+        this.canvasContainer.animate([
             { transform: `translate(${Math.random() * magnitude}px, ${Math.random() * magnitude}px)` },
             { transform: `translate(${Math.random() * -magnitude}px, ${Math.random() * magnitude}px)` },
             { transform: `translate(${Math.random() * magnitude}px, ${Math.random() * -magnitude}px)` },

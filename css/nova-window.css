@@ -131,7 +131,8 @@
 .window-content {
     flex-grow: 1;
     position: relative;
-    overflow: hidden;
+    overflow: hidden auto; /* hidden horizontally, auto vertically */
+    min-height: 0; /* Critical: allows flex children to scroll */
     background: rgba(0, 0, 0, 0.2); /* Slightly darker inner area */
     border-bottom-left-radius: 16px;
     border-bottom-right-radius: 16px;

@@ -77,6 +77,7 @@ Apps.register({
         let selectedIdx = -1;
         let isGameOver = false;
         let isAnimating = false;
+        let nextBalls = [];
         let isPreviewVisible = localStorage.getItem('novaos_colorlines_preview') !== 'false';
 
         const svgEyeOpen = `<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;

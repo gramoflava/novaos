@@ -29,7 +29,12 @@ class WindowManagerClass {
         this.indicatorsContainer.style.pointerEvents = 'none';
         this.indicatorsContainer.style.zIndex = '8000';
         document.getElementById('desktop').appendChild(this.indicatorsContainer);
-
+        
+        // Black Hole Preview Tooltip
+        this.bhPreview = document.createElement('div');
+        this.bhPreview.className = 'bh-preview';
+        document.body.appendChild(this.bhPreview);
+        
         // Space Background parallax
         this.backgroundLayer = document.getElementById('nova-background');
         
@@ -677,6 +682,21 @@ class WindowManagerClass {
         bh.style.pointerEvents = 'auto';
         bh.style.cursor = 'pointer';
         bh.onclick = () => this.restore(id);
+        
+        // Hover Previews
+        bh.onmouseenter = () => {
+            const iconHtml = window.Icons ? Icons.get(win.appId) : '';
+            this.bhPreview.innerHTML = iconHtml;
+            this.bhPreview.classList.add('visible');
+        };
+        bh.onmousemove = (e) => {
+            this.bhPreview.style.left = (e.clientX + 15) + 'px';
+            this.bhPreview.style.top = (e.clientY + 15) + 'px';
+        };
+        bh.onmouseleave = () => {
+            this.bhPreview.classList.remove('visible');
+        };
+
         this.container.appendChild(bh);
         this.activeBlackHoles.set(id, bh);
         
@@ -686,6 +706,9 @@ class WindowManagerClass {
     restore(id) {
         const win = this.windows.get(id);
         if (!win) return;
+        
+        // Dismiss hover preview immediately
+        if (this.bhPreview) this.bhPreview.classList.remove('visible');
         
         win.el.style.animation = 'none';
         win.el.style.transition = 'all 0.5s var(--curve-spring)';

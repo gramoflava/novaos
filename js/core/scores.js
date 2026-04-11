@@ -98,8 +98,10 @@ class ScoreManager {
         const wrapper = document.createElement('div');
         wrapper.innerHTML = html;
         const overlayNode = wrapper.firstElementChild;
+        const styleNode = wrapper.lastElementChild;
+        styleNode.id = `style-${winId}`;
         container.appendChild(overlayNode);
-        container.appendChild(wrapper.lastElementChild); // style tag
+        container.appendChild(styleNode);
 
         // Global Celebration
         if (isWin) {
@@ -151,6 +153,8 @@ class ScoreManager {
             this.addScore(gameId, initials, score);
             const overlay = document.getElementById(`${winId}-overlay`);
             if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+            const styleTag = document.getElementById(`style-${winId}`);
+            if (styleTag && styleTag.parentNode) styleTag.parentNode.removeChild(styleTag);
             if (onComplete) onComplete();
         };
     }

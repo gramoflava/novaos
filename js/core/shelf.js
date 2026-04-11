@@ -55,8 +55,10 @@ class Shelf {
                             // Center camera on the window (whether just restored or already active)
                             const left = parseFloat(lastWin.el.dataset.x);
                             const top = parseFloat(lastWin.el.dataset.y);
-                            const cx = left + lastWin.el.offsetWidth / 2;
-                            const cy = top + lastWin.el.offsetHeight / 2;
+                            const w = parseFloat(lastWin.el.dataset.w);
+                            const h = parseFloat(lastWin.el.dataset.h);
+                            const cx = left + w / 2;
+                            const cy = top + h / 2;
                             const targetX = window.innerWidth / 2 - cx * WindowManager.cameraZ;
                             const targetY = window.innerHeight / 2 - cy * WindowManager.cameraZ;
                             WindowManager.animateCameraTo(targetX, targetY);

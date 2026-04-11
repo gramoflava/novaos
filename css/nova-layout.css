@@ -307,3 +307,33 @@
     background: var(--border-glass);
     margin: 4px 0;
 }
+
+.bh-preview {
+    position: fixed;
+    pointer-events: none;
+    z-index: 9999;
+    width: 44px;
+    height: 44px;
+    background: var(--surface-glass);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-glass-strong);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-elevated), 0 0 20px rgba(0,0,0,0.3);
+    opacity: 0;
+    transition: opacity 0.25s, transform 0.25s var(--curve-spring);
+    transform: scale(0.5);
+    color: var(--text-primary);
+}
+
+.bh-preview.visible {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.bh-preview svg {
+    width: 26px;
+    height: 26px;
+}

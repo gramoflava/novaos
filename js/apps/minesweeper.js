@@ -236,7 +236,6 @@ Apps.register({
                 setTimeout(() => Scores.showScorePrompt(levelId, finalScore, true, null, winId), 500);
             } else {
                 if (window.AudioMng) AudioMng.play('lose');
-                setTimeout(() => Scores.showScorePrompt(levelId, 0, false, null, winId), 1000);
             }
         };
 
@@ -261,7 +260,11 @@ Apps.register({
         
         const winObj = WindowManager.windows.get(winId);
         if(winObj) {
-            winObj.cleanup = () => { if(timer) clearInterval(timer); };
+            const originalCleanup = winObj.cleanup;
+            winObj.cleanup = () => {
+                if (originalCleanup) originalCleanup();
+                if(timer) clearInterval(timer);
+            };
         }
 
         initBoard();
