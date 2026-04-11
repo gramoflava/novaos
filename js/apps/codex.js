@@ -8,7 +8,7 @@ Apps.register({
         const winId = 'cx-' + Math.random().toString(36).substr(2, 9);
         
         const style = `
-            .cx-wrap { display: flex; height: 100%; color: var(--text-primary); font-family: var(--font-sans); min-height: 0; }
+            .cx-wrap { display: flex; flex: 1; color: var(--text-primary); font-family: var(--font-sans); min-height: 0; }
             .cx-sidebar { width: 220px; flex-shrink: 0; background: rgba(0,0,0,0.15); border-right: 1px solid var(--border-glass); display: flex; flex-direction: column; overflow-y: auto; padding: 16px 0; min-height: 0; }
             .cx-nav-item { 
                 padding: 10px 24px; 
