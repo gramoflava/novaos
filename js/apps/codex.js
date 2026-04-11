@@ -9,7 +9,7 @@ Apps.register({
         
         const style = `
             .cx-wrap { display: flex; height: 100%; color: var(--text-primary); font-family: var(--font-sans); }
-            .cx-sidebar { width: 220px; background: rgba(0,0,0,0.15); border-right: 1px solid var(--border-glass); display: flex; flex-direction: column; overflow-y: auto; padding: 16px 0; }
+            .cx-sidebar { width: 220px; flex-shrink: 0; background: rgba(0,0,0,0.15); border-right: 1px solid var(--border-glass); display: flex; flex-direction: column; overflow-y: auto; padding: 16px 0; }
             .cx-nav-item { padding: 10px 24px; cursor: pointer; transition: all 0.2s; font-weight: 500; font-size: 14px; opacity: 0.7; }
             .cx-nav-item:hover { opacity: 1; background: rgba(128,128,128,0.1); }
             .cx-nav-item.active { opacity: 1; background: rgba(128,128,128,0.15); border-left: 3px solid var(--accent-primary); }
