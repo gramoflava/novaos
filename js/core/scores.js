@@ -124,7 +124,8 @@ class ScoreManager {
                 const gameColors = {
                     'minesweeper': ['#EF4444', '#3B82F6', '#fff'],
                     'game2048': ['#8B5CF6', '#EC4899', '#fff'],
-                    'colorlines': ['#10B981', '#F59E0B', '#fff']
+                    'colorlines': ['#10B981', '#F59E0B', '#fff'],
+                    'wordl': ['#22C55E', '#EAB308', '#fff']
                 };
                 const colors = gameColors[gameId.split('-')[0]] || ['var(--accent-primary)', '#fff'];
                 

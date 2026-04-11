@@ -22,6 +22,7 @@ Apps.register({
                     <div class="scores-menu-item active" data-game="minesweeper-easy">Mines</div>
                     <div class="scores-menu-item" data-game="game2048">2048</div>
                     <div class="scores-menu-item" data-game="colorlines">Lines</div>
+                    <div class="scores-menu-item" data-game="wordl">Wordl</div>
                 </div>
                 <div class="scores-content" id="scores-content-${winId}">
                     <!-- Scores injected here -->
@@ -44,7 +45,8 @@ Apps.register({
         const games = {
             'minesweeper': 'Minesweeper',
             'game2048': '2048',
-            'colorlines': 'Color Lines'
+            'colorlines': 'Color Lines',
+            'wordl': 'Wordl'
         };
 
         const renderScores = (gameId) => {

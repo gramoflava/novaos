@@ -122,9 +122,10 @@ Apps.register({
         let isAnimating = false;
         let startTime = Date.now();
         
-        // Dictionary
+        // Global Dictionary Storage
         if (!window.WordlDict) {
             window.WordlDict = { 4:[], 5:[], 6:[], 7:[], loaded: false };
+            window.WordlValidSet = new Set();
         }
 
         const uiBoard = document.getElementById(`wl-board-${winId}`);
@@ -139,12 +140,31 @@ Apps.register({
             }
             try {
                 loadingOverlay.style.display = 'flex';
-                const res = await fetch('https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-no-swears.txt');
-                const text = await res.text();
-                const allWords = text.split('\n').map(w => w.trim().toLowerCase()).filter(w => w.length >= 4 && w.length <= 7);
-                allWords.forEach(w => {
+                loadingOverlay.innerHTML = '<div style="display:flex; flex-direction:column; align-items:center; gap:12px;"><span>Evolving Lexicon...</span> <div style="width:100px; height:2px; background:rgba(255,255,255,0.2); overflow:hidden; position:relative;"><div id="wl-prog" style="position:absolute; top:0; left:0; height:100%; width:0; background:var(--accent-primary); transition:width 0.3s;"></div></div></div>';
+                const prog = document.getElementById('wl-prog');
+
+                // 1. Fetch Common Word List (20k) for Targets
+                const res20k = await fetch('https://raw.githubusercontent.com/first20hours/google-10000-english/master/20k.txt');
+                const text20k = await res20k.text();
+                if (prog) prog.style.width = '30%';
+
+                const commonWords = text20k.split('\n').map(w => w.trim().toLowerCase()).filter(w => w.length >= 4 && w.length <= 7);
+                commonWords.forEach(w => {
                     window.WordlDict[w.length].push(w);
+                    window.WordlValidSet.add(w);
                 });
+                if (prog) prog.style.width = '60%';
+
+                // 2. Fetch Massive Word List (370k) for Validation
+                const resHuge = await fetch('https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt');
+                const textHuge = await resHuge.text();
+                if (prog) prog.style.width = '90%';
+
+                textHuge.split('\r\n').forEach(w => {
+                    const word = w.trim().toLowerCase();
+                    if (word.length >= 4 && word.length <= 7) window.WordlValidSet.add(word);
+                });
+
                 window.WordlDict.loaded = true;
                 loadingOverlay.style.display = 'none';
                 initGame();
@@ -248,7 +268,7 @@ Apps.register({
                 showMessage('Not enough letters');
                 return;
             }
-            if (!window.WordlDict[wordLength].includes(currentGuess.toLowerCase())) {
+            if (!window.WordlValidSet.has(currentGuess.toLowerCase())) {
                 const rowObj = uiBoard.children[guesses.length];
                 rowObj.classList.remove('shaking');
                 void rowObj.offsetWidth;
@@ -349,10 +369,20 @@ Apps.register({
             const timeBonus = Math.max(0, Math.floor(1000 - timeElapsed * 10));
             const score = stepPoints + timeBonus;
             
-            showMessage('Genius!');
+            showMessage('GENIUS!');
+            
+            if (window.NovaEffects) {
+                // Individual small bursts on win as well as the global one
+                NovaEffects.burst(window.innerWidth/2, window.innerHeight/2, { 
+                    colors: ['#22C55E', '#EAB308', '#fff'],
+                    count: 30 
+                });
+            }
+
             setTimeout(() => {
                 const isHighScore = Scores.isHighScore('wordl', score);
-                Scores.showScorePrompt('wordl', score, isHighScore, initGame, winId);
+                // Passing true for 'isWin' ensures the prompt shows "Board Cleared!" branding
+                Scores.showScorePrompt('wordl', score, true, initGame, winId);
             }, 1500);
         }
 
