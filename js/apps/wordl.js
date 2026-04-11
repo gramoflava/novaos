@@ -141,7 +141,7 @@ Apps.register({
                 loadingOverlay.style.display = 'flex';
                 const res = await fetch('https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english-no-swears.txt');
                 const text = await res.text();
-                const allWords = text.split('\\n').map(w => w.trim().toLowerCase()).filter(w => w.length >= 4 && w.length <= 7);
+                const allWords = text.split('\n').map(w => w.trim().toLowerCase()).filter(w => w.length >= 4 && w.length <= 7);
                 allWords.forEach(w => {
                     window.WordlDict[w.length].push(w);
                 });
@@ -166,12 +166,12 @@ Apps.register({
             maxGuesses = wordLength + 1; // 5 -> 6 guesses, 6 -> 7 guesses
             
             // Render Board structure
-            uiBoard.style.gridTemplateRows = \`repeat(\${maxGuesses}, 1fr)\`;
+            uiBoard.style.gridTemplateRows = `repeat(${maxGuesses}, 1fr)`;
             uiBoard.innerHTML = '';
             for(let r=0; r<maxGuesses; r++) {
                 const row = document.createElement('div');
                 row.className = 'wl-row';
-                row.style.gridTemplateColumns = \`repeat(\${wordLength}, 1fr)\`;
+                row.style.gridTemplateColumns = `repeat(${wordLength}, 1fr)`;
                 for(let c=0; c<wordLength; c++) {
                     const cell = document.createElement('div');
                     cell.className = 'wl-cell';
@@ -223,7 +223,7 @@ Apps.register({
             toast.style.opacity = '1';
             toast.style.transition = 'opacity 0.5s ease';
             toast.textContent = msg;
-            document.getElementById(\`wl-wrap-\${winId}\`).appendChild(toast);
+            document.getElementById(`wl-wrap-${winId}`).appendChild(toast);
             
             setTimeout(() => {
                 toast.style.opacity = '0';
@@ -366,10 +366,10 @@ Apps.register({
         }
 
         // Setup DOM events
-        document.getElementById(\`wl-len-\${winId}\`).addEventListener('change', () => {
+        document.getElementById(`wl-len-${winId}`).addEventListener('change', () => {
             initGame();
         });
-        document.getElementById(\`wl-restart-\${winId}\`).addEventListener('click', () => {
+        document.getElementById(`wl-restart-${winId}`).addEventListener('click', () => {
             initGame();
         });
         uiKeyboard.addEventListener('click', (e) => {
