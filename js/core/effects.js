@@ -5,6 +5,8 @@
 class NovaEffectsClass {
     constructor() {
         this.container = null;
+        this.celebrationInterval = null;
+        this.celebrationTimeout = null;
     }
 
     init() {
@@ -135,6 +137,43 @@ class NovaEffectsClass {
             { transform: `translate(${Math.random() * -magnitude}px, ${Math.random() * -magnitude}px)` },
             { transform: `translate(0, 0)` }
         ], { duration: duration, easing: 'ease-in-out' });
+    }
+
+    /**
+     * Starts a periodic celebration burst at the given position.
+     * Automatically stops after 30 seconds for safety.
+     */
+    startCelebration(x, y, options = {}) {
+        this.stopCelebration(); // Clear any existing
+        
+        // Immediate burst
+        this.burst(x, y, options);
+
+        // Loop for persistent feel
+        this.celebrationInterval = setInterval(() => {
+            // Lower particle count for loop to be lighter on performance
+            const loopOptions = { ...options, count: 12, flash: false, shake: false };
+            this.burst(x, y, loopOptions);
+        }, 1200);
+
+        // Safety timeout (30s)
+        this.celebrationTimeout = setTimeout(() => {
+            this.stopCelebration();
+        }, 30000);
+    }
+
+    /**
+     * Stops the periodic celebration.
+     */
+    stopCelebration() {
+        if (this.celebrationInterval) {
+            clearInterval(this.celebrationInterval);
+            this.celebrationInterval = null;
+        }
+        if (this.celebrationTimeout) {
+            clearTimeout(this.celebrationTimeout);
+            this.celebrationTimeout = null;
+        }
     }
 }
 
