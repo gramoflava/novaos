@@ -70,36 +70,59 @@ class AudioManager {
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(600, now);
                 osc.frequency.exponentialRampToValueAtTime(300, now + 0.1);
-                gain.gain.setValueAtTime(0.3, now);
-                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.3, now + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                gain.gain.linearRampToValueAtTime(0, now + 0.15);
                 osc.start(now);
-                osc.stop(now + 0.1);
+                osc.stop(now + 0.15);
             } else if (type === 'win') {
                 osc.type = 'square';
                 osc.frequency.setValueAtTime(440, now);
                 osc.frequency.setValueAtTime(554, now + 0.1);
                 osc.frequency.setValueAtTime(659, now + 0.2);
                 osc.frequency.setValueAtTime(880, now + 0.3);
-                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.2, now + 0.01);
                 gain.gain.linearRampToValueAtTime(0, now + 0.6);
                 osc.start(now);
-                osc.stop(now + 0.6);
+                osc.stop(now + 0.65);
             } else if (type === 'lose') {
                 osc.type = 'sawtooth';
                 osc.frequency.setValueAtTime(300, now);
                 osc.frequency.exponentialRampToValueAtTime(100, now + 0.8);
-                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.3, now + 0.02);
                 gain.gain.linearRampToValueAtTime(0, now + 0.8);
                 osc.start(now);
-                osc.stop(now + 0.8);
+                osc.stop(now + 0.85);
             } else if (type === 'explode') {
                 osc.type = 'sawtooth';
                 osc.frequency.setValueAtTime(100, now);
                 osc.frequency.exponentialRampToValueAtTime(40, now + 0.2);
-                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.1, now + 0.01);
                 gain.gain.linearRampToValueAtTime(0, now + 0.2);
                 osc.start(now);
-                osc.stop(now + 0.2);
+                osc.stop(now + 0.25);
+            } else if (type === 'flag_on') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800, now);
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.2, now + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+                gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'flag_off') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, now);
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.15, now + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+                gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
             }
         } catch(e) { 
             console.warn('Audio play failed', e); 

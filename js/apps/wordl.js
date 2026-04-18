@@ -9,12 +9,6 @@ Apps.register({
         
         const style = `
             .wl-wrap { display: flex; flex-direction: column; height: 100%; color: var(--text-primary); font-family: var(--font-sans); }
-            .wl-header { display: flex; justify-content: space-between; align-items: center; padding: 16px; border-bottom: 1px solid var(--border-glass); }
-            .wl-title { font-size: 20px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
-            .wl-controls { display: flex; gap: 8px; align-items: center; }
-            .wl-btn { background: rgba(128,128,128,0.1); border: 1px solid var(--border-glass); color: var(--text-primary); padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; transition: background 0.2s; }
-            .wl-btn:hover { background: rgba(128,128,128,0.2); }
-            .wl-score-wrap { background: rgba(128,128,128,0.1); padding: 4px 12px; border-radius: 6px; text-align: right; }
             
             .wl-board-wrap { flex-grow: 1; display: flex; justify-content: center; align-items: center; overflow: hidden; padding: 16px; }
             .wl-board { display: grid; gap: 6px; }
@@ -44,17 +38,26 @@ Apps.register({
 
         const html = `
             <div class="wl-wrap" id="wl-wrap-${winId}">
-                <div class="wl-header">
-                    <div class="wl-title">Wordl</div>
-                    <div class="wl-controls">
-                        <select id="wl-len-${winId}" class="wl-btn">
-                            <option value="4">4 Letters</option>
-                            <option value="5" selected>5 Letters</option>
-                            <option value="6">6 Letters</option>
-                            <option value="7">7 Letters</option>
-                        </select>
-                        <button class="wl-btn" id="wl-reveal-${winId}" style="display:none; border-color: #EF4444; color: #EF4444;">Reveal</button>
-                        <button class="wl-btn" id="wl-restart-${winId}">Restart</button>
+                <div class="app-header" style="padding: 16px; border-bottom: 1px solid var(--border-glass); margin-bottom: 0;">
+                    <div class="app-title-group">
+                        <div class="app-title" style="letter-spacing: 2px; text-transform: uppercase;">Wordl</div>
+                        <div class="app-controls">
+                            <select id="wl-len-${winId}" class="app-btn">
+                                <option value="4">4 Letters</option>
+                                <option value="5" selected>5 Letters</option>
+                                <option value="6">6 Letters</option>
+                                <option value="7">7 Letters</option>
+                            </select>
+                            <button class="app-btn" id="wl-reveal-${winId}" style="display:none; border-color: #EF4444; color: #EF4444;">Reveal</button>
+                            <button class="app-btn" id="wl-restart-${winId}">Restart</button>
+                        </div>
+                    </div>
+                    
+                    <div class="app-stats">
+                        <div class="app-stat-box">
+                            <div class="app-stat-label">Time</div>
+                            <div class="app-stat-val" id="wl-time-${winId}">0</div>
+                        </div>
                     </div>
                 </div>
                 
@@ -122,6 +125,8 @@ Apps.register({
         let gameOver = false;
         let isAnimating = false;
         let startTime = Date.now();
+        let time = 0;
+        let timer = null;
         
         // Global Dictionary Storage
         if (!window.WordlDict) {
@@ -194,6 +199,15 @@ Apps.register({
             gameOver = false;
             isAnimating = false;
             startTime = Date.now();
+            time = 0;
+            document.getElementById(`wl-time-${winId}`).textContent = time;
+            if (timer) clearInterval(timer);
+            timer = setInterval(() => {
+                if (!gameOver) {
+                    time++;
+                    document.getElementById(`wl-time-${winId}`).textContent = time;
+                }
+            }, 1000);
             maxGuesses = wordLength + 1; // 5 -> 6 guesses, 6 -> 7 guesses
             
             const revealBtn = document.getElementById(`wl-reveal-${winId}`);
@@ -342,14 +356,16 @@ Apps.register({
             
             if (guess === target) {
                 gameOver = true;
+                if (timer) clearInterval(timer);
                 handleWin();
             } else if (guesses.length >= maxGuesses) {
                 gameOver = true;
+                if (timer) clearInterval(timer);
                 showMessage('GAME OVER');
                 const revealBtn = document.getElementById(`wl-reveal-${winId}`);
                 if (revealBtn) revealBtn.style.display = 'inline-block';
                 if (window.AudioMng) AudioMng.play('lose');
-                setTimeout(() => Scores.showScorePrompt('wordl', 0, false, null, winId), 3000);
+                setTimeout(() => Scores.showScorePrompt(`wordl-${wordLength}`, 0, false, null, winId), 3000);
             } else {
                 updateBoard();
             }
@@ -389,7 +405,7 @@ Apps.register({
             showMessage('GENIUS!');
             
             // Winning now immediately triggers the unified OS-level celebration prompt
-            Scores.showScorePrompt('wordl', score, true, null, winId);
+            Scores.showScorePrompt(`wordl-${wordLength}`, score, true, null, winId);
         }
 
         function handleKeypress(key) {
@@ -440,6 +456,7 @@ Apps.register({
         const originalCleanup = winObj.cleanup;
         winObj.cleanup = () => {
             if (originalCleanup) originalCleanup();
+            if (timer) clearInterval(timer);
             document.removeEventListener('keydown', onGlobalKey);
         };
 

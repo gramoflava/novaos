@@ -170,21 +170,25 @@ class WindowManagerClass {
         document.body.addEventListener('wheel', (e) => {
             // Ignore and let native scroll take over if hovering any scrollable element
             if (!e.ctrlKey) {
-                let domNode = e.target;
-                let isScrollable = false;
-                while (domNode && domNode !== document.body && domNode !== document) {
-                    if (domNode.scrollHeight > domNode.clientHeight || domNode.scrollWidth > domNode.clientWidth) {
-                        const style = window.getComputedStyle(domNode);
-                        if (style.overflowY === 'auto' || style.overflowY === 'scroll' || 
-                            style.overflowX === 'auto' || style.overflowX === 'scroll' ||
-                            style.overflow === 'auto' || style.overflow === 'scroll') {
-                            isScrollable = true;
-                            break;
+                const hoveredWin = e.target.closest('.nova-window');
+                if (!hoveredWin || hoveredWin.classList.contains('is-active')) {
+                    let domNode = e.target;
+                    let isScrollable = false;
+                    while (domNode && domNode !== document.body && domNode !== document) {
+                        if (domNode.scrollHeight > domNode.clientHeight || domNode.scrollWidth > domNode.clientWidth) {
+                            const style = window.getComputedStyle(domNode);
+                            if (style.overflowY === 'auto' || style.overflowY === 'scroll' || 
+                                style.overflowX === 'auto' || style.overflowX === 'scroll' ||
+                                style.overflow === 'auto' || style.overflow === 'scroll') {
+                                isScrollable = true;
+                                break;
+                            }
                         }
+                        if (hoveredWin && domNode === hoveredWin) break;
+                        domNode = domNode.parentNode;
                     }
-                    domNode = domNode.parentNode;
+                    if (isScrollable) return;
                 }
-                if (isScrollable) return;
             }
 
             e.preventDefault();

@@ -32,13 +32,15 @@ Apps.register({
         
         const html = `
             <div class="game-container" id="game-container-${winId}">
-                <div style="display:flex; justify-content: space-between; align-items: flex-end; width: 100%; max-width: 320px; margin-bottom: 24px;">
-                    <div>
-                        <div style="font-size: 24px; font-weight: 700; color: var(--text-primary);">2048</div>
+                <div class="app-header" style="max-width: 320px;">
+                    <div class="app-title-group">
+                        <div class="app-title">2048</div>
                     </div>
-                    <div style="background: rgba(128,128,128,0.1); padding: 4px 12px; border-radius: 6px; font-variant-numeric: tabular-nums; text-align: right;">
-                        <div style="font-size: 10px; color: var(--text-secondary); text-transform: uppercase;">Score</div>
-                        <div id="score-${winId}" style="font-weight: 600; font-size: 16px; color: var(--text-primary);">0</div>
+                    <div class="app-stats">
+                        <div class="app-stat-box">
+                            <div class="app-stat-label">Score</div>
+                            <div class="app-stat-val" id="score-${winId}">0</div>
+                        </div>
                     </div>
                 </div>
                 <div class="grid-2048" id="grid-${winId}">

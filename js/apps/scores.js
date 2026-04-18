@@ -21,8 +21,8 @@ Apps.register({
                 <div class="scores-sidebar" id="scores-sidebar-${winId}">
                     <div class="scores-menu-item active" data-game="minesweeper-easy">Mines</div>
                     <div class="scores-menu-item" data-game="game2048">2048</div>
-                    <div class="scores-menu-item" data-game="colorlines">Lines</div>
-                    <div class="scores-menu-item" data-game="wordl">Wordl</div>
+                    <div class="scores-menu-item" data-game="colorlines-5">Lines</div>
+                    <div class="scores-menu-item" data-game="wordl-5">Wordl</div>
                 </div>
                 <div class="scores-content" id="scores-content-${winId}">
                     <!-- Scores injected here -->
@@ -50,7 +50,7 @@ Apps.register({
         };
 
         const renderScores = (gameId) => {
-            const isMines = gameId.startsWith('minesweeper');
+            const baseGame = gameId.split('-')[0];
             const scoresList = window.Scores && window.Scores.getTopScores(gameId) || [];
             let listHtml = '';
             if (scoresList.length === 0) {
@@ -67,33 +67,50 @@ Apps.register({
                 });
             }
 
-            const selectorHtml = isMines ? `
-                <div style="display: flex; background: rgba(128,128,128,0.1); padding: 4px; border-radius: 8px; margin-bottom: 16px;">
-                    <div class="ms-level-opt ${gameId === 'minesweeper-easy' ? 'active' : ''}" data-id="minesweeper-easy" style="flex: 1; text-align: center; font-size: 11px; padding: 6px; border-radius: 6px; cursor: pointer;">Easy</div>
-                    <div class="ms-level-opt ${gameId === 'minesweeper-medium' ? 'active' : ''}" data-id="minesweeper-medium" style="flex: 1; text-align: center; font-size: 11px; padding: 6px; border-radius: 6px; cursor: pointer;">Med</div>
-                    <div class="ms-level-opt ${gameId === 'minesweeper-hard' ? 'active' : ''}" data-id="minesweeper-hard" style="flex: 1; text-align: center; font-size: 11px; padding: 6px; border-radius: 6px; cursor: pointer;">Hard</div>
-                </div>
-            ` : '';
+            let selectorHtml = '';
+            if (baseGame === 'minesweeper') {
+                selectorHtml = `
+                    <div style="display: flex; background: rgba(128,128,128,0.1); padding: 4px; border-radius: 8px; margin-bottom: 16px;">
+                        <div class="lb-level-opt ${gameId === 'minesweeper-easy' ? 'active' : ''}" data-id="minesweeper-easy">Easy</div>
+                        <div class="lb-level-opt ${gameId === 'minesweeper-medium' ? 'active' : ''}" data-id="minesweeper-medium">Med</div>
+                        <div class="lb-level-opt ${gameId === 'minesweeper-hard' ? 'active' : ''}" data-id="minesweeper-hard">Hard</div>
+                    </div>
+                `;
+            } else if (baseGame === 'wordl') {
+                selectorHtml = `
+                    <div style="display: flex; background: rgba(128,128,128,0.1); padding: 4px; border-radius: 8px; margin-bottom: 16px;">
+                        <div class="lb-level-opt ${gameId === 'wordl-4' ? 'active' : ''}" data-id="wordl-4">4 Letters</div>
+                        <div class="lb-level-opt ${gameId === 'wordl-5' ? 'active' : ''}" data-id="wordl-5">5 Letters</div>
+                        <div class="lb-level-opt ${gameId === 'wordl-6' ? 'active' : ''}" data-id="wordl-6">6 Letters</div>
+                        <div class="lb-level-opt ${gameId === 'wordl-7' ? 'active' : ''}" data-id="wordl-7">7 Letters</div>
+                    </div>
+                `;
+            } else if (baseGame === 'colorlines') {
+                selectorHtml = `
+                    <div style="display: flex; background: rgba(128,128,128,0.1); padding: 4px; border-radius: 8px; margin-bottom: 16px;">
+                        <div class="lb-level-opt ${gameId === 'colorlines-5' ? 'active' : ''}" data-id="colorlines-5">Classic (5)</div>
+                        <div class="lb-level-opt ${gameId === 'colorlines-4' ? 'active' : ''}" data-id="colorlines-4">Quick (4)</div>
+                    </div>
+                `;
+            }
 
             content.innerHTML = `
                 <style>
-                    .ms-level-opt { transition: all 0.2s; color: var(--text-secondary); }
-                    .ms-level-opt:hover { background: rgba(128,128,128,0.1); color: var(--text-primary); }
-                    .ms-level-opt.active { background: var(--accent-primary); color: #fff; box-shadow: 0 4px 12px var(--accent-glow); }
+                    .lb-level-opt { flex: 1; text-align: center; font-size: 11px; padding: 6px; border-radius: 6px; cursor: pointer; transition: all 0.2s; color: var(--text-secondary); }
+                    .lb-level-opt:hover { background: rgba(128,128,128,0.1); color: var(--text-primary); }
+                    .lb-level-opt.active { background: var(--accent-primary); color: #fff; box-shadow: 0 4px 12px var(--accent-glow); }
                 </style>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-                    <h3 style="margin: 0;">${games[gameId.split('-')[0]]} Leaderboard</h3>
+                    <h3 style="margin: 0;">${games[baseGame]} Leaderboard</h3>
                     <button class="scores-reset-btn" style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #EF4444; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.2s;">Reset</button>
                 </div>
                 ${selectorHtml}
                 ${listHtml}
             `;
             
-            if (isMines) {
-                content.querySelectorAll('.ms-level-opt').forEach(opt => {
-                    opt.onclick = () => renderScores(opt.dataset.id);
-                });
-            }
+            content.querySelectorAll('.lb-level-opt').forEach(opt => {
+                opt.onclick = () => renderScores(opt.dataset.id);
+            });
 
             const resetBtn = content.querySelector('.scores-reset-btn');
             if (resetBtn) {
@@ -116,12 +133,14 @@ Apps.register({
             };
         });
 
-        // initial
         // Listen for new scores being broadcast globally
         window.addEventListener('scoresUpdated', (e) => {
             const active = sidebar.querySelector('.scores-menu-item.active');
-            if (active && active.dataset.game === e.detail.gameId) {
+            if (active && active.dataset.game.split('-')[0] === e.detail.gameId.split('-')[0]) {
+                // If they are on the same base game, update if the exact gameId matches or it's currently selected
                 renderScores(e.detail.gameId);
+                // Also update the sidebar data-game to track what was last played
+                active.dataset.game = e.detail.gameId;
             }
         });
 

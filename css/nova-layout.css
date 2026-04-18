@@ -337,3 +337,67 @@
     width: 26px;
     height: 26px;
 }
+
+/* ==========================================================================
+   App Standard Layout Classes
+   ========================================================================== */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    width: 100%;
+    margin-bottom: 24px;
+}
+.app-title-group {
+    display: flex;
+    flex-direction: column;
+}
+.app-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+.app-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-top: 8px;
+}
+.app-btn {
+    background: rgba(128,128,128,0.1);
+    border: 1px solid var(--border-glass);
+    color: var(--text-primary);
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: background 0.2s;
+    outline: none;
+    font-family: inherit;
+}
+.app-btn:hover {
+    background: rgba(128,128,128,0.2);
+}
+.app-stats {
+    display: flex;
+    gap: 16px;
+}
+.app-stat-box {
+    background: rgba(128,128,128,0.1);
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    min-width: 60px;
+}
+.app-stat-label {
+    font-size: 10px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+}
+.app-stat-val {
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--text-primary);
+}

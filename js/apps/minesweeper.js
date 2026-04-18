@@ -9,19 +9,12 @@ Apps.register({
         
         const style = `
             .ms-container { padding: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; font-family: var(--font-sans); color: var(--text-primary); }
-            .ms-header { display:flex; justify-content: space-between; align-items: flex-end; width: 100%; margin-bottom: 24px; }
-            .ms-stats { display: flex; gap: 16px; }
-            .ms-stat-box { background: rgba(128,128,128,0.1); padding: 4px 12px; border-radius: 6px; font-variant-numeric: tabular-nums; text-align: center; min-width: 60px; }
-            .ms-stat-label { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; }
-            .ms-stat-val { font-weight: 600; font-size: 16px; color: var(--text-primary); }
             .ms-grid { display: grid; gap: 2px; padding: 12px; background: rgba(128,128,128,0.05); border-radius: 12px; border: 1px solid var(--border-glass-strong); box-shadow: var(--shadow-inset); user-select: none; }
             .ms-cell { width: 32px; height: 32px; background: rgba(128,128,128,0.1); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; cursor: pointer; transition: background 0.1s; color: var(--text-primary); }
             .ms-cell:hover { background: rgba(128,128,128,0.2); }
             .ms-cell.revealed { background: rgba(128,128,128,0.3); border: 1px solid rgba(128,128,128,0.1); cursor: default; }
             .ms-cell.mine { background: #EF4444; color: #fff;}
             .ms-cell.flagged { color: #F59E0B; }
-            .ms-btn { background: rgba(128,128,128,0.1); border: 1px solid var(--border-glass); color: var(--text-primary); padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; transition: background 0.2s; }
-            .ms-btn:hover { background: rgba(128,128,128,0.2); }
             .c-1 { color: #3B82F6; } .c-2 { color: #10B981; } .c-3 { color: #EF4444; } 
             .c-4 { color: #8B5CF6; } .c-5 { color: #F59E0B; } .c-6 { color: #06B6D4; } 
             .c-7 { color: #111827; } .c-8 { color: #6B7280; }
@@ -29,26 +22,26 @@ Apps.register({
 
         const html = `
             <div class="ms-container" id="ms-container-${winId}">
-                <div class="ms-header">
-                    <div>
-                        <div style="font-size: 24px; font-weight: 700; color: var(--text-primary);">Mines</div>
-                        <div style="display:flex; gap: 8px; margin-top: 8px;">
-                            <select id="ms-level-${winId}" class="ms-btn" style="outline: none;">
+                <div class="app-header">
+                    <div class="app-title-group">
+                        <div class="app-title">Mines</div>
+                        <div class="app-controls">
+                            <select id="ms-level-${winId}" class="app-btn" style="outline: none;">
                                 <option value="easy">Beginner</option>
                                 <option value="medium">Intermed.</option>
                                 <option value="hard">Expert</option>
                             </select>
-                            <button class="ms-btn" id="ms-restart-${winId}">Restart</button>
+                            <button class="app-btn" id="ms-restart-${winId}">Restart</button>
                         </div>
                     </div>
-                    <div class="ms-stats">
-                        <div class="ms-stat-box">
-                            <div class="ms-stat-label">Mines</div>
-                            <div class="ms-stat-val" id="ms-mines-${winId}">10</div>
+                    <div class="app-stats">
+                        <div class="app-stat-box">
+                            <div class="app-stat-label">Mines</div>
+                            <div class="app-stat-val" id="ms-mines-${winId}">10</div>
                         </div>
-                        <div class="ms-stat-box">
-                            <div class="ms-stat-label">Time</div>
-                            <div class="ms-stat-val" id="ms-time-${winId}">0</div>
+                        <div class="app-stat-box">
+                            <div class="app-stat-label">Time</div>
+                            <div class="app-stat-val" id="ms-time-${winId}">0</div>
                         </div>
                     </div>
                 </div>
@@ -76,6 +69,7 @@ Apps.register({
         let isGameOver = false;
         let isFirstClick = true;
         let revealedCount = 0;
+        let lastHoveredCell = {r: -1, c: -1};
 
         const uiGrid = document.getElementById(`ms-grid-${winId}`);
         const uiTime = document.getElementById(`ms-time-${winId}`);
@@ -107,6 +101,8 @@ Apps.register({
                     div.dataset.c = c;
                     div.addEventListener('click', () => handleLeftClick(r, c));
                     div.addEventListener('contextmenu', (e) => { e.preventDefault(); handleRightClick(r, c); });
+                    div.addEventListener('mouseenter', () => { lastHoveredCell = {r, c}; });
+                    div.addEventListener('mouseleave', () => { if (lastHoveredCell.r === r && lastHoveredCell.c === c) lastHoveredCell = {r: -1, c: -1}; });
                     uiGrid.appendChild(div);
                 }
                 board.push(row);
@@ -205,6 +201,7 @@ Apps.register({
             minesLeft += board[r][c].isFlagged ? -1 : 1;
             uiMines.textContent = minesLeft;
             updateCellUI(r, c);
+            if (window.AudioMng) AudioMng.play(board[r][c].isFlagged ? 'flag_on' : 'flag_off');
         };
 
         const checkWin = () => {
@@ -258,12 +255,23 @@ Apps.register({
             initBoard();
         };
         
+        const onGlobalKey = (e) => {
+            if (WindowManager.activeWindowId === winId && e.code === 'Space') {
+                if (lastHoveredCell.r !== -1 && lastHoveredCell.c !== -1) {
+                    e.preventDefault(); // Prevent page scroll
+                    handleRightClick(lastHoveredCell.r, lastHoveredCell.c);
+                }
+            }
+        };
+        document.addEventListener('keydown', onGlobalKey);
+
         const winObj = WindowManager.windows.get(winId);
         if(winObj) {
             const originalCleanup = winObj.cleanup;
             winObj.cleanup = () => {
                 if (originalCleanup) originalCleanup();
                 if(timer) clearInterval(timer);
+                document.removeEventListener('keydown', onGlobalKey);
             };
         }
 
