@@ -57,7 +57,7 @@ Apps.register({
             appId: 'game2048',
             title: '2048',
             width: 380,
-            height: 440,
+            height: 500,
             content: html
         });
 

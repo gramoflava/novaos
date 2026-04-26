@@ -67,7 +67,7 @@ Apps.register({
             appId: 'colorlines',
             title: 'Color Lines',
             width: 380,
-            height: 500,
+            height: 540,
             content: html
         });
 

@@ -108,7 +108,7 @@ Apps.register({
             appId: 'wordl',
             title: 'Wordl',
             width: 480,
-            height: 660,
+            height: 700,
             content: html
         });
 

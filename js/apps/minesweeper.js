@@ -52,7 +52,7 @@ Apps.register({
             appId: 'minesweeper',
             title: 'Minesweeper',
             width: 440,
-            height: 440,
+            height: 500,
             content: html
         });
 
@@ -238,7 +238,7 @@ Apps.register({
         document.getElementById(`ms-level-${winId}`).onchange = (e) => {
             const val = e.target.value;
             const winEl = WindowManager.windows.get(winId).el;
-            if (val === 'easy') { rows=9; cols=9; totalMines=10; winEl.style.width='440px'; winEl.style.height='520px'; }
+            if (val === 'easy') { rows=9; cols=9; totalMines=10; winEl.style.width='440px'; winEl.style.height='500px'; }
             if (val === 'medium') { rows=16; cols=16; totalMines=40; winEl.style.width='650px'; winEl.style.height='720px'; }
             if (val === 'hard') { rows=16; cols=30; totalMines=99; winEl.style.width='1100px'; winEl.style.height='720px'; }
             
