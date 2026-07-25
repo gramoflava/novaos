@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.NovaIsland = new Island();
     window.NovaSpotlight = new SpotlightSearch();
     window.NovaShelf = new Shelf();
-    
+
     // 2. Trigger initial Shelf render
     NovaShelf.render();
 

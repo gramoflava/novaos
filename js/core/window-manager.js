@@ -9,7 +9,8 @@ class WindowManagerClass {
         this.activeBlackHoles = new Map();
         this.remnantCounter = 0;
         this.activeRemnants = new Set();
-        
+        this.mobileQuery = window.matchMedia('(max-width: 640px)');
+
         // Infinite Canvas properties
         this.cameraX = 0;
         this.cameraY = 0;
@@ -29,24 +30,41 @@ class WindowManagerClass {
         this.indicatorsContainer.style.pointerEvents = 'none';
         this.indicatorsContainer.style.zIndex = '8000';
         document.getElementById('desktop').appendChild(this.indicatorsContainer);
-        
+
         // Black Hole Preview Tooltip
         this.bhPreview = document.createElement('div');
         this.bhPreview.className = 'bh-preview';
         document.body.appendChild(this.bhPreview);
-        
+
         // Space Background parallax
         this.backgroundLayer = document.getElementById('nova-background');
-        
+
         this.desktopContentStyle = getComputedStyle(document.getElementById('desktop'));
         this.initCanvasControls();
         this.startIndicatorsLoop();
+        this.mobileQuery.addEventListener('change', () => {
+            if (this.isMobile()) {
+                this.cameraX = 0;
+                this.cameraY = 0;
+                this.cameraZ = 1;
+            }
+            this.applyCameraTransform();
+            if (this.activeWindowId) this.focus(this.activeWindowId);
+        });
+    }
+
+    isMobile() {
+        return this.mobileQuery.matches;
     }
 
     startIndicatorsLoop() {
         const loop = () => {
             this.indicatorsContainer.innerHTML = '';
-            
+            if (this.isMobile()) {
+                requestAnimationFrame(loop);
+                return;
+            }
+
             const vW = window.innerWidth;
             const vH = window.innerHeight;
 
@@ -55,7 +73,7 @@ class WindowManagerClass {
                 const wy = parseFloat(w.el.dataset.y);
                 const ww = parseFloat(w.el.style.width);
                 const wh = parseFloat(w.el.style.height);
-                
+
                 const screenX = this.cameraX + wx * this.cameraZ;
                 const screenY = this.cameraY + wy * this.cameraZ;
                 const screenW = ww * this.cameraZ;
@@ -69,13 +87,13 @@ class WindowManagerClass {
                     const scY = vH / 2;
                     const dx = centerX - scX;
                     const dy = centerY - scY;
-                    
+
                     let edgeX = scX;
                     let edgeY = scY;
                     const slope = dy / dx;
                     const maxDX = vW/2 - 20;
                     const maxDY = vH/2 - 20;
-                    
+
                     if (Math.abs(slope) < maxDY / maxDX) {
                         edgeX = dx > 0 ? vW - 20 : 20;
                         edgeY = scY + (edgeX - scX) * slope;
@@ -90,18 +108,18 @@ class WindowManagerClass {
                     ind.style.top = edgeY + 'px';
                     ind.style.width = '6px';
                     ind.style.height = '6px';
-                    ind.style.background = 'var(--text-primary)';
-                    ind.style.boxShadow = '0 0 12px var(--text-primary)';
+                    ind.style.background = 'var(--text)';
+                    ind.style.boxShadow = '0 0 12px var(--text)';
                     ind.style.borderRadius = '50%';
                     ind.style.transform = 'translate(-50%, -50%)';
                     ind.style.transition = 'opacity 0.2s';
-                    
+
                     // Slightly point the diamond shape
                     if(w.appId === 'game2048' || w.appId === 'minesweeper' || w.appId === 'colorlines') {
-                        ind.style.background = 'var(--accent-primary)';
-                        ind.style.boxShadow = '0 0 12px var(--accent-primary)';
+                        ind.style.background = 'var(--accent)';
+                        ind.style.boxShadow = '0 0 12px var(--accent)';
                     }
-                    
+
                     this.indicatorsContainer.appendChild(ind);
                 }
             });
@@ -110,18 +128,18 @@ class WindowManagerClass {
             this.activeRemnants.forEach(rem => {
                 rem.currentDepth += (rem.targetDepth - rem.currentDepth) * 0.02;
                 rem.currentOpacity += (rem.targetOpacity - rem.currentOpacity) * 0.02;
-                
+
                 rem.el.style.opacity = Math.max(0, rem.currentOpacity);
-                
+
                 const M = 0.95 * rem.currentDepth;
                 const dx = (this.cameraX - rem.initCameraX);
                 const dy = (this.cameraY - rem.initCameraY);
-                
+
                 const offsetX = -M * dx / this.cameraZ;
                 const offsetY = -M * dy / this.cameraZ;
 
                 rem.el.style.transform = `translate3d(${offsetX}px, ${offsetY}px, 0) scale(${1 - rem.currentDepth * 0.3})`;
-                
+
                 if (rem.targetOpacity <= 0 && rem.currentOpacity <= 0.01) {
                     if (rem.el.parentNode) rem.el.remove();
                     this.activeRemnants.delete(rem);
@@ -137,8 +155,9 @@ class WindowManagerClass {
         // Handle infinite canvas panning
         // We bind to document body but only initiate if the target isn't an interactive window element
         document.body.addEventListener('mousedown', (e) => {
+            if (this.isMobile()) return;
             // Ignore if clicking on UI elements like island, shelf, or interactive window parts
-            if (e.target.closest('#nova-island-container') || 
+            if (e.target.closest('#nova-island-container') ||
                 e.target.closest('#nova-shelf-container') ||
                 e.target.closest('.nova-window')) {
                 return;
@@ -151,11 +170,12 @@ class WindowManagerClass {
         });
 
         document.body.addEventListener('mousemove', (e) => {
+            if (this.isMobile()) return;
             if (!this.isPanning) return;
-            
+
             this.cameraX = e.clientX - this.panStartX;
             this.cameraY = e.clientY - this.panStartY;
-            
+
             this.applyCameraTransform();
         });
 
@@ -171,6 +191,7 @@ class WindowManagerClass {
         let wheelTimeout = null;
 
         document.body.addEventListener('wheel', (e) => {
+            if (this.isMobile()) return;
             clearTimeout(wheelTimeout);
             wheelTimeout = setTimeout(() => { wheelGestureMode = null; }, 150);
 
@@ -186,7 +207,7 @@ class WindowManagerClass {
                         while (domNode && domNode !== document.body && domNode !== document) {
                             if (domNode.scrollHeight > domNode.clientHeight || domNode.scrollWidth > domNode.clientWidth) {
                                 const style = window.getComputedStyle(domNode);
-                                if (style.overflowY === 'auto' || style.overflowY === 'scroll' || 
+                                if (style.overflowY === 'auto' || style.overflowY === 'scroll' ||
                                     style.overflowX === 'auto' || style.overflowX === 'scroll' ||
                                     style.overflow === 'auto' || style.overflow === 'scroll') {
                                     isScrollable = true;
@@ -231,6 +252,11 @@ class WindowManagerClass {
     }
 
     applyCameraTransform() {
+        if (this.isMobile()) {
+            this.container.style.transform = 'none';
+            if (this.backgroundLayer) this.backgroundLayer.style.transform = 'none';
+            return;
+        }
         this.container.style.transform = `translate3d(${this.cameraX}px, ${this.cameraY}px, 0) scale(${this.cameraZ})`;
         if (this.backgroundLayer) {
             this.backgroundLayer.style.transform = `translate3d(${this.cameraX * 0.05}px, ${this.cameraY * 0.05}px, 0)`;
@@ -239,7 +265,7 @@ class WindowManagerClass {
             const M = 0.95 * rem.currentDepth;
             const dx = (this.cameraX - rem.initCameraX);
             const dy = (this.cameraY - rem.initCameraY);
-            
+
             const offsetX = -M * dx / this.cameraZ;
             const offsetY = -M * dy / this.cameraZ;
 
@@ -248,6 +274,7 @@ class WindowManagerClass {
     }
 
     animateCameraTo(targetX, targetY) {
+        if (this.isMobile()) return;
         // Simple spring or ease animation to center camera
         const startX = this.cameraX;
         const startY = this.cameraY;
@@ -259,10 +286,10 @@ class WindowManagerClass {
             if (p > 1) p = 1;
             // ease-out cubic
             const ease = 1 - Math.pow(1 - p, 3);
-            
+
             this.cameraX = startX + (targetX - startX) * ease;
             this.cameraY = startY + (targetY - startY) * ease;
-            
+
             this.applyCameraTransform();
 
             if (p < 1) requestAnimationFrame(animate);
@@ -279,21 +306,24 @@ class WindowManagerClass {
 
         const width = options.width || 600;
         const height = options.height || 400;
-        
+
         let left = options.x;
         let top = options.y;
 
-        if (left === undefined || top === undefined) {
+        if (this.isMobile()) {
+            left = 0;
+            top = 0;
+        } else if (left === undefined || top === undefined) {
             const localViewportCenterX = (window.innerWidth / 2 - this.cameraX) / this.cameraZ;
             const localViewportCenterY = (window.innerHeight / 2 - this.cameraY) / this.cameraZ;
-            
+
             // Randomly scatter avoiding overlap
             let attempts = 0;
             let found = false;
             while(!found && attempts < 50) {
                 left = localViewportCenterX - (width / 2) + (Math.random() - 0.5) * window.innerWidth * 0.8 / this.cameraZ;
                 top = localViewportCenterY - (height / 2) + (Math.random() - 0.5) * window.innerHeight * 0.8 / this.cameraZ;
-                
+
                 let overlap = false;
                 this.windows.forEach(w => {
                     if (w.el.dataset.minimized === 'true') return;
@@ -301,13 +331,13 @@ class WindowManagerClass {
                     const wy = parseFloat(w.el.dataset.y);
                     const ww = parseFloat(w.el.dataset.w);
                     const wh = parseFloat(w.el.dataset.h);
-                    
+
                     // Check intersection with padding
                     if (left < wx + ww + 20 && left + width > wx - 20 && top < wy + wh + 20 && top + height > wy - 20) {
                         overlap = true;
                     }
                 });
-                
+
                 // Active blackholes are obstacles too
                 this.activeBlackHoles.forEach(bh => {
                     const bx = parseFloat(bh.style.left) - 60; // 120px width/height container
@@ -316,29 +346,29 @@ class WindowManagerClass {
                         overlap = true;
                     }
                 });
-                
+
                 if (!overlap) found = true;
                 attempts++;
             }
         }
 
-        // Animate camera to center this new window
-        const targetCameraX = (window.innerWidth / 2) - (left + width / 2) * this.cameraZ;
-        const targetCameraY = (window.innerHeight / 2) - (top + height / 2) * this.cameraZ;
-        this.animateCameraTo(targetCameraX, targetCameraY);
-
-        this.pushWindowsOut('none', {x: left, y: top, w: width, h: height});
+        if (!this.isMobile()) {
+            const targetCameraX = (window.innerWidth / 2) - (left + width / 2) * this.cameraZ;
+            const targetCameraY = (window.innerHeight / 2) - (top + height / 2) * this.cameraZ;
+            this.animateCameraTo(targetCameraX, targetCameraY);
+            this.pushWindowsOut('none', {x: left, y: top, w: width, h: height});
+        }
 
         const winEl = document.createElement('div');
         winEl.className = 'nova-window';
         winEl.id = id;
         winEl.style.width = width + 'px';
         winEl.style.height = height + 'px';
-        
+
         // Use left and top so it survives CSS scale animation
         winEl.style.left = left + 'px';
         winEl.style.top = top + 'px';
-        
+
         // Custom attribute to track actual logical coords
         winEl.dataset.x = left;
         winEl.dataset.y = top;
@@ -348,24 +378,27 @@ class WindowManagerClass {
 
         const titlebar = document.createElement('div');
         titlebar.className = 'window-titlebar';
-        
+
         // Window Controls
         const controls = document.createElement('div');
         controls.className = 'window-controls';
-        
+
         const closeBtn = document.createElement('button');
         closeBtn.className = 'window-btn close';
-        closeBtn.innerHTML = '<svg viewBox="0 0 24 24" stroke="currentColor" fill="none"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+        closeBtn.setAttribute('aria-label', 'Close window');
+        closeBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"></path></svg>';
         closeBtn.onclick = (e) => { e.stopPropagation(); this.close(id); };
-        
+
         const minBtn = document.createElement('button');
         minBtn.className = 'window-btn minimize';
-        minBtn.innerHTML = '<svg viewBox="0 0 24 24" stroke="currentColor" fill="none"><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
+        minBtn.setAttribute('aria-label', 'Minimize window');
+        minBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>';
         minBtn.onclick = (e) => { e.stopPropagation(); this.minimize(id); };
-        
+
         const maxBtn = document.createElement('button');
         maxBtn.className = 'window-btn maximize';
-        maxBtn.innerHTML = '<svg viewBox="0 0 24 24" stroke="currentColor" fill="none"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>';
+        maxBtn.setAttribute('aria-label', 'Maximize window');
+        maxBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h5v5M14 10l6 -6M9 20h-5v-5M4 20l6 -6"></path></svg>';
         maxBtn.onclick = (e) => { e.stopPropagation(); this.maximize(id); };
 
         controls.appendChild(closeBtn);
@@ -374,7 +407,7 @@ class WindowManagerClass {
 
         const title = document.createElement('div');
         title.className = 'window-title';
-        title.textContent = options.title || '';
+        title.innerHTML = `<img class="window-title-mark" src="design_handbook/assets/gemini-blackhole.svg" alt=""><span>${this.escapeTitle(options.title || '')}</span>`;
 
         const placeholder = document.createElement('div');
         placeholder.className = 'window-placeholder';
@@ -402,7 +435,7 @@ class WindowManagerClass {
 
         this.windows.set(id, winObj);
         this.setupInteractions(winObj);
-        
+
         // Wait for next frame so animation plays
         requestAnimationFrame(() => {
             this.focus(id);
@@ -416,6 +449,15 @@ class WindowManagerClass {
         return id;
     }
 
+    escapeTitle(value) {
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     setupInteractions(win) {
         win.el.addEventListener('mousedown', () => this.focus(win.id));
 
@@ -425,31 +467,32 @@ class WindowManagerClass {
         let startWinX, startWinY;
 
         win.titlebar.addEventListener('mousedown', (e) => {
+            if (this.isMobile()) return;
             // Ignore if clicking window controls
             if (e.target.closest('.window-btn')) return;
-            
+
             isDragging = true;
             this.focus(win.id);
-            
+
             startClientX = e.clientX;
             startClientY = e.clientY;
             startWinX = parseFloat(win.el.dataset.x);
             startWinY = parseFloat(win.el.dataset.y);
-            
+
             document.body.style.cursor = 'grabbing';
         });
 
         // Use global mouse handlers for dragging to prevent losing drag when mouse moves fast
         const onMouseMove = (e) => {
             if (!isDragging) return;
-            
+
             // Adjust delta by camera zoom to move perfectly with the mouse
             const deltaX = (e.clientX - startClientX) / this.cameraZ;
             const deltaY = (e.clientY - startClientY) / this.cameraZ;
-            
+
             const newX = startWinX + deltaX;
             const newY = startWinY + deltaY;
-            
+
             win.el.dataset.x = newX;
             win.el.dataset.y = newY;
             win.el.style.left = newX + 'px';
@@ -475,62 +518,76 @@ class WindowManagerClass {
 
     focus(id) {
         if (!this.windows.has(id)) return;
-        
+
         // Blur all
         this.windows.forEach(w => w.el.classList.remove('is-active'));
-        
+
         this.zIndexCounter++;
         const win = this.windows.get(id);
         win.el.style.zIndex = this.zIndexCounter;
         win.el.classList.add('is-active');
-        
+
         this.activeWindowId = id;
     }
 
     close(id) {
         const win = this.windows.get(id);
         if (!win) return;
-        
+
+        if (this.isMobile()) {
+            if (win.cleanup) win.cleanup();
+            win.el.remove();
+            this.windows.delete(id);
+            if (win.appId && !Array.from(this.windows.values()).some(w => w.appId === win.appId)) {
+                Apps.markClosed(win.appId);
+            }
+            const remaining = Array.from(this.windows.values()).filter(w => w.el.dataset.minimized !== 'true');
+            this.activeWindowId = null;
+            if (remaining.length) this.focus(remaining[remaining.length - 1].id);
+            if (window.ShelfInstance) window.ShelfInstance.render();
+            return;
+        }
+
         if (win.cleanup) win.cleanup();
-        
+
         // Physics and visuals chain
         win.el.style.animation = 'none';
         win.el.style.transition = 'all 0.5s cubic-bezier(1, 0, 0.5, 1)';
         win.el.style.transform = 'scale(0)';
         win.el.style.opacity = '0';
         win.el.style.pointerEvents = 'none';
-        
+
         const box = { x: parseFloat(win.el.dataset.x), y: parseFloat(win.el.dataset.y), w: parseFloat(win.el.dataset.w), h: parseFloat(win.el.dataset.h) };
         this.pullWindowsIn(id, box);
 
         setTimeout(() => {
             if (window.AudioMng) AudioMng.play('explode'); // subtle pop
-            
+
             const explosion = document.createElement('div');
             explosion.className = 'nova-explosion';
             explosion.style.left = (box.x + box.w / 2) + 'px';
             explosion.style.top = (box.y + box.h / 2) + 'px';
             this.container.appendChild(explosion);
-            
+
             this.pushWindowsOut(id, box);
-            
+
             // Spawn persistent wrapper immediately as explosion flashes
             const remContainer = document.createElement('div');
             remContainer.className = 'nova-remnant-wrap';
             remContainer.style.position = 'absolute';
             remContainer.style.left = (box.x + box.w / 2) + 'px';
             remContainer.style.top = (box.y + box.h / 2) + 'px';
-            
+
             const remnant = document.createElement('div');
             remnant.className = 'nova-remnant';
-            
+
             // Random nebular gradient
             const hue = Math.floor(Math.random() * 360);
             remnant.style.background = `radial-gradient(circle, hsla(${hue}, 80%, 65%, 0.5) 0%, hsla(${hue}, 100%, 30%, 0.2) 40%, transparent 70%)`;
-            
+
             remContainer.appendChild(remnant);
             this.container.appendChild(remContainer);
-            
+
             this.activeRemnants.add({
                 el: remContainer,
                 targetOpacity: 1.1, // 1.1 so it takes 1 initial closing to hit 1.0
@@ -540,14 +597,14 @@ class WindowManagerClass {
                 initCameraX: this.cameraX,
                 initCameraY: this.cameraY
             });
-            
+
             // Incrementally fade all active remnants by 10%
             this.activeRemnants.forEach(rem => {
                 let op = rem.targetOpacity - 0.1;
                 rem.targetOpacity = op;
                 rem.targetDepth = 1 - Math.max(0, Math.min(1, op));
             });
-            
+
             setTimeout(() => { explosion.remove(); }, 500);
         }, 400);
 
@@ -556,7 +613,7 @@ class WindowManagerClass {
                 win.el.parentNode.removeChild(win.el);
             }
             this.windows.delete(id);
-            
+
             if (win.appId) {
                 let hasMore = false;
                 this.windows.forEach(w => {
@@ -592,14 +649,14 @@ class WindowManagerClass {
                 const distB = Math.abs(wy - (box.y + box.h));
 
                 const min = Math.min(distL, distR, distT, distB);
-                
+
                 let newX = wx, newY = wy;
                 if (min === distL) newX = box.x - ww - 20;
                 else if (min === distR) newX = box.x + box.w + 20;
                 else if (min === distT) newY = box.y - wh - 20;
                 else if (min === distB) newY = box.y + box.h + 20;
 
-                win.el.style.transition = 'all 0.5s var(--curve-spring)';
+                win.el.style.transition = 'all 0.5s var(--ease-spring)';
                 win.el.dataset.x = newX;
                 win.el.dataset.y = newY;
                 win.el.style.left = newX + 'px';
@@ -612,22 +669,22 @@ class WindowManagerClass {
     pullWindowsIn(targetId, box) {
         const centerX = box.x + box.w / 2;
         const centerY = box.y + box.h / 2;
-        
+
         this.windows.forEach((win, id) => {
             if (id === targetId || win.el.dataset.minimized === 'true') return;
             const wx = parseFloat(win.el.dataset.x);
             const wy = parseFloat(win.el.dataset.y);
-            
+
             const dx = centerX - (wx + parseFloat(win.el.dataset.w)/2);
             const dy = centerY - (wy + parseFloat(win.el.dataset.h)/2);
             const dist = Math.sqrt(dx*dx + dy*dy);
-            
+
             if (dist > 0 && dist < 1200) {
                 const pullFactor = Math.max(0.1, 1 - dist/1200) * 0.4;
                 const newX = wx + dx * pullFactor;
                 const newY = wy + dy * pullFactor;
 
-                win.el.style.transition = 'all 0.6s var(--curve-spring)';
+                win.el.style.transition = 'all 0.6s var(--ease-spring)';
                 win.el.dataset.x = newX;
                 win.el.dataset.y = newY;
                 win.el.style.left = newX + 'px';
@@ -638,28 +695,29 @@ class WindowManagerClass {
     }
 
     minimize(id) {
+        if (this.isMobile()) return;
         const win = this.windows.get(id);
         if (!win) return;
-        
+
         if (window.AudioMng) AudioMng.play('collapse');
-        
+
         // Capture current state to avoid snapping back to hidden styles when animation is removed
         const computed = window.getComputedStyle(win.el);
         const transform = computed.transform;
         const opacity = computed.opacity;
-        
+
         win.el.style.animation = 'none';
         win.el.style.transform = transform;
         win.el.style.opacity = opacity;
-        
+
         void win.el.offsetHeight; // Force reflow
-        
+
         win.el.style.transition = 'all 0.5s cubic-bezier(1, 0, 0.5, 1)';
         win.el.style.transform = 'scale(0)';
         win.el.style.opacity = '0';
         win.el.style.pointerEvents = 'none';
         win.el.dataset.minimized = 'true';
-        
+
         const box = {
             x: parseFloat(win.el.dataset.x),
             y: parseFloat(win.el.dataset.y),
@@ -667,20 +725,20 @@ class WindowManagerClass {
             h: parseFloat(win.el.dataset.h)
         };
         this.pullWindowsIn(id, box);
-        
+
         const bh = document.createElement('div');
         bh.className = 'nova-blackhole-container';
-        
+
         const hue = Math.floor(Math.random() * 360);
         const gradId = 'discGrad-' + id;
-        
+
         bh.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" style="width:100%; height:100%; filter: var(--bh-theme-filter) hue-rotate(${hue}deg);">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" style="width:100%; height:100%; filter: hue-rotate(${hue}deg);">
           <defs>
             <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" style="stop-color:#b32400;stop-opacity:1" /> 
-              <stop offset="50%" style="stop-color:#ff6600;stop-opacity:1" /> 
-              <stop offset="100%" style="stop-color:#ffcc66;stop-opacity:1" /> 
+              <stop offset="0%" style="stop-color:#b32400;stop-opacity:1" />
+              <stop offset="50%" style="stop-color:#ff6600;stop-opacity:1" />
+              <stop offset="100%" style="stop-color:#ffcc66;stop-opacity:1" />
             </linearGradient>
           </defs>
 
@@ -704,7 +762,7 @@ class WindowManagerClass {
         bh.style.pointerEvents = 'auto';
         bh.style.cursor = 'pointer';
         bh.onclick = () => this.restore(id);
-        
+
         // Hover Previews
         bh.onmouseenter = () => {
             const iconHtml = window.Icons ? Icons.get(win.appId) : '';
@@ -721,53 +779,60 @@ class WindowManagerClass {
 
         this.container.appendChild(bh);
         this.activeBlackHoles.set(id, bh);
-        
+
         if (window.ShelfInstance) window.ShelfInstance.render();
     }
 
     restore(id) {
         const win = this.windows.get(id);
         if (!win) return;
-        
+
+        if (this.isMobile()) {
+            win.el.dataset.minimized = 'false';
+            this.focus(id);
+            return;
+        }
+
         if (window.AudioMng) AudioMng.play('expand');
-        
+
         // Dismiss hover preview immediately
         if (this.bhPreview) this.bhPreview.classList.remove('visible');
-        
+
         win.el.style.animation = 'none';
-        win.el.style.transition = 'all 0.5s var(--curve-spring)';
+        win.el.style.transition = 'all 0.5s var(--ease-spring)';
         win.el.style.transform = 'scale(1)';
         win.el.style.opacity = '1';
         win.el.style.pointerEvents = 'auto';
         win.el.dataset.minimized = 'false';
-        
+
         const box = {
             x: parseFloat(win.el.dataset.x),
             y: parseFloat(win.el.dataset.y),
             w: parseFloat(win.el.dataset.w),
             h: parseFloat(win.el.dataset.h)
         };
-        
+
         const bh = this.activeBlackHoles.get(id);
         if (bh) {
             bh.style.opacity = '0';
             setTimeout(() => { if (bh.parentNode) bh.remove(); }, 500);
             this.activeBlackHoles.delete(id);
         }
-        
+
         this.pushWindowsOut(id, box);
         this.focus(id);
     }
 
     maximize(id) {
+        if (this.isMobile()) return;
         const win = this.windows.get(id);
         if (!win) return;
 
         if (win.el.dataset.maximized === 'true') {
             // Restore
             win.el.dataset.maximized = 'false';
-            win.el.style.transition = 'all 0.3s var(--curve-spring)';
-            
+            win.el.style.transition = 'all 0.3s var(--ease-spring)';
+
             const prevW = parseFloat(win.el.dataset.prevW);
             const prevH = parseFloat(win.el.dataset.prevH);
             const prevX = parseFloat(win.el.dataset.prevX);
@@ -795,8 +860,8 @@ class WindowManagerClass {
             win.el.dataset.prevX = win.el.dataset.x;
             win.el.dataset.prevY = win.el.dataset.y;
 
-            win.el.style.transition = 'all 0.4s var(--curve-spring)';
-            
+            win.el.style.transition = 'all 0.4s var(--ease-spring)';
+
             const vpW = window.innerWidth / this.cameraZ;
             const vpH = window.innerHeight / this.cameraZ;
             const vpX = -this.cameraX / this.cameraZ;

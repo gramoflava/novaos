@@ -6,13 +6,13 @@ Apps.register({
     keepInDock: true,
     launch: () => {
         const winId = 'game2048-' + Date.now();
-        
+
         const style = `
-            .game-container { padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%; font-family: var(--font-sans); color: var(--text-primary); }
-            .grid-2048 { position: relative; width: 316px; height: 316px; background: rgba(128,128,128,0.05); border-radius: 12px; border: 1px solid var(--border-glass-strong); box-shadow: var(--shadow-inset); overflow: hidden; }
+            .game-container { padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%; font-family: var(--font-sans); color: var(--text); }
+            .grid-2048 { position: relative; width: 316px; height: 316px; background: var(--surface-sunk); border-radius: var(--radius-md); border: 1px solid var(--line-strong); box-shadow: var(--glass-edge); overflow: hidden; }
             .grid-bg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 12px; width: 100%; height: 100%; position: absolute; top:0; left:0; }
-            .tile-bg { background: rgba(128,128,128,0.1); border-radius: 8px; width: 64px; height: 64px; }
-            .tile { width: 64px; height: 64px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 600; color: #fff; position: absolute; transition: left 0.075s ease-in-out, top 0.075s ease-in-out, background 0.075s ease-in-out; z-index: 10; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+            .tile-bg { background: var(--surface-sunk); border-radius: var(--radius-sm); width: 64px; height: 64px; }
+            .tile { width: 64px; height: 64px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 600; color: #fff; position: absolute; transition: left 0.075s ease-in-out, top 0.075s ease-in-out, background 0.075s ease-in-out; z-index: 10; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
             .tile-2 { background: #3730A3; box-shadow: 0 0 8px rgba(55,48,163,0.5); }
             .tile-4 { background: #4F46E5; box-shadow: 0 0 10px rgba(79,70,229,0.5); }
             .tile-8 { background: #6366F1; box-shadow: 0 0 12px rgba(99,102,241,0.5); }
@@ -24,12 +24,12 @@ Apps.register({
             .tile-512 { background: #E11D48; box-shadow: 0 0 24px rgba(225,29,72,0.5); }
             .tile-1024 { background: rgba(244,63,94,0.9); box-shadow: 0 0 26px rgba(225,29,72,0.7); }
             .tile-2048 { background: rgba(250,204,21,0.9); color: #000; box-shadow: 0 0 30px rgba(250,204,21,0.8); text-shadow: none; }
-            .leaderboard-btn { background: rgba(128,128,128,0.1); border: 1px solid var(--border-glass); color: var(--text-primary); padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 500; transition: background 0.2s; }
-            .leaderboard-btn:hover { background: rgba(128,128,128,0.2); }
+            .leaderboard-btn { background: var(--surface-sunk); border: 1px solid var(--line); color: var(--text); padding: 4px 12px; border-radius: var(--radius-sm); cursor: pointer; font-size: 12px; font-weight: 500; transition: background 0.2s; }
+            .leaderboard-btn:hover { background: var(--glass-hover); }
         `;
 
         const bgGrid = Array(16).fill('<div class="tile-bg"></div>').join('');
-        
+
         const html = `
             <div class="game-container" id="game-container-${winId}">
                 <div class="app-header" style="align-items: center; width: 100%; margin-bottom: 16px;">
@@ -46,7 +46,7 @@ Apps.register({
                 <div class="grid-2048" id="grid-${winId}">
                     <div class="grid-bg">${bgGrid}</div>
                     <div id="tiles-${winId}"></div>
-                    <div id="gameover-${winId}" style="position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); color: white; display: none; align-items: center; justify-content: center; font-size: 32px; font-weight: bold; z-index: 20; backdrop-filter: blur(4px);">Game Over</div>
+                    <div id="gameover-${winId}" style="position: absolute; top:0; left:0; width:100%; height:100%; background: color-mix(in srgb, var(--bg) 75%, transparent); color: white; display: none; align-items: center; justify-content: center; font-size: 32px; font-weight: bold; z-index: 20; backdrop-filter: blur(var(--blur-panel));">Game Over</div>
                 </div>
             </div>
             <style>${style}</style>
@@ -66,7 +66,7 @@ Apps.register({
         let score = 0;
         let isGameOver = false;
         let hasWon = false;
-        
+
         const uiScore = document.getElementById(`score-${winId}`);
         const uiTiles = document.getElementById(`tiles-${winId}`);
 
@@ -82,7 +82,7 @@ Apps.register({
                 t.el.textContent = t.val;
                 t.el.style.left = `${12 + t.c * 76}px`;
                 t.el.style.top = `${12 + t.r * 76}px`;
-                
+
                 if(t.mergedThisTurn) {
                     t.el.animate([{transform:'scale(1)'}, {transform:'scale(1.15)'}, {transform:'scale(1)'}], {duration:100});
                 }
@@ -132,7 +132,7 @@ Apps.register({
                  return;
              }
              if(getEmpty().length > 0) return;
-             
+
              // Check adjacent merges
              for(let r=0; r<4; r++) {
                  for(let c=0; c<4; c++) {
@@ -141,7 +141,7 @@ Apps.register({
                      if(r<3 && val === activeTiles.find(t=>!t.deleted && t.r===r+1 && t.c===c).val) return;
                  }
              }
- 
+
              // Game over
              isGameOver = true;
              document.getElementById(`gameover-${winId}`).style.display = 'flex';
@@ -170,18 +170,18 @@ Apps.register({
             if (window.AudioMng) AudioMng.play('click');
             let moved = false;
             activeTiles.forEach(t => t.mergedThisTurn = false);
-            
+
             for(let i=0; i<4; i++) {
-                let line = getLine(i, dir); 
+                let line = getLine(i, dir);
                 let targetPos = 0;
                 for(let j=0; j<line.length; j++) {
                     let t = line[j];
                     if(j < line.length - 1 && t.val === line[j+1].val && !line[j+1].mergedThisTurn) {
                         let popTile = t;
-                        let deadTile = line[j+1]; 
+                        let deadTile = line[j+1];
                         let tr = getRC(i, targetPos, dir).r;
                         let tc = getRC(i, targetPos, dir).c;
-                        
+
                         if(deadTile.r !== tr || deadTile.c !== tc) moved = true;
                         if(popTile.r !== tr || popTile.c !== tc) moved = true;
 
@@ -189,7 +189,7 @@ Apps.register({
                         popTile.r = tr; popTile.c = tc;
                         popTile.val *= 2; score += popTile.val;
                         popTile.mergedThisTurn = true;
-                        
+
                         targetPos++; j++;
                     } else {
                         let tr = getRC(i, targetPos, dir).r;
@@ -220,7 +220,7 @@ Apps.register({
             }
         };
         document.addEventListener('keydown', keyHandler);
-        
+
         const winObj = WindowManager.windows.get(winId);
         if(winObj) {
             const originalCleanup = winObj.cleanup;

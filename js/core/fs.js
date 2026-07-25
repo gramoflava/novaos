@@ -77,7 +77,7 @@ class FileSystem {
     writeFile(parentId, name, content) {
         const parent = this.getNodeById(parentId);
         if (!parent || parent.type !== 'dir') throw new Error('Parent directory not found');
-        
+
         // Update if exists
         const existing = parent.children.find(c => c.name === name);
         if (existing) {
@@ -105,7 +105,7 @@ class FileSystem {
 
     deleteNode(id) {
         if (id === 'root') throw new Error('Cannot delete root');
-        
+
         const removeRecursive = (current) => {
             if (current.type === 'dir') {
                 const index = current.children.findIndex(c => c.id === id);

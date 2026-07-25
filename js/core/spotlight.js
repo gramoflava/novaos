@@ -4,9 +4,9 @@ class SpotlightSearch {
         this.input = document.getElementById('spotlight-input');
         this.results = document.getElementById('spotlight-results');
         this.trigger = document.getElementById('btn-search');
-        
+
         this.isOpen = false;
-        
+
         this.setupListeners();
     }
 
@@ -63,12 +63,12 @@ class SpotlightSearch {
     performSearch() {
         const query = this.input.value.toLowerCase().trim();
         this.results.innerHTML = '';
-        
+
         if (!query) return;
 
         // Search apps
         const apps = Apps.getAll().filter(a => a.name.toLowerCase().includes(query) || a.id.includes(query));
-        
+
         apps.forEach(app => {
             const el = document.createElement('div');
             el.className = 'spotlight-item';
@@ -82,7 +82,7 @@ class SpotlightSearch {
             };
             this.results.appendChild(el);
         });
-        
+
         if(apps.length === 0) {
             const el = document.createElement('div');
             el.className = 'spotlight-item';

@@ -3,14 +3,14 @@ class AudioManager {
         this.context = null;
         this.limiter = null;
         this.masterGain = null;
-        
+
         // Load muted state from LocalStorage
         try {
             this.muted = localStorage.getItem('nova_muted') === 'true';
         } catch(e) {
             this.muted = false;
         }
-        
+
         // Listen for boot or user interaction to init context properly
         document.body.addEventListener('mousedown', () => this.init(), { once: true });
         document.body.addEventListener('keydown', () => this.init(), { once: true });
@@ -20,7 +20,7 @@ class AudioManager {
         if (!this.context) {
             try {
                 this.context = new (window.AudioContext || window.webkitAudioContext)();
-                
+
                 // Create Limiter (Compressor with high ratio)
                 this.limiter = this.context.createDynamicsCompressor();
                 this.limiter.threshold.setValueAtTime(-12, this.context.currentTime);
@@ -61,7 +61,7 @@ class AudioManager {
             const osc = this.context.createOscillator();
             const gain = this.context.createGain();
             osc.connect(gain);
-            
+
             // Connect to the global limiter instead of destination
             gain.connect(this.limiter);
 
@@ -144,8 +144,8 @@ class AudioManager {
                 osc.start(now);
                 osc.stop(now + 0.25);
             }
-        } catch(e) { 
-            console.warn('Audio play failed', e); 
+        } catch(e) {
+            console.warn('Audio play failed', e);
         }
     }
 }

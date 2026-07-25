@@ -2,7 +2,11 @@
 class Shelf {
     constructor() {
         this.container = document.getElementById('nova-shelf');
-        
+        this.mobileQuery = window.matchMedia('(max-width: 640px)');
+        const syncMobileClass = () => this.container.classList.toggle('tabbar', this.mobileQuery.matches);
+        syncMobileClass();
+        this.mobileQuery.addEventListener('change', syncMobileClass);
+
         // Listen to app lifecycle events
         Bus.on('app:registered', (app) => this.render());
         Bus.on('app:launching', (appId) => this.render());
@@ -12,9 +16,9 @@ class Shelf {
 
     render() {
         this.container.innerHTML = '';
-        
+
         const allApps = Apps.getAll().filter(app => app.keepInDock || Apps.isRunning(app.id));
-        
+
         // Logical Order & Grouping
         const GROUPS = [
             { id: 'utils', apps: ['codex', 'settings', 'calculator'] },
@@ -26,7 +30,7 @@ class Shelf {
 
         GROUPS.forEach((group, groupIdx) => {
             const groupApps = allApps.filter(app => group.apps.includes(app.id));
-            
+
             // Sort within group based on the order in GROUPS
             groupApps.sort((a, b) => group.apps.indexOf(a.id) - group.apps.indexOf(b.id));
 
@@ -34,10 +38,10 @@ class Shelf {
                 const el = document.createElement('div');
                 el.className = 'shelf-item';
                 if (Apps.isRunning(app.id)) el.classList.add('is-running');
-                
-                el.innerHTML = Icons.get(app.iconId) || `<svg><circle cx="12" cy="12" r="10"/></svg>`;
+
+                el.innerHTML = Icons.get(app.iconId);
                 el.title = app.name;
-                
+
                 el.onclick = () => {
                     if (!Apps.isRunning(app.id)) {
                         Apps.launch(app.id);
@@ -51,26 +55,28 @@ class Shelf {
                             } else {
                                 WindowManager.focus(lastWin.id);
                             }
-                            
-                            // Center camera on the window (whether just restored or already active)
-                            const left = parseFloat(lastWin.el.dataset.x);
-                            const top = parseFloat(lastWin.el.dataset.y);
-                            const w = parseFloat(lastWin.el.dataset.w);
-                            const h = parseFloat(lastWin.el.dataset.h);
-                            const cx = left + w / 2;
-                            const cy = top + h / 2;
-                            const targetX = window.innerWidth / 2 - cx * WindowManager.cameraZ;
-                            const targetY = window.innerHeight / 2 - cy * WindowManager.cameraZ;
-                            WindowManager.animateCameraTo(targetX, targetY);
+
+                            if (!this.mobileQuery.matches) {
+                                // Desktop keeps the infinite-space camera behaviour.
+                                const left = parseFloat(lastWin.el.dataset.x);
+                                const top = parseFloat(lastWin.el.dataset.y);
+                                const w = parseFloat(lastWin.el.dataset.w);
+                                const h = parseFloat(lastWin.el.dataset.h);
+                                const cx = left + w / 2;
+                                const cy = top + h / 2;
+                                const targetX = window.innerWidth / 2 - cx * WindowManager.cameraZ;
+                                const targetY = window.innerHeight / 2 - cy * WindowManager.cameraZ;
+                                WindowManager.animateCameraTo(targetX, targetY);
+                            }
                         } else {
                             Apps.launch(app.id);
                         }
                     }
-                    
+
                     el.classList.add('is-active');
                     setTimeout(() => el.classList.remove('is-active'), 300);
                 };
-                
+
                 this.container.appendChild(el);
                 renderedCount++;
             });
@@ -78,10 +84,10 @@ class Shelf {
             // Add divider if not the last group and we actually rendered something in this group
             if (groupIdx < GROUPS.length - 1 && groupApps.length > 0) {
                 // Peek if next groups have anything to render
-                const remainingApps = GROUPS.slice(groupIdx + 1).some(g => 
+                const remainingApps = GROUPS.slice(groupIdx + 1).some(g =>
                     allApps.some(a => g.apps.includes(a.id))
                 );
-                
+
                 if (remainingApps) {
                     const divider = document.createElement('div');
                     divider.className = 'shelf-divider';

@@ -1,4 +1,13 @@
-# Handoff: Nova OS Design System
+# Nova OS-specific design notes
+
+The family-wide source of truth now lives in [`../gramofdesign/`](../gramofdesign/):
+colour themes, typography, spacing, radii, glass surfaces, buttons, controls and
+Tabler UI icons all come from there.
+
+This directory remains a reference for Nova-only behavior: infinite-space window
+physics, expressive animation, the black-hole brand mark, and geometric app
+marks. The historical HTML specimens below are snapshots, not a second token or
+component system.
 
 ## Overview
 Nova OS is an experimental browser-based operating system built by **gramoflava** ([github.com/gramoflava/novaos](https://github.com/gramoflava/novaos)). This design system documents the visual language, component patterns, and interaction model for the OS and its built-in apps.

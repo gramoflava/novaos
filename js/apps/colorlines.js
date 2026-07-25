@@ -6,15 +6,15 @@ Apps.register({
     keepInDock: true,
     launch: () => {
         const winId = 'colorlines-' + Date.now();
-        
+
         const style = `
-            .cl-container { padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%; font-family: var(--font-sans); color: var(--text-primary); }
-            .cl-grid { display: grid; gap: 2px; padding: 8px; background: rgba(128,128,128,0.05); border-radius: 12px; border: 1px solid var(--border-glass-strong); box-shadow: var(--shadow-inset); user-select: none; position: relative; }
-            .cl-cell { width: 32px; height: 32px; background: rgba(128,128,128,0.08); border-radius: 6px; position: relative; cursor: pointer; transition: background 0.2s; }
-            .cl-cell:hover { background: rgba(128,128,128,0.15); }
-            .cl-cell.selected { background: rgba(128,128,128,0.25); box-shadow: inset 0 0 10px rgba(128,128,128,0.5); }
-            .cl-cell.traced::after { content: ''; position: absolute; top: 12px; left: 12px; width: 8px; height: 8px; border-radius: 50%; background: var(--fg-1); opacity: 0.3; pointer-events: none; }
-            .cl-ball { position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; box-shadow: inset -4px -4px 8px rgba(0,0,0,0.5); pointer-events: none; transition: transform 0.2s; z-index: 10; }
+            .cl-container { padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%; font-family: var(--font-sans); color: var(--text); }
+            .cl-grid { display: grid; gap: 2px; padding: 8px; background: var(--surface-sunk); border-radius: var(--radius-md); border: 1px solid var(--line-strong); box-shadow: var(--glass-edge); user-select: none; position: relative; }
+            .cl-cell { width: 32px; height: 32px; background: var(--surface-sunk); border-radius: var(--radius-sm); position: relative; cursor: pointer; transition: background 0.2s; }
+            .cl-cell:hover { background: var(--glass-hover); }
+            .cl-cell.selected { background: var(--glass-active); box-shadow: var(--glass-edge); }
+            .cl-cell.traced::after { content: ''; position: absolute; top: 12px; left: 12px; width: 8px; height: 8px; border-radius: var(--radius-pill); background: var(--text); opacity: 0.3; pointer-events: none; }
+            .cl-ball { position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: var(--radius-pill); box-shadow: inset -4px -4px 8px color-mix(in srgb, var(--bg) 75%, transparent); pointer-events: none; transition: transform 0.2s; z-index: 10; }
             .cl-cell.selected .cl-ball { transform: scale(1.15); animation: pulseBall 1s infinite alternate; }
             .color-0 { color: #EF4444; background: #EF4444; }
             .color-1 { color: #3B82F6; background: #3B82F6; }
@@ -24,13 +24,13 @@ Apps.register({
             .color-5 { color: #EC4899; background: #EC4899; }
             .color-6 { color: #06B6D4; background: #06B6D4; }
             @keyframes pulseBall { from { transform: scale(1.1); } to { transform: scale(1.2); } }
-            .cl-preview-group { display: flex; align-items: center; background: rgba(128,128,128,0.05); border: 1px solid var(--border-glass); border-radius: 6px; padding: 2px 4px; gap: 4px; transition: background 0.2s; }
-            .cl-preview-btn { background: transparent; border: none; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; opacity: 0.6; transition: opacity 0.2s; }
+            .cl-preview-group { display: flex; align-items: center; background: var(--surface-sunk); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 4px; gap: 4px; transition: background 0.2s; }
+            .cl-preview-btn { background: transparent; border: none; color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; opacity: 0.6; transition: opacity 0.2s; }
             .cl-preview-btn:hover { opacity: 1; }
             .cl-preview-wrap { overflow: hidden; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; width: 94px; opacity: 1; display: flex; gap: 4px; align-items: center; }
             .cl-preview-wrap.collapsed { width: 0; opacity: 0; pointer-events: none; }
-            .cl-preview-cell { flex-shrink: 0; width: 26px; height: 26px; background: rgba(128,128,128,0.05); border-radius: 4px; position: relative; border: 1px solid rgba(128,128,128,0.1); }
-            .cl-preview-cell .cl-ball { top: 3px; left: 3px; width: 18px; height: 18px; box-shadow: inset -2px -2px 4px rgba(0,0,0,0.5); }
+            .cl-preview-cell { flex-shrink: 0; width: 26px; height: 26px; background: var(--surface-sunk); border-radius: var(--radius-xs); position: relative; border: 1px solid var(--surface-sunk); }
+            .cl-preview-cell .cl-ball { top: 3px; left: 3px; width: 18px; height: 18px; box-shadow: inset -2px -2px 4px color-mix(in srgb, var(--bg) 75%, transparent); }
         `;
 
         const html = `
@@ -81,11 +81,11 @@ Apps.register({
         let nextBalls = [];
         let lineLength = 5;
         let isPreviewVisible = localStorage.getItem('novaos_colorlines_preview') !== 'false';
-        
+
         const getGameId = () => 'colorlines-' + lineLength;
 
-        const svgEyeOpen = `<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
-        const svgEyeClosed = `<svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
+        const svgEyeOpen = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3 -7 10 -7s10 7 10 7s-3 7 -10 7s-10 -7 -10 -7"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+        const svgEyeClosed = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.58 10.58a2 2 0 0 0 2.83 2.83M9.88 4.24a9.84 9.84 0 0 1 2.12 -.24c7 0 10 8 10 8a15.09 15.09 0 0 1 -1.67 2.68M6.61 6.61c-3.12 2.05 -4.61 5.39 -4.61 5.39s3 8 10 8a9.74 9.74 0 0 0 5.39 -1.61"></path></svg>`;
 
         const toggleBtn = document.getElementById(`cl-toggle-preview-${winId}`);
         toggleBtn.innerHTML = isPreviewVisible ? svgEyeOpen : svgEyeClosed;
@@ -93,9 +93,9 @@ Apps.register({
         toggleBtn.onclick = () => {
             isPreviewVisible = !isPreviewVisible;
             localStorage.setItem('novaos_colorlines_preview', isPreviewVisible);
-            
+
             toggleBtn.innerHTML = isPreviewVisible ? svgEyeOpen : svgEyeClosed;
-            
+
             const wrap = document.getElementById(`cl-preview-${winId}`);
             if (isPreviewVisible) {
                 wrap.classList.remove('collapsed');
@@ -136,10 +136,10 @@ Apps.register({
             for(let i=0; i<size*size; i++) {
                 const cell = uiGrid.children[i];
                 cell.className = 'cl-cell' + (selectedIdx === i ? ' selected' : '');
-                
+
                 // Clear out existing balls
                 cell.innerHTML = '';
-                
+
                 if(board[i] !== -1) {
                     const ball = document.createElement('div');
                     ball.className = `cl-ball color-${board[i]}`;
@@ -171,7 +171,7 @@ Apps.register({
         const spawnBalls = async (num) => {
             let empty = getEmpty();
             if(empty.length === 0) return false;
-            
+
             // Initialization spawn (typically 5 balls)
             if (num !== 3) {
                 isAnimating = true;
@@ -231,7 +231,7 @@ Apps.register({
             // Shift focus: Generate new nextBalls and reveal them
             nextBalls = [];
             while(nextBalls.length < 3) nextBalls.push(Math.floor(Math.random() * colors));
-            
+
             // Sequential reveal in preview (40ms each, total ~120ms)
             if (wrap) {
                 wrap.innerHTML = '';
@@ -245,7 +245,7 @@ Apps.register({
                     ball.style.transform = 'scale(0)';
                     cell.appendChild(ball);
                     wrap.appendChild(cell);
-                    
+
                     await ball.animate([
                         { transform: 'scale(0)', opacity: 0 },
                         { transform: 'scale(1)', opacity: 1 }
@@ -264,11 +264,11 @@ Apps.register({
             if(start === end) return [start];
             let queue = [start];
             let cameFrom = { [start]: null };
-            
+
             while(queue.length > 0) {
                 let curr = queue.shift();
                 if(curr === end) break;
-                
+
                 let r = Math.floor(curr / size);
                 let c = curr % size;
                 let neighbors = [];
@@ -276,7 +276,7 @@ Apps.register({
                 if(r < size-1) neighbors.push(curr + size); // down
                 if(c > 0) neighbors.push(curr - 1); // left
                 if(c < size-1) neighbors.push(curr + 1); // right
-                
+
                 for(let n of neighbors) {
                     if(!(n in cameFrom) && board[n] === -1) {
                         cameFrom[n] = curr;
@@ -299,7 +299,7 @@ Apps.register({
 
         const checkLines = async () => {
             let toRemove = new Set();
-            
+
             const trace = (startR, startC, dR, dC) => {
                 let col = board[startR * size + startC];
                 if(col === -1) return;
@@ -327,7 +327,7 @@ Apps.register({
                 isAnimating = true;
                 if (window.AudioMng) AudioMng.play('win');
                 score += (toRemove.size * 2) + ((toRemove.size - lineLength) * 5);
-                
+
                 const promises = Array.from(toRemove).map(idx => {
                     const cell = uiGrid.children[idx];
                     if(cell && cell.firstChild) {
@@ -335,9 +335,9 @@ Apps.register({
                     }
                     return Promise.resolve();
                 });
-                
+
                 await Promise.all(promises);
-                
+
                 toRemove.forEach(idx => board[idx] = -1);
                 render();
                 isAnimating = false;
@@ -359,17 +359,17 @@ Apps.register({
                 if(path) {
                     isAnimating = true;
                     clearTrace();
-                    
+
                     const startColorIdx = board[selectedIdx];
                     board[selectedIdx] = -1;
                     selectedIdx = -1;
                     render(); // Remove ball from original slot visually
-                    
+
                     // Create floating animated ball
                     const animBall = document.createElement('div');
                     animBall.className = `cl-ball color-${startColorIdx}`;
                     uiGrid.appendChild(animBall);
-                    
+
                     // Map path indices to physical offsets
                     const keyframes = path.map(p => {
                         const cell = uiGrid.children[p];
@@ -378,11 +378,11 @@ Apps.register({
 
                     const timing = { duration: path.length * 35, easing: 'linear' };
                     await animBall.animate(keyframes, timing).finished;
-                    
+
                     animBall.remove();
                     board[idx] = startColorIdx;
                     render();
-                    
+
                     if(!(await checkLines())) {
                         await spawnBalls(3);
                         if(getEmpty().length === 0) gameOver();

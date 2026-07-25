@@ -46,7 +46,7 @@ class NovaEffectsClass {
         }
 
         const count = options.count || Math.floor(Math.random() * 25) + 30;
-        const colors = options.colors || ['var(--accent-primary)', 'var(--accent-secondary)', '#fff'];
+        const colors = options.colors || ['var(--accent)', 'var(--nova-accent-alt)', '#fff'];
         const spread = options.spread || 400;
         const duration = options.duration || 4000;
 
@@ -154,7 +154,7 @@ class NovaEffectsClass {
         this.celebrationOrigin = { x, y };
         this.celebrationOptions = {
             count: 30,
-            colors: ['var(--accent-primary)', 'var(--accent-secondary)', '#fff'],
+            colors: ['var(--accent)', 'var(--nova-accent-alt)', '#fff'],
             spread: 0.2, // Conical spread in radians
             angle: -Math.PI / 2, // Default: upwards
             duration: 3500,
@@ -218,7 +218,7 @@ class NovaEffectsClass {
         // Closer to origin = faster angular velocity, farther = slower
         const spreadAngle = (Math.random() - 0.5) * options.spread;
         const startAngle = options.angle + spreadAngle;
-        
+
         const p = {
             el,
             baseX: screenX,
@@ -235,7 +235,7 @@ class NovaEffectsClass {
 
         // Fade in
         requestAnimationFrame(() => el.style.opacity = '1');
-        
+
         this.particles.add(p);
     }
 
@@ -251,9 +251,9 @@ class NovaEffectsClass {
 
             // Physics logic: Orbital movement
             // Angular velocity (spin) is faster when closer to the center
-            const orbitalSpeedFactor = 1 / (1 + p.radius * 0.01); 
+            const orbitalSpeedFactor = 1 / (1 + p.radius * 0.01);
             p.angle += p.angularVelocity * orbitalSpeedFactor;
-            
+
             // Radial velocity (expansion)
             const drag = 0.98;
             p.radialVelocity *= drag;

@@ -10,22 +10,17 @@ const Icons = {
             </defs>
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
         </svg>`,
-        
-        'settings': `<svg viewBox="0 0 24 24" fill="none" stroke="var(--text-primary)" stroke-width="1.5">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-        </svg>`,
-        
-        // Apps
+
+        // App marks only. UI icons live in ../../gramofdesign/icons/.
         'calculator': `<svg viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2">
             <rect x="4" y="2" width="16" height="20" rx="4"></rect>
             <path d="M8 6h8"></path><path d="M12 10v8"></path><path d="M8 14h8"></path>
         </svg>`,
-        
+
         'codex': `<svg viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path>
         </svg>`,
-        
+
         'minesweeper': `<svg viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2">
             <circle cx="12" cy="12" r="8"></circle>
             <path d="M12 2v2"></path><path d="M12 20v2"></path>
@@ -33,7 +28,7 @@ const Icons = {
             <path d="M2 12h2"></path><path d="M20 12h2"></path>
             <path d="M6.34 17.66l-1.41 1.41"></path><path d="M19.07 4.93l-1.41 1.41"></path>
         </svg>`,
-        
+
         'colorlines': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="6" cy="12" r="3" fill="#3B82F6" stroke="none"></circle>
             <circle cx="12" cy="12" r="3" fill="#10B981" stroke="none"></circle>
@@ -48,7 +43,7 @@ const Icons = {
             <line x1="9" y1="3" x2="9" y2="21"></line>
             <line x1="15" y1="3" x2="15" y2="21"></line>
         </svg>`,
-        
+
         'scores': `<svg viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
             <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
@@ -68,15 +63,11 @@ const Icons = {
             <rect x="10" y="16" width="4" height="4" rx="1" fill="#22C55E" stroke="none"></rect>
             <rect x="17" y="16" width="4" height="4" rx="1" fill="#22C55E" stroke="none"></rect>
         </svg>`,
-        
-        // UI
-        'close': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`,
-        'file': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>`,
-        'folder': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`
+
     },
 
     get(id) {
-        return this.library[id] || this.library['file'];
+        return this.library[id] || this.library['finder'];
     }
 };
 

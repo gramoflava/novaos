@@ -17,8 +17,8 @@ Abandoning traditional rigid window boundaries and the standard "dock and top-ba
 
 ### 🎨 Premium "Nova" Aesthetic
 - **Fluid & Responsive Elements:** A mesmerizing animated mesh background dynamically shifts under heavily frosted glass overlays.
-- **Auto Light/Dark Mode:** Seamlessly hooks into your system's `prefers-color-scheme` to transition between a deep cosmic dark mode and a sleek, frosted minimal light mode.
-- **Geometric SVG Iconography:** Original, sleek, ultra-minimal vector icons tailored specifically for the Nova design system.
+- **Light / Auto / Dark:** Uses the shared gramof theme switch; Auto follows the system while manual choices stay selected.
+- **Purposeful Iconography:** Geometric marks identify apps; interface actions use the shared Tabler set.
 
 ### 💻 Included Workspace Applications
 - **Files:** A `localStorage` backed virtual file system with folder navigation.
@@ -46,6 +46,10 @@ Nova is built around an internal singleton pattern for absolute zero-dependency 
 - **Space Window Manager (`js/core/window-manager.js`)**: The heart of the infinite geometric pan & scale interactions without clashing with structural CSS animations.
 
 All application logic gracefully exists within atomic `js/apps/*` modules.
+
+On phones Nova switches to one active window at a time and presents the shelf
+as a bottom app bar. The infinite-space camera and window physics remain the
+desktop interaction model.
 
 ## 📜 License
 

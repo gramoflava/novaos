@@ -3,7 +3,7 @@ class Shell {
     constructor() {
         this.clockEl = document.getElementById('island-clock');
         this.initClock();
-        
+
         Bus.on('system:ready', () => {
             this.welcome();
         });
@@ -17,7 +17,7 @@ class Shell {
             const ampm = h >= 12 ? 'PM' : 'AM';
             h = h % 12 || 12;
             m = m < 10 ? '0' + m : m;
-            
+
             if (this.clockEl) {
                 this.clockEl.textContent = `${h}:${m} ${ampm}`;
             }

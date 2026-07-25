@@ -1,126 +1,102 @@
-/* ==========================================================================
-   Nova Effects (Physical Mechanics & Space Distortions)
-   ========================================================================== */
+/* Nova-only physical effects. Shared colours, radii and shadows come from gramof. */
 
-:root {
-    --bh-core-color: #000000;
-    --bh-theme-filter: invert(0);
-}
-
-@media (prefers-color-scheme: light) {
-    :root {
-        --bh-core-color: #ffffff;
-        --bh-theme-filter: invert(1);
-    }
-}
-
-/* --- Gemini Black Hole Visuals --- */
 .nova-blackhole-container {
-    position: absolute;
-    transform: translate(-50%, -50%);
-    z-index: 50;
-    transition: opacity var(--duration-slow) var(--curve-smooth);
-    width: 120px;
-    height: 120px;
+  position: absolute;
+  z-index: 50;
+  width: 120px;
+  height: 120px;
+  transform: translate(-50%, -50%);
+  transition: opacity var(--dur-slow) var(--ease-smooth);
 }
 
-.central-mass { 
-    fill: var(--bh-core-color); 
+.central-mass {
+  fill: var(--bg);
 }
 
 .inflow {
-    fill: none;
-    stroke-linecap: round;
-    /* Dash array simulates clumpy matter, dash offset simulates flow */
-    stroke-dasharray: 15 45;
-    stroke-dashoffset: 0;
-    animation: flowInward 10s linear infinite;
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 15 45;
+  stroke-dashoffset: 0;
+  animation: flow-inward 10s linear infinite;
 }
 
-/* Animate flow inward along the spiral paths */
-@keyframes flowInward {
-    0% { stroke-dashoffset: 0; opacity: 0.8; }
-    100% { stroke-dashoffset: 200; opacity: 0; }
+@keyframes flow-inward {
+  to {
+    stroke-dashoffset: 200;
+    opacity: 0;
+  }
 }
 
-/* Slow overall rotation of the system */
 .rotating-disc {
-    transform-origin: center;
-    animation: rotateDisc 60s linear infinite;
+  transform-origin: center;
+  animation: rotate-disc 60s linear infinite;
 }
 
-@keyframes rotateDisc {
-    to { transform: rotate(360deg); }
+@keyframes rotate-disc {
+  to { transform: rotate(360deg); }
 }
 
-/* --- Supernova Explosion Flashes --- */
 .nova-explosion {
-    position: absolute;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: #fff;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    z-index: 50;
-    animation: explodeNova 0.4s cubic-bezier(0.1, 0.8, 0.2, 1) forwards;
+  position: absolute;
+  z-index: 50;
+  width: 20px;
+  height: 20px;
+  pointer-events: none;
+  background: var(--text);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-lg);
+  transform: translate(-50%, -50%);
+  animation: explode-nova 400ms var(--ease-out) forwards;
 }
 
-@keyframes explodeNova {
-    0% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 20px 10px rgba(255,255,255,0.9); opacity: 1; }
-    50% { transform: translate(-50%, -50%) scale(8); box-shadow: 0 0 50px 30px rgba(150,200,255,0.8); opacity: 0.9; }
-    100% { transform: translate(-50%, -50%) scale(12); box-shadow: 0 0 100px 50px rgba(150,200,255,0); opacity: 0; }
+@keyframes explode-nova {
+  0% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  50% { transform: translate(-50%, -50%) scale(8); opacity: 0.9; }
+  100% { transform: translate(-50%, -50%) scale(12); opacity: 0; }
 }
 
-/* --- Persistent Remnant Nebula --- */
 .nova-remnant {
-    position: absolute;
-    width: 150px;
-    height: 150px;
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 5;
-    transform: translate(-50%, -50%);
-    animation: fadePulseRemnant 8s infinite alternate ease-in-out;
+  position: absolute;
+  z-index: 5;
+  width: 150px;
+  height: 150px;
+  pointer-events: none;
+  border-radius: var(--radius-pill);
+  transform: translate(-50%, -50%);
+  animation: fade-pulse-remnant 8s infinite alternate var(--ease-smooth);
 }
 
 .nova-remnant::before {
-    content: '';
-    position: absolute;
-    inset: -30px;
-    border-radius: 50%;
-    background: inherit;
-    filter: blur(20px);
-    opacity: 0.8;
+  content: '';
+  position: absolute;
+  inset: -30px;
+  background: inherit;
+  border-radius: var(--radius-pill);
+  filter: blur(var(--blur-panel));
+  opacity: 0.8;
 }
 
 .nova-remnant::after {
-    content: '';
-    position: absolute;
-    top: 50%; left: 50%;
-    width: 6px; height: 6px;
-    background: #fff;
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    box-shadow: 0 0 15px 3px rgba(255,255,255,0.9), 0 0 30px 10px rgba(150,200,255,0.5);
-    animation: twinkleStar 3s infinite alternate ease-in-out;
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  background: var(--text);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-lg);
+  transform: translate(-50%, -50%);
+  animation: twinkle-star 3s infinite alternate var(--ease-smooth);
 }
 
-@keyframes twinkleStar {
-    0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.7; }
-    100% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+@keyframes twinkle-star {
+  from { transform: translate(-50%, -50%) scale(0.8); opacity: 0.7; }
+  to { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
 }
 
-@keyframes fadePulseRemnant {
-    0% { transform: translate(-50%, -50%) scale(0.9) rotate(0deg); opacity: 0.6; }
-    100% { transform: translate(-50%, -50%) scale(1.1) rotate(25deg); opacity: 1; }
-}
-
-@media (prefers-color-scheme: light) {
-    .nova-explosion { background: #000; animation-name: explodeNovaLight; }
-    @keyframes explodeNovaLight {
-        0% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 20px 10px rgba(0,0,0,0.9); opacity: 1; }
-        50% { transform: translate(-50%, -50%) scale(8); box-shadow: 0 0 50px 30px rgba(50,50,50,0.8); opacity: 0.9; }
-        100% { transform: translate(-50%, -50%) scale(12); box-shadow: 0 0 100px 50px rgba(50,50,50,0); opacity: 0; }
-    }
+@keyframes fade-pulse-remnant {
+  from { transform: translate(-50%, -50%) scale(0.9) rotate(0deg); opacity: 0.6; }
+  to { transform: translate(-50%, -50%) scale(1.1) rotate(25deg); opacity: 1; }
 }

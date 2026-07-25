@@ -7,15 +7,15 @@ Apps.register({
     launch: () => {
         const winId = 'scoresapp-' + Date.now();
         const style = `
-            .scores-container { display: flex; height: 100%; color: var(--text-primary); }
-            .scores-sidebar { width: 120px; border-right: 1px solid var(--border-glass); padding: 12px; }
-            .scores-menu-item { padding: 8px 12px; margin-bottom: 4px; border-radius: 6px; cursor: pointer; transition: background 0.2s; font-size: 14px; }
-            .scores-menu-item:hover { background: rgba(128,128,128,0.1); }
-            .scores-menu-item.active { background: var(--accent); color: white; }
+            .scores-container { display: flex; height: 100%; color: var(--text); }
+            .scores-sidebar { width: 120px; border-right: 1px solid var(--line); padding: 12px; }
+            .scores-menu-item { padding: 8px 12px; margin-bottom: 4px; border-radius: var(--radius-sm); cursor: pointer; transition: background 0.2s; font-size: 14px; }
+            .scores-menu-item:hover { background: var(--surface-sunk); }
+            .scores-menu-item.active { background: var(--accent); color: var(--text-on-accent); }
             .scores-content { flex: 1; padding: 24px; overflow-y: auto; }
-            .score-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-glass); }
+            .score-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); }
         `;
-        
+
         const html = `
             <div class="scores-container" id="scores-container-${winId}">
                 <div class="scores-sidebar" id="scores-sidebar-${winId}">
@@ -60,7 +60,7 @@ Apps.register({
                     listHtml += `
                         <div class="score-row">
                             <span style="font-weight: 600; color: var(--text-secondary); width: 30px;">#${i+1}</span>
-                            <span style="font-weight: bold; color: var(--text-primary); flex: 1; text-align: left;">${s.initials}</span>
+                            <span style="font-weight: bold; color: var(--text); flex: 1; text-align: left;">${s.initials}</span>
                             <span style="color: var(--accent); font-variant-numeric: tabular-nums;">${s.score}</span>
                         </div>
                     `;
@@ -70,7 +70,7 @@ Apps.register({
             let selectorHtml = '';
             if (baseGame === 'minesweeper') {
                 selectorHtml = `
-                    <div style="display: flex; background: rgba(128,128,128,0.1); padding: 4px; border-radius: 8px; margin-bottom: 16px;">
+                    <div style="display: flex; background: var(--surface-sunk); padding: 4px; border-radius: var(--radius-sm); margin-bottom: 16px;">
                         <div class="lb-level-opt ${gameId === 'minesweeper-easy' ? 'active' : ''}" data-id="minesweeper-easy">Easy</div>
                         <div class="lb-level-opt ${gameId === 'minesweeper-medium' ? 'active' : ''}" data-id="minesweeper-medium">Med</div>
                         <div class="lb-level-opt ${gameId === 'minesweeper-hard' ? 'active' : ''}" data-id="minesweeper-hard">Hard</div>
@@ -78,7 +78,7 @@ Apps.register({
                 `;
             } else if (baseGame === 'wordl') {
                 selectorHtml = `
-                    <div style="display: flex; background: rgba(128,128,128,0.1); padding: 4px; border-radius: 8px; margin-bottom: 16px;">
+                    <div style="display: flex; background: var(--surface-sunk); padding: 4px; border-radius: var(--radius-sm); margin-bottom: 16px;">
                         <div class="lb-level-opt ${gameId === 'wordl-4' ? 'active' : ''}" data-id="wordl-4">4 Letters</div>
                         <div class="lb-level-opt ${gameId === 'wordl-5' ? 'active' : ''}" data-id="wordl-5">5 Letters</div>
                         <div class="lb-level-opt ${gameId === 'wordl-6' ? 'active' : ''}" data-id="wordl-6">6 Letters</div>
@@ -87,7 +87,7 @@ Apps.register({
                 `;
             } else if (baseGame === 'colorlines') {
                 selectorHtml = `
-                    <div style="display: flex; background: rgba(128,128,128,0.1); padding: 4px; border-radius: 8px; margin-bottom: 16px;">
+                    <div style="display: flex; background: var(--surface-sunk); padding: 4px; border-radius: var(--radius-sm); margin-bottom: 16px;">
                         <div class="lb-level-opt ${gameId === 'colorlines-5' ? 'active' : ''}" data-id="colorlines-5">Classic (5)</div>
                         <div class="lb-level-opt ${gameId === 'colorlines-4' ? 'active' : ''}" data-id="colorlines-4">Quick (4)</div>
                     </div>
@@ -96,25 +96,23 @@ Apps.register({
 
             content.innerHTML = `
                 <style>
-                    .lb-level-opt { flex: 1; text-align: center; font-size: 11px; padding: 6px; border-radius: 6px; cursor: pointer; transition: all 0.2s; color: var(--text-secondary); }
-                    .lb-level-opt:hover { background: rgba(128,128,128,0.1); color: var(--text-primary); }
-                    .lb-level-opt.active { background: var(--accent); color: #fff; box-shadow: var(--shadow-glow); }
+                    .lb-level-opt { flex: 1; text-align: center; font-size: 11px; padding: 6px; border-radius: var(--radius-sm); cursor: pointer; transition: all 0.2s; color: var(--text-secondary); }
+                    .lb-level-opt:hover { background: var(--surface-sunk); color: var(--text); }
+                    .lb-level-opt.active { background: var(--accent); color: var(--text-on-accent); box-shadow: var(--shadow-lg); }
                 </style>
                 <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 16px;">
-                    <button class="scores-reset-btn" style="background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #EF4444; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.2s;">Reset</button>
+                    <button class="btn btn--danger scores-reset-btn">Reset</button>
                 </div>
                 ${selectorHtml}
                 ${listHtml}
             `;
-            
+
             content.querySelectorAll('.lb-level-opt').forEach(opt => {
                 opt.onclick = () => renderScores(opt.dataset.id);
             });
 
             const resetBtn = content.querySelector('.scores-reset-btn');
             if (resetBtn) {
-                resetBtn.addEventListener('mouseenter', () => resetBtn.style.background = 'rgba(239,68,68,0.2)');
-                resetBtn.addEventListener('mouseleave', () => resetBtn.style.background = 'rgba(239,68,68,0.1)');
                 resetBtn.onclick = () => {
                     if (window.Scores) {
                         window.Scores.clearScores(gameId);

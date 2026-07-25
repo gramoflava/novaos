@@ -6,32 +6,32 @@
     right: 24px;
     width: 60px;
     height: 60px;
-    background: var(--surface-glass);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid var(--border-glass);
-    border-radius: 50%;
-    box-shadow: var(--shadow-elevated);
+    background: var(--glass);
+    backdrop-filter: blur(var(--blur-panel));
+    -webkit-backdrop-filter: blur(var(--blur-panel));
+    border: 1px solid var(--line);
+    border-radius: var(--radius-pill);
+    box-shadow: var(--shadow-lg);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: all var(--duration-base) var(--curve-smooth);
+    transition: all var(--dur-base) var(--ease-smooth);
     z-index: 9999;
-    color: var(--text-primary);
+    color: var(--text);
 }
 
 .kofi-floater:hover {
     transform: scale(1.1) translateY(-2px);
-    background: var(--surface-glass-hover);
-    border-color: var(--border-glass-strong);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+    background: var(--glass-hover);
+    border-color: var(--line-strong);
+    box-shadow: var(--shadow-hover);
 }
 
 .kofi-floater svg {
     width: 30px;
     height: 30px;
-    transition: transform var(--duration-fast) var(--curve-smooth);
+    transition: transform var(--dur-fast) var(--ease-smooth);
 }
 
 .kofi-floater:hover svg {
@@ -50,16 +50,16 @@
     height: 660px;
     max-width: calc(100vw - 48px);
     max-height: calc(100vh - 120px);
-    background: var(--surface-glass);
-    backdrop-filter: blur(30px);
-    -webkit-backdrop-filter: blur(30px);
-    border: 1px solid var(--border-glass-strong);
-    border-radius: 20px;
-    box-shadow: var(--shadow-elevated);
+    background: var(--glass);
+    backdrop-filter: blur(var(--blur-panel));
+    -webkit-backdrop-filter: blur(var(--blur-panel));
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
     z-index: 9998;
     overflow: hidden;
-    transition: all var(--duration-base) var(--curve-smooth);
-    animation: novaFadeIn 0.3s var(--curve-smooth);
+    transition: all var(--dur-base) var(--ease-smooth);
+    animation: novaFadeIn 0.3s var(--ease-smooth);
 }
 
 @keyframes novaFadeIn {
@@ -71,6 +71,13 @@
     display: none;
 }
 
+.kofi-frame {
+    width: 100%;
+    padding: 0;
+    background: transparent;
+    border: 0;
+}
+
 @media (max-width: 480px) {
     .kofi-panel {
         bottom: 0;
@@ -79,13 +86,13 @@
         height: 100vh;
         max-width: 100vw;
         max-height: 100vh;
-        border-radius: 0;
+        border-radius: var(--radius-none);
     }
-    
+
     .kofi-floater {
-        bottom: 20px;
-        right: 20px;
-        width: 50px;
-        height: 50px;
+        right: var(--space-2);
+        bottom: 80px;
+        width: 44px;
+        height: 44px;
     }
 }

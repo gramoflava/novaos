@@ -6,17 +6,17 @@ Apps.register({
     keepInDock: true,
     launch: () => {
         const winId = 'minesweeper-' + Date.now();
-        
+
         const style = `
-            .ms-container { padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%; font-family: var(--font-sans); color: var(--text-primary); }
-            .ms-grid { display: grid; gap: 2px; padding: 12px; background: rgba(128,128,128,0.05); border-radius: 12px; border: 1px solid var(--border-glass-strong); box-shadow: var(--shadow-inset); user-select: none; }
-            .ms-cell { width: 32px; height: 32px; background: rgba(128,128,128,0.1); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; cursor: pointer; transition: background 0.1s; color: var(--text-primary); }
-            .ms-cell:hover { background: rgba(128,128,128,0.2); }
-            .ms-cell.revealed { background: rgba(128,128,128,0.3); border: 1px solid rgba(128,128,128,0.1); cursor: default; }
+            .ms-container { padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%; font-family: var(--font-sans); color: var(--text); }
+            .ms-grid { display: grid; gap: 2px; padding: 12px; background: var(--surface-sunk); border-radius: var(--radius-md); border: 1px solid var(--line-strong); box-shadow: var(--glass-edge); user-select: none; }
+            .ms-cell { width: 32px; height: 32px; background: var(--surface-sunk); border-radius: var(--radius-xs); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; cursor: pointer; transition: background 0.1s; color: var(--text); }
+            .ms-cell:hover { background: var(--glass-hover); }
+            .ms-cell.revealed { background: var(--glass-active); border: 1px solid var(--surface-sunk); cursor: default; }
             .ms-cell.mine { background: #EF4444; color: #fff;}
             .ms-cell.flagged { color: #F59E0B; }
-            .c-1 { color: #3B82F6; } .c-2 { color: #10B981; } .c-3 { color: #EF4444; } 
-            .c-4 { color: #8B5CF6; } .c-5 { color: #F59E0B; } .c-6 { color: #06B6D4; } 
+            .c-1 { color: #3B82F6; } .c-2 { color: #10B981; } .c-3 { color: #EF4444; }
+            .c-4 { color: #8B5CF6; } .c-5 { color: #F59E0B; } .c-6 { color: #06B6D4; }
             .c-7 { color: #111827; } .c-8 { color: #6B7280; }
         `;
 
@@ -91,7 +91,7 @@ Apps.register({
                 for(let c=0; c<cols; c++) {
                     let cell = { r, c, isMine: false, isRevealed: false, isFlagged: false, neighborMines: 0 };
                     row.push(cell);
-                    
+
                     const div = document.createElement('div');
                     div.className = 'ms-cell';
                     div.dataset.r = r;
@@ -117,7 +117,7 @@ Apps.register({
                     placed++;
                 }
             }
-            
+
             // Calc numbers
             for(let r=0; r<rows; r++) {
                 for(let c=0; c<cols; c++) {
@@ -139,25 +139,25 @@ Apps.register({
             const div = uiGrid.children[r * cols + c];
             div.className = 'ms-cell';
             div.textContent = '';
-            
+
             if (cell.isRevealed) {
                 div.classList.add('revealed');
                 if (cell.isMine) {
                     div.classList.add('mine');
-                    div.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="6"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>';
+                    div.innerHTML = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="13" cy="14" r="7"></circle><path d="M9.15 9.15l-1.15 -1.15M9 4l1 2M13 4l-1 2M17 4l-1 2M18 8l2 -1M21 11l-2 1"></path></svg>';
                 } else if (cell.neighborMines > 0) {
                     div.textContent = cell.neighborMines;
                     div.classList.add('c-'+cell.neighborMines);
                 }
             } else if (cell.isFlagged) {
                 div.classList.add('flagged');
-                div.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7"/></svg>';
+                div.innerHTML = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5a5 5 0 0 1 7 0a5 5 0 0 0 7 0v9a5 5 0 0 1 -7 0a5 5 0 0 0 -7 0v-9M5 21v-7"></path></svg>';
             }
         };
 
         const reveal = (r, c) => {
             if(r<0 || r>=rows || c<0 || c>=cols || board[r][c].isRevealed || board[r][c].isFlagged) return;
-            
+
             board[r][c].isRevealed = true;
             revealedCount++;
             updateCellUI(r, c);
@@ -193,7 +193,7 @@ Apps.register({
 
         const handleRightClick = (r, c) => {
             if(isGameOver || board[r][c].isRevealed) return;
-            
+
             board[r][c].isFlagged = !board[r][c].isFlagged;
             minesLeft += board[r][c].isFlagged ? -1 : 1;
             uiMines.textContent = minesLeft;
@@ -210,7 +210,7 @@ Apps.register({
         const gameOver = (win) => {
             isGameOver = true;
             if(timer) clearInterval(timer);
-            
+
             // Reveal all mines
             for(let r=0; r<rows; r++) {
                 for(let c=0; c<cols; c++) {
@@ -224,7 +224,7 @@ Apps.register({
             const levels = { 'easy': 'Beginner', 'medium': 'Intermediate', 'hard': 'Expert' };
             const levelId = 'minesweeper-' + (document.getElementById(`ms-level-${winId}`).value || 'easy');
             const finalScore = win ? Math.max(0, 9999 - time * 10) : 0;
-            
+
             if(win) {
                 if (window.AudioMng) AudioMng.play('win');
                 setTimeout(() => Scores.showScorePrompt(levelId, finalScore, true, null, winId), 500);
@@ -241,17 +241,17 @@ Apps.register({
             if (val === 'easy') { rows=9; cols=9; totalMines=10; winEl.style.width='440px'; winEl.style.height='500px'; }
             if (val === 'medium') { rows=16; cols=16; totalMines=40; winEl.style.width='650px'; winEl.style.height='720px'; }
             if (val === 'hard') { rows=16; cols=30; totalMines=99; winEl.style.width='1100px'; winEl.style.height='720px'; }
-            
+
             winEl.dataset.w = parseFloat(winEl.style.width);
             winEl.dataset.h = parseFloat(winEl.style.height);
-            
+
             if (window.WindowManager) {
                 WindowManager.pushWindowsOut(winId, { x: parseFloat(winEl.dataset.x), y: parseFloat(winEl.dataset.y), w: parseFloat(winEl.dataset.w), h: parseFloat(winEl.dataset.h) });
             }
-            
+
             initBoard();
         };
-        
+
         const onGlobalKey = (e) => {
             if (WindowManager.activeWindowId === winId && e.code === 'Space') {
                 if (lastHoveredCell.r !== -1 && lastHoveredCell.c !== -1) {

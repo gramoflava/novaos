@@ -25,10 +25,10 @@ class AppRegistry {
             console.error(`App ${appId} not found!`);
             return;
         }
-        
+
         this.running.add(appId);
         Bus.emit('app:launching', appId);
-        
+
         try {
             app.launch(args);
         } catch (e) {

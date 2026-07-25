@@ -8,7 +8,7 @@ class ScoreManager {
         try {
             const data = localStorage.getItem(this.storageKey);
             this.scores = data ? JSON.parse(data) : {};
-            
+
             // Migration for Minesweeper level-specific scores
             if (this.scores.minesweeper && !this.scores['minesweeper-easy']) {
                 this.scores['minesweeper-easy'] = this.scores.minesweeper;
@@ -26,10 +26,10 @@ class ScoreManager {
 
     addScore(gameId, initials, score) {
         if (!this.scores[gameId]) this.scores[gameId] = [];
-        this.scores[gameId].push({ 
-            initials: (initials || '???').toUpperCase().substring(0,3), 
-            score: score, 
-            date: Date.now() 
+        this.scores[gameId].push({
+            initials: (initials || '???').toUpperCase().substring(0,3),
+            score: score,
+            date: Date.now()
         });
         this.scores[gameId].sort((a, b) => b.score - a.score);
         this.scores[gameId] = this.scores[gameId].slice(0, 10); // Top 10 max
@@ -46,7 +46,7 @@ class ScoreManager {
         this.save();
         window.dispatchEvent(new CustomEvent('scoresUpdated', { detail: { gameId } }));
     }
-    
+
     isHighScore(gameId, score) {
         if (score <= 0) return false;
         const topScores = this.getTopScores(gameId);
@@ -73,23 +73,31 @@ class ScoreManager {
 
         const winId = 'score-' + Date.now();
         const html = `
-            <div id="${winId}-overlay" class="score-prompt-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; opacity: 0; pointer-events: none; animation: scoreFadeIn 0.5s ease forwards; transition: opacity 0.5s ease;">
-                <h2 style="color: ${isWin ? '#4ADE80' : '#F472B6'}; margin-bottom: 8px;">
+            <div id="${winId}-overlay" class="score-prompt-overlay">
+                <h2 class="${isWin ? 'score-prompt-result--win' : 'score-prompt-result--loss'}">
                     ${isWin ? 'Board Cleared!' : 'Game Over'}
                 </h2>
-                <div style="font-size: 48px; font-weight: 300; margin-bottom: 24px; color: #FFFFFF; text-shadow: 0 0 20px rgba(255,255,255,0.2);">${score}</div>
-                <div style="margin-bottom: 16px; font-size: 14px; color: rgba(255,255,255,0.7);">Enter 3 initials for the leaderboard:</div>
-                <input type="text" id="initials-${winId}" maxlength="3" style="width: 100px; text-align: center; font-size: 24px; letter-spacing: 4px; text-transform: uppercase; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #FFFFFF; padding: 8px; border-radius: 8px; margin-bottom: 24px; outline: none; box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.1);">
-                <button id="save-btn-${winId}" style="background: var(--accent-primary); color: #fff; border: none; padding: 12px 24px; border-radius: 8px; font-size: 16px; cursor: pointer; transition: all 0.2s; font-weight: 500;">Save Score</button>
+                <div class="score-prompt-score">${score}</div>
+                <div class="score-prompt-copy">Enter 3 initials for the leaderboard:</div>
+                <input class="score-prompt-input" type="text" id="initials-${winId}" maxlength="3">
+                <button class="btn btn--primary score-prompt-save" id="save-btn-${winId}">Save Score</button>
             </div>
             <style id="style-${winId}">
+                .score-prompt-overlay { position: absolute; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(var(--blur-panel)); opacity: 0; pointer-events: none; animation: scoreFadeIn var(--dur-slow) var(--ease-smooth) forwards; transition: opacity var(--dur-slow) var(--ease-smooth); }
+                .score-prompt-result--win, .score-prompt-result--loss { margin-bottom: 8px; }
+                .score-prompt-result--win { color: var(--success); }
+                .score-prompt-result--loss { color: var(--danger); }
+                .score-prompt-score { margin-bottom: 24px; color: var(--text); font-size: 48px; font-weight: 300; text-shadow: var(--shadow-sm); }
+                .score-prompt-copy { margin-bottom: 16px; color: var(--text-secondary); font-size: 14px; }
+                .score-prompt-input { width: 100px; margin-bottom: 24px; padding: 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); outline: none; background: var(--glass-hover); box-shadow: var(--glass-edge); color: var(--text); text-align: center; text-transform: uppercase; font-size: 24px; letter-spacing: 4px; }
+                .score-prompt-save { padding: 12px 24px; font-size: 16px; }
                 @keyframes scoreFadeIn { from { opacity: 0; transform: scale(1.1); } to { opacity: 1; transform: scale(1); pointer-events: auto; } }
                 #save-btn-${winId}:hover { filter: brightness(1.1); transform: translateY(-1px); }
                 #save-btn-${winId}:active { transform: translateY(1px); }
-                #initials-${winId}:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 2px var(--accent-glow); }
+                #initials-${winId}:focus { border-color: var(--accent); box-shadow: var(--shadow-sm); }
             </style>
         `;
-        
+
         let container = document.body;
         if (targetWinId) {
             const targetWinObj = WindowManager.windows.get(targetWinId);
@@ -127,8 +135,8 @@ class ScoreManager {
                 'colorlines': ['#10B981', '#F59E0B', '#fff'],
                 'wordl': ['#22C55E', '#EAB308', '#fff']
             };
-            const colors = gameColors[gameId.split('-')[0]] || ['var(--accent-primary)', '#fff'];
-            
+            const colors = gameColors[gameId.split('-')[0]] || ['var(--accent)', '#fff'];
+
             // Unified Celebration: Start persistent effect if winning
             NovaEffects.startCelebration(burstX, burstY, {
                 colors: colors,
@@ -149,25 +157,25 @@ class ScoreManager {
         btn.onclick = () => {
             const initials = input.value || '???';
             this.addScore(gameId, initials, score);
-            
+
             const overlay = document.getElementById(`${winId}-overlay`);
             if (overlay) {
                 // Fade out overlay
                 overlay.style.opacity = '0';
                 overlay.style.pointerEvents = 'none';
-                
+
                 setTimeout(() => {
                     if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
                     const styleTag = document.getElementById(`style-${winId}`);
                     if (styleTag && styleTag.parentNode) styleTag.parentNode.removeChild(styleTag);
-                    
+
                     // Stop celebration after overlay is gone + some delay
                     setTimeout(() => {
                         if (window.NovaEffects) NovaEffects.stopCelebration();
                     }, 1000);
                 }, 500);
             }
-            
+
             if (onComplete) onComplete();
         };
     }
@@ -175,9 +183,9 @@ class ScoreManager {
     showLeaderboard(gameName, gameId) {
         const winId = 'leaderboard-' + gameId + '-' + Date.now();
         let currentSubId = gameId;
-        
+
         const isMines = gameId.startsWith('minesweeper');
-        
+
         const renderList = (id) => {
             const scores = this.getTopScores(id);
             let listHtml = '';
@@ -186,10 +194,10 @@ class ScoreManager {
             } else {
                 scores.forEach((s, i) => {
                     listHtml += `
-                        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-glass);">
+                        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line);">
                             <span style="font-weight: 600; color: var(--text-secondary); width: 30px;">#${i+1}</span>
-                            <span style="font-weight: bold; color: var(--text-primary); flex: 1; text-align: left;">${s.initials}</span>
-                            <span style="color: var(--accent-primary); font-variant-numeric: tabular-nums;">${s.score}</span>
+                            <span style="font-weight: bold; color: var(--text); flex: 1; text-align: left;">${s.initials}</span>
+                            <span style="color: var(--accent); font-variant-numeric: tabular-nums;">${s.score}</span>
                         </div>
                     `;
                 });
@@ -198,27 +206,27 @@ class ScoreManager {
         };
 
         const selectorHtml = isMines ? `
-            <div class="lb-selector" style="display: flex; background: rgba(128,128,128,0.1); padding: 4px; border-radius: 8px; margin-bottom: 16px;">
-                <div class="lb-opt ${gameId === 'minesweeper-easy' ? 'active' : ''}" data-id="minesweeper-easy" style="flex: 1; text-align: center; font-size: 11px; padding: 6px; border-radius: 6px; cursor: pointer;">Easy</div>
-                <div class="lb-opt ${gameId === 'minesweeper-medium' ? 'active' : ''}" data-id="minesweeper-medium" style="flex: 1; text-align: center; font-size: 11px; padding: 6px; border-radius: 6px; cursor: pointer;">Med</div>
-                <div class="lb-opt ${gameId === 'minesweeper-hard' ? 'active' : ''}" data-id="minesweeper-hard" style="flex: 1; text-align: center; font-size: 11px; padding: 6px; border-radius: 6px; cursor: pointer;">Hard</div>
+            <div class="lb-selector" style="display: flex; background: var(--surface-sunk); padding: 4px; border-radius: var(--radius-sm); margin-bottom: 16px;">
+                <div class="lb-opt ${gameId === 'minesweeper-easy' ? 'active' : ''}" data-id="minesweeper-easy" style="flex: 1; text-align: center; font-size: 11px; padding: 6px; border-radius: var(--radius-sm); cursor: pointer;">Easy</div>
+                <div class="lb-opt ${gameId === 'minesweeper-medium' ? 'active' : ''}" data-id="minesweeper-medium" style="flex: 1; text-align: center; font-size: 11px; padding: 6px; border-radius: var(--radius-sm); cursor: pointer;">Med</div>
+                <div class="lb-opt ${gameId === 'minesweeper-hard' ? 'active' : ''}" data-id="minesweeper-hard" style="flex: 1; text-align: center; font-size: 11px; padding: 6px; border-radius: var(--radius-sm); cursor: pointer;">Hard</div>
             </div>
         ` : '';
 
         const html = `
-            <div style="padding: 24px; display: flex; flex-direction: column; height: 100%; background: var(--surface-base);">
-                <h3 style="color: var(--text-primary); margin-bottom: 16px; text-align: center;">${gameName} Leaderboard</h3>
+            <div style="padding: 24px; display: flex; flex-direction: column; height: 100%; background: var(--bg);">
+                <h3 style="color: var(--text); margin-bottom: 16px; text-align: center;">${gameName} Leaderboard</h3>
                 ${selectorHtml}
                 <div id="lb-list-${winId}" style="flex: 1; overflow-y: auto; padding-right: 8px;">
                     ${renderList(gameId)}
                 </div>
-                <button id="lb-close-${winId}" style="margin-top: 16px; background: rgba(128,128,128,0.1); color: var(--text-primary); border: 1px solid var(--border-glass); padding: 8px 16px; border-radius: 8px; cursor: pointer; transition: background 0.2s;">Close</button>
+                <button id="lb-close-${winId}" style="margin-top: 16px; background: var(--surface-sunk); color: var(--text); border: 1px solid var(--line); padding: 8px 16px; border-radius: var(--radius-sm); cursor: pointer; transition: background 0.2s;">Close</button>
             </div>
             <style>
-                #lb-close-${winId}:hover { background: rgba(128,128,128,0.2); }
+                #lb-close-${winId}:hover { background: var(--glass-hover); }
                 .lb-opt { transition: all 0.2s; color: var(--text-secondary); }
-                .lb-opt:hover { background: rgba(128,128,128,0.1); color: var(--text-primary); }
-                .lb-opt.active { background: var(--accent-primary); color: #fff; box-shadow: 0 4px 12px var(--accent-glow); }
+                .lb-opt:hover { background: var(--surface-sunk); color: var(--text); }
+                .lb-opt.active { background: var(--accent); color: var(--text-on-accent); box-shadow: var(--shadow-md); }
             </style>
         `;
 
@@ -250,4 +258,3 @@ class ScoreManager {
 }
 
 window.Scores = new ScoreManager();
-

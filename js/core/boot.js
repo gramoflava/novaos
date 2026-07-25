@@ -25,18 +25,18 @@ class BootSequence {
             setTimeout(() => {
                 this.screen.style.display = 'none';
                 this.desktop.style.display = 'block';
-                
+
                 // Play subtle startup animation on island and shelf
                 const island = document.getElementById('nova-island');
                 const shelf = document.getElementById('nova-shelf');
-                
+
                 island.style.transform = 'translateY(-20px) scale(0.9)';
                 island.style.opacity = '0';
-                island.style.transition = 'all 0.6s var(--curve-spring)';
-                
+                island.style.transition = 'all 0.6s var(--ease-spring)';
+
                 shelf.style.transform = 'translateY(20px) scale(0.9)';
                 shelf.style.opacity = '0';
-                shelf.style.transition = 'all 0.6s var(--curve-spring) 0.1s';
+                shelf.style.transition = 'all 0.6s var(--ease-spring) 0.1s';
 
                 requestAnimationFrame(() => {
                     requestAnimationFrame(() => {

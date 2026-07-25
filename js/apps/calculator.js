@@ -6,7 +6,7 @@ Apps.register({
     keepInDock: true,
     launch: () => {
         const winId = 'calc-' + Date.now();
-        
+
         let current = '0';
         let previous = null;
         let op = null;
@@ -26,31 +26,32 @@ Apps.register({
 
         const calcStyle = `
             .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 24px; flex: 1; }
-            .calc-btn { 
-                background: rgba(255,255,255,0.03); 
-                border: 1px solid var(--border-glass); 
-                box-shadow: var(--shadow-inset); 
-                border-radius: 12px; 
-                font-size: 20px; 
-                color: var(--text-primary); 
-                cursor: pointer; 
-                transition: all 0.2s; 
+            .calc-btn {
+                background: var(--surface-sunk);
+                border: 1px solid var(--line);
+                box-shadow: var(--glass-edge);
+                border-radius: var(--radius-md);
+                font-size: 20px;
+                color: var(--text);
+                cursor: pointer;
+                transition: all 0.2s;
                 display: flex; align-items: center; justify-content: center;
                 user-select: none;
             }
-            .calc-btn:hover { background: rgba(255,255,255,0.1); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.2), var(--shadow-inset); }
-            .calc-btn:active { transform: translateY(2px); background: rgba(0,0,0,0.2); box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); }
-            .calc-btn.op { background: rgba(99, 102, 241, 0.2); color: #818CF8; border-color: rgba(99, 102, 241, 0.3); }
-            .calc-btn.op:hover { background: rgba(99, 102, 241, 0.3); }
+            .calc-btn:hover { background: var(--glass-hover); transform: translateY(-2px); box-shadow: var(--shadow-md), var(--glass-edge); }
+            .calc-btn:active { transform: translateY(2px); background: var(--surface-sunk); box-shadow: var(--glass-edge); }
+            .calc-btn.op { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-ring); }
+            .calc-btn.op:hover { background: var(--accent-mid); }
+            .calc-btn.equals { background: var(--accent); color: var(--text-on-accent); }
             .calc-btn.zero { grid-column: span 2; }
-            .calc-display { 
-                padding: 32px 24px 16px; 
-                text-align: right; 
-                font-size: 48px; 
-                font-weight: 300; 
+            .calc-display {
+                padding: 32px 24px 16px;
+                text-align: right;
+                font-size: 48px;
+                font-weight: 300;
                 letter-spacing: -1px;
-                border-bottom: 1px solid var(--border-glass);
-                background: rgba(0,0,0,0.2);
+                border-bottom: 1px solid var(--line);
+                background: var(--surface-sunk);
             }
         `;
 
@@ -62,25 +63,25 @@ Apps.register({
                     <div class="calc-btn" data-action="sign">+/-</div>
                     <div class="calc-btn" data-action="percent">%</div>
                     <div class="calc-btn op" data-action="/">÷</div>
-                    
+
                     <div class="calc-btn" data-val="7">7</div>
                     <div class="calc-btn" data-val="8">8</div>
                     <div class="calc-btn" data-val="9">9</div>
                     <div class="calc-btn op" data-action="*">×</div>
-                    
+
                     <div class="calc-btn" data-val="4">4</div>
                     <div class="calc-btn" data-val="5">5</div>
                     <div class="calc-btn" data-val="6">6</div>
                     <div class="calc-btn op" data-action="-">−</div>
-                    
+
                     <div class="calc-btn" data-val="1">1</div>
                     <div class="calc-btn" data-val="2">2</div>
                     <div class="calc-btn" data-val="3">3</div>
                     <div class="calc-btn op" data-action="+">+</div>
-                    
+
                     <div class="calc-btn zero" data-val="0">0</div>
                     <div class="calc-btn" data-val=".">.</div>
-                    <div class="calc-btn op" style="background:#6366F1; color:#fff;" data-action="=">=</div>
+                    <div class="calc-btn op equals" data-action="=">=</div>
                 </div>
             </div>
             <style>${calcStyle}</style>
@@ -142,7 +143,7 @@ Apps.register({
             if (WindowManager.activeWindowId !== winId) return;
             let action = null;
             let val = null;
-            
+
             if (e.key >= '0' && e.key <= '9') val = e.key;
             if (e.key === '.') val = '.';
             if (e.key === 'Escape') action = 'clear';
