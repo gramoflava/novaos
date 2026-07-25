@@ -140,6 +140,18 @@
     transition: transform 0.2s var(--ease-spring);
 }
 
+.tabler-app-mark {
+    width: 28px;
+    height: 28px;
+    opacity: 0.8;
+    transition: transform var(--dur-base) var(--ease-spring);
+}
+
+.spotlight-item .tabler-app-mark {
+    width: 24px;
+    height: 24px;
+}
+
 .shelf-item:hover {
     background: var(--glass-hover);
     border: 1px solid var(--line);

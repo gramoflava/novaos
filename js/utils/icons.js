@@ -11,12 +11,8 @@ const Icons = {
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
         </svg>`,
 
-        'settings': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="6" cy="10" r="2"></circle>
-            <path d="M6 4v4M6 12v8M13.653 14.874a2 2 0 1 0 -.586 2.818M12 4v10M12 18v2"></path>
-            <circle cx="18" cy="7" r="2"></circle>
-            <path d="M18 4v1M18 9v4M22 22l-5 -5M17 22l5 -5"></path>
-        </svg>`,
+        // Settings is a system affordance, so it comes from the shared Tabler set.
+        'settings': `<img class="tabler-app-mark" src="gramofdesign/icons/adjustments-x.svg" alt="">`,
 
         // Apps
         'calculator': `<svg viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2">
@@ -71,14 +67,10 @@ const Icons = {
             <rect x="17" y="16" width="4" height="4" rx="1" fill="#22C55E" stroke="none"></rect>
         </svg>`,
 
-        // UI
-        'close': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>`,
-        'file': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2"/></svg>`,
-        'folder': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l3 3h7a2 2 0 0 1 2 2v8a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-10a3 3 0 0 1 2 -3"/></svg>`
     },
 
     get(id) {
-        return this.library[id] || this.library['file'];
+        return this.library[id] || this.library['finder'];
     }
 };
 
