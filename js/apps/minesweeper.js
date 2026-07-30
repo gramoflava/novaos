@@ -22,23 +22,24 @@ Apps.register({
 
         const html = `
             <div class="ms-container" id="ms-container-${winId}">
-                <div class="app-header" style="align-items: center; margin-bottom: 16px; width: 100%;">
-                    <div class="app-controls" style="margin: 0; display: flex; gap: 8px;">
-                        <select id="ms-level-${winId}" class="app-btn" style="text-align: center;">
+                <div class="game-toolbar">
+                    <div class="game-toolbar__group">
+                        <select id="ms-level-${winId}" class="game-select" aria-label="Difficulty">
                             <option value="easy">Beginner</option>
                             <option value="medium">Intermed.</option>
                             <option value="hard">Expert</option>
                         </select>
-                        <button class="app-btn" id="ms-restart-${winId}">Restart</button>
+                        <button class="game-icon-btn game-icon-btn--restart" id="ms-restart-${winId}" type="button" title="Restart" aria-label="Restart"></button>
                     </div>
-                    <div class="app-stats" style="display: flex; gap: 8px;">
-                        <div class="app-stat-box" style="margin: 0; padding: 4px 12px;">
-                            <div class="app-stat-label">Mines</div>
-                            <div class="app-stat-val" id="ms-mines-${winId}">10</div>
+                    <div class="game-toolbar__spacer"></div>
+                    <div class="game-stat-group">
+                        <div class="game-stat">
+                            <div class="game-stat__label">Mines</div>
+                            <div class="game-stat__value" id="ms-mines-${winId}">10</div>
                         </div>
-                        <div class="app-stat-box" style="margin: 0; padding: 4px 12px;">
-                            <div class="app-stat-label">Time</div>
-                            <div class="app-stat-val" id="ms-time-${winId}">0</div>
+                        <div class="game-stat">
+                            <div class="game-stat__label">Time</div>
+                            <div class="game-stat__value" id="ms-time-${winId}">0</div>
                         </div>
                     </div>
                 </div>

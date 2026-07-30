@@ -14,7 +14,7 @@ Apps.register({
             .cl-cell:hover { background: var(--glass-hover); }
             .cl-cell.selected { background: var(--glass-active); box-shadow: var(--glass-edge); }
             .cl-cell.traced::after { content: ''; position: absolute; top: 12px; left: 12px; width: 8px; height: 8px; border-radius: var(--radius-pill); background: var(--text); opacity: 0.3; pointer-events: none; }
-            .cl-ball { position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: var(--radius-pill); box-shadow: inset -4px -4px 8px color-mix(in srgb, var(--bg) 75%, transparent); pointer-events: none; transition: transform 0.2s; z-index: 10; }
+            .cl-ball { position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: var(--radius-pill); box-shadow: inset -5px -6px 9px rgba(15, 23, 42, 0.48), inset 4px 4px 6px rgba(255, 255, 255, 0.38), 0 3px 7px rgba(15, 23, 42, 0.24); pointer-events: none; transition: transform 0.2s; z-index: 10; }
             .cl-cell.selected .cl-ball { transform: scale(1.15); animation: pulseBall 1s infinite alternate; }
             .color-0 { color: #EF4444; background: #EF4444; }
             .color-1 { color: #3B82F6; background: #3B82F6; }
@@ -24,38 +24,34 @@ Apps.register({
             .color-5 { color: #EC4899; background: #EC4899; }
             .color-6 { color: #06B6D4; background: #06B6D4; }
             @keyframes pulseBall { from { transform: scale(1.1); } to { transform: scale(1.2); } }
-            .cl-preview-group { display: flex; align-items: center; background: var(--surface-sunk); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 4px; gap: 4px; transition: background 0.2s; }
+            .cl-preview-group { display: flex; flex: 1 1 auto; min-width: 34px; height: 36px; align-items: center; background: var(--surface-sunk); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 4px; gap: 2px; transition: background 0.2s; }
             .cl-preview-btn { background: transparent; border: none; color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; opacity: 0.6; transition: opacity 0.2s; }
             .cl-preview-btn:hover { opacity: 1; }
-            .cl-preview-wrap { overflow: hidden; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; width: 94px; opacity: 1; display: flex; gap: 4px; align-items: center; }
+            .cl-preview-wrap { overflow: hidden; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; width: 76px; opacity: 1; display: flex; gap: 2px; align-items: center; }
             .cl-preview-wrap.collapsed { width: 0; opacity: 0; pointer-events: none; }
-            .cl-preview-cell { flex-shrink: 0; width: 26px; height: 26px; background: var(--surface-sunk); border-radius: var(--radius-xs); position: relative; border: 1px solid var(--surface-sunk); }
-            .cl-preview-cell .cl-ball { top: 3px; left: 3px; width: 18px; height: 18px; box-shadow: inset -2px -2px 4px color-mix(in srgb, var(--bg) 75%, transparent); }
+            .cl-preview-cell { flex-shrink: 0; width: 24px; height: 24px; background: var(--surface-sunk); border-radius: var(--radius-xs); position: relative; border: 1px solid var(--surface-sunk); }
+            .cl-preview-cell .cl-ball { top: 3px; left: 3px; width: 16px; height: 16px; box-shadow: inset -3px -3px 5px rgba(15, 23, 42, 0.46), inset 2px 2px 3px rgba(255, 255, 255, 0.36), 0 2px 4px rgba(15, 23, 42, 0.2); }
         `;
 
         const html = `
             <div class="cl-container" id="cl-container-${winId}">
-                <div class="app-header" style="flex-direction: column; align-items: stretch; gap: 8px; margin-bottom: 16px; width: 100%;">
-                    <div style="display: flex; justify-content: center; gap: 32px; align-items: center;">
-                        <div class="cl-preview-group" style="margin: 0; height: 32px;">
-                            <button class="cl-preview-btn" id="cl-toggle-preview-${winId}" title="Toggle Preview" style="height: 100%;">
-                                <!-- SVG handled dynamically by JS -->
-                            </button>
-                            <div class="cl-preview-wrap ${localStorage.getItem('novaos_colorlines_preview') === 'false' ? 'collapsed' : ''}" id="cl-preview-${winId}"></div>
-                        </div>
-                        <div class="app-stat-box" style="margin: 0; padding: 4px 16px;">
-                            <div class="app-stat-label">Score</div>
-                            <div class="app-stat-val" id="cl-score-${winId}">0</div>
-                        </div>
+                <div class="game-toolbar">
+                    <select id="cl-level-${winId}" class="game-select" aria-label="Line length" style="min-width: 80px; width: 80px;">
+                        <option value="5" selected>Classic</option>
+                        <option value="4">Quick</option>
+                    </select>
+                    <div class="cl-preview-group">
+                        <button class="cl-preview-btn" id="cl-toggle-preview-${winId}" type="button" title="Toggle preview" aria-label="Toggle preview">
+                            <!-- SVG handled dynamically by JS -->
+                        </button>
+                        <div class="cl-preview-wrap ${localStorage.getItem('novaos_colorlines_preview') === 'false' ? 'collapsed' : ''}" id="cl-preview-${winId}"></div>
                     </div>
-                    <div class="app-controls" style="margin: 0; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; width: 100%;">
-                        <select id="cl-level-${winId}" class="app-btn" style="width: 100%; text-align: center;">
-                            <option value="5" selected>Classic</option>
-                            <option value="4">Quick</option>
-                        </select>
-                        <button class="app-btn" id="cl-restart-${winId}" style="width: 100%;">Restart</button>
-                        <button class="app-btn" id="cl-forfeit-${winId}" style="width: 100%; color: #F59E0B;">Forfeit</button>
+                    <div class="game-stat" style="min-width: 48px;">
+                        <div class="game-stat__label">Score</div>
+                        <div class="game-stat__value" id="cl-score-${winId}">0</div>
                     </div>
+                    <button class="game-icon-btn game-icon-btn--restart" id="cl-restart-${winId}" type="button" title="Restart" aria-label="Restart"></button>
+                    <button class="game-icon-btn game-icon-btn--forfeit" id="cl-forfeit-${winId}" type="button" title="Forfeit" aria-label="Forfeit"></button>
                 </div>
                 <div class="cl-grid" id="cl-grid-${winId}"></div>
             </div>

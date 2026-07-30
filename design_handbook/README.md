@@ -52,6 +52,7 @@ Nova's geometric icon library is reserved for app identities:
 - 2048
 - Color Lines
 - Wordl
+- Nova Run
 - Scores
 
 Settings and every interface action use Tabler sources from

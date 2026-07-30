@@ -25,6 +25,7 @@ Abandoning traditional rigid window boundaries and the standard "dock and top-ba
 - **Calculator:** A refined, fully functional inline glass calculator.
 - **Notes & Code:** Elegant markdown and code editors featuring `JetBrains Mono`.
 - **2048:** A built-in iteration of the classic tile game, heavily stylized for the Nova theme.
+- **Nova Run:** A large-pixel endless runner with a default lunar astronaut route and a switchable monochrome Dino classic.
 
 ## 🚀 Quick Start
 

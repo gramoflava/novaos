@@ -401,6 +401,127 @@
     color: var(--text);
 }
 
+/* Game chrome shares one control height and one spacing rhythm. */
+.game-toolbar {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    width: 100%;
+    min-height: 36px;
+    margin-bottom: var(--space-4);
+}
+
+.game-toolbar__group,
+.game-stat-group {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.game-toolbar__spacer {
+    flex: 1 1 auto;
+}
+
+.game-select,
+.game-icon-btn,
+.game-stat {
+    height: 36px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--surface-sunk);
+    color: var(--text);
+}
+
+.game-select {
+    min-width: 96px;
+    padding: 0 28px 0 10px;
+    outline: none;
+    font: 500 var(--text-sm) var(--font-sans);
+    cursor: pointer;
+}
+
+.game-icon-btn {
+    position: relative;
+    display: inline-flex;
+    flex: 0 0 36px;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    padding: 0;
+    outline: none;
+    cursor: pointer;
+    transition:
+        background var(--dur-base) var(--ease-smooth),
+        border-color var(--dur-base) var(--ease-smooth),
+        color var(--dur-base) var(--ease-smooth),
+        transform var(--dur-fast) var(--ease-out);
+}
+
+.game-icon-btn::before {
+    width: 18px;
+    height: 18px;
+    background: currentColor;
+    content: "";
+    -webkit-mask: var(--game-action-icon) center / contain no-repeat;
+    mask: var(--game-action-icon) center / contain no-repeat;
+}
+
+.game-icon-btn:hover,
+.game-select:hover {
+    background: var(--glass-hover);
+    border-color: var(--line-strong);
+}
+
+.game-icon-btn:active {
+    transform: scale(0.94);
+}
+
+.game-icon-btn:focus-visible,
+.game-select:focus-visible {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.game-icon-btn--restart {
+    --game-action-icon: url("../gramofdesign/icons/refresh.svg");
+}
+
+.game-icon-btn--forfeit {
+    --game-action-icon: url("../gramofdesign/icons/flag.svg");
+    color: var(--warn);
+}
+
+.game-icon-btn--reveal {
+    --game-action-icon: url("../gramofdesign/icons/eye.svg");
+    color: var(--danger);
+}
+
+.game-stat {
+    display: flex;
+    min-width: 52px;
+    padding: 3px var(--space-2);
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+
+.game-stat__label {
+    color: var(--text-muted);
+    font-size: 8px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.game-stat__value {
+    margin-top: 2px;
+    color: var(--text);
+    font-size: var(--text-lg);
+    font-weight: 600;
+}
+
 .settings-app {
     display: flex;
     flex-direction: column;

@@ -32,14 +32,13 @@ Apps.register({
 
         const html = `
             <div class="game-container" id="game-container-${winId}">
-                <div class="app-header" style="align-items: center; width: 100%; margin-bottom: 16px;">
-                    <div class="app-controls" style="margin: 0; display: flex; gap: 8px;">
-                        <button class="app-btn" id="btn-restart-${winId}">Restart</button>
-                    </div>
-                    <div class="app-stats" style="margin: 0;">
-                        <div class="app-stat-box" style="margin: 0; padding: 4px 16px;">
-                            <div class="app-stat-label">Score</div>
-                            <div class="app-stat-val" id="score-${winId}">0</div>
+                <div class="game-toolbar">
+                    <button class="game-icon-btn game-icon-btn--restart" id="btn-restart-${winId}" type="button" title="Restart" aria-label="Restart"></button>
+                    <div class="game-toolbar__spacer"></div>
+                    <div class="game-stat-group">
+                        <div class="game-stat">
+                            <div class="game-stat__label">Score</div>
+                            <div class="game-stat__value" id="score-${winId}">0</div>
                         </div>
                     </div>
                 </div>

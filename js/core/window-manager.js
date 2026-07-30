@@ -115,7 +115,7 @@ class WindowManagerClass {
                     ind.style.transition = 'opacity 0.2s';
 
                     // Slightly point the diamond shape
-                    if(w.appId === 'game2048' || w.appId === 'minesweeper' || w.appId === 'colorlines') {
+                    if(w.appId === 'game2048' || w.appId === 'minesweeper' || w.appId === 'colorlines' || w.appId === 'wordl' || w.appId === 'novarun') {
                         ind.style.background = 'var(--accent)';
                         ind.style.boxShadow = '0 0 12px var(--accent)';
                     }

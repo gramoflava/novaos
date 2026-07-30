@@ -160,6 +160,31 @@ Apps.register({
                     </ul>
                     <p>Expert mode completion is the highest honor in the Nova OS gaming community.</p>
                 `
+            },
+            'novarun': {
+                title: 'Nova Run',
+                html: `
+                    <h1>Nova Run</h1>
+                    <p>An endless runner built around Nova's own small piece of space folklore: an astronaut crossing Lunar Route 07 while the quiet landscape becomes progressively less quiet.</p>
+
+                    <h2>Lunar Route</h2>
+                    <ul>
+                        <li><b>Visual language:</b> Characters, hazards, saucers and the distant ridge all use a deliberately large 3x3 pixel grid.</li>
+                        <li><b>Astronaut:</b> The default runner wears a white field suit with a violet life-support pack and a reflective amber-cyan visor.</li>
+                        <li><b>Craters and moon rocks:</b> Ground hazards must be jumped.</li>
+                        <li><b>Saucers:</b> Low-flying visitors must be ducked under.</li>
+                        <li><b>Escalation:</b> The route accelerates as the score rises, turning a calm survey into an emergency sprint.</li>
+                    </ul>
+
+                    <h2>Dino Classic</h2>
+                    <p>Switch the theme to <b>Dino</b> for the familiar monochrome offline runner with cacti and birds. Lunar and Dino records are stored separately.</p>
+
+                    <h2>Controls</h2>
+                    <ul>
+                        <li><b>Space, Up or tap:</b> Start and jump.</li>
+                        <li><b>Down:</b> Duck or descend faster while airborne.</li>
+                    </ul>
+                `
             }
         };
 
@@ -171,6 +196,7 @@ Apps.register({
                     <div class="cx-nav-item" data-page="colorlines">Color Lines</div>
                     <div class="cx-nav-item" data-page="game2048">2048</div>
                     <div class="cx-nav-item" data-page="minesweeper">Minesweeper</div>
+                    <div class="cx-nav-item" data-page="novarun">Nova Run</div>
                 </div>
                 <div class="cx-content" id="cx-content-${winId}">
                     ${pages['novaos'].html}

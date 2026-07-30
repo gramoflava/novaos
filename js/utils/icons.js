@@ -47,6 +47,14 @@ const Icons = {
             <line x1="15" y1="3" x2="15" y2="21"></line>
         </svg>`,
 
+        'novarun': `<svg viewBox="0 0 24 24" fill="none" stroke="#06B6D4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M7 14v-4a5 5 0 0 1 10 0v4"></path>
+            <path d="M8 10h8"></path>
+            <path d="M9 10a3 3 0 0 1 6 0" fill="#8B5CF6" stroke="none"></path>
+            <path d="M5 19c3 -2 11 -2 14 0"></path>
+            <circle cx="18.5" cy="5.5" r="1.5" fill="#F59E0B" stroke="none"></circle>
+        </svg>`,
+
         'scores': `<svg viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
             <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>

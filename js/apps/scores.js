@@ -23,6 +23,7 @@ Apps.register({
                     <div class="scores-menu-item" data-game="game2048">2048</div>
                     <div class="scores-menu-item" data-game="colorlines-5">Color Lines</div>
                     <div class="scores-menu-item" data-game="wordl-5">Wordl</div>
+                    <div class="scores-menu-item" data-game="novarun-lunar">Nova Run</div>
                 </div>
                 <div class="scores-content" id="scores-content-${winId}">
                     <!-- Scores injected here -->
@@ -46,7 +47,8 @@ Apps.register({
             'minesweeper': 'Minesweeper',
             'game2048': '2048',
             'colorlines': 'Color Lines',
-            'wordl': 'Wordl'
+            'wordl': 'Wordl',
+            'novarun': 'Nova Run'
         };
 
         const renderScores = (gameId) => {
@@ -90,6 +92,13 @@ Apps.register({
                     <div style="display: flex; background: var(--surface-sunk); padding: 4px; border-radius: var(--radius-sm); margin-bottom: 16px;">
                         <div class="lb-level-opt ${gameId === 'colorlines-5' ? 'active' : ''}" data-id="colorlines-5">Classic (5)</div>
                         <div class="lb-level-opt ${gameId === 'colorlines-4' ? 'active' : ''}" data-id="colorlines-4">Quick (4)</div>
+                    </div>
+                `;
+            } else if (baseGame === 'novarun') {
+                selectorHtml = `
+                    <div style="display: flex; background: var(--surface-sunk); padding: 4px; border-radius: var(--radius-sm); margin-bottom: 16px;">
+                        <div class="lb-level-opt ${gameId === 'novarun-lunar' ? 'active' : ''}" data-id="novarun-lunar">Lunar</div>
+                        <div class="lb-level-opt ${gameId === 'novarun-classic' ? 'active' : ''}" data-id="novarun-classic">Dino</div>
                     </div>
                 `;
             }
