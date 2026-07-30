@@ -171,18 +171,18 @@ Apps.register({
                     <ul>
                         <li><b>Visual language:</b> Characters, hazards, saucers and the distant ridge all use a deliberately large 3x3 pixel grid.</li>
                         <li><b>Astronaut:</b> The default runner wears a white field suit with a violet life-support pack and a reflective amber-cyan visor.</li>
-                        <li><b>Craters and moon rocks:</b> Ground hazards must be jumped.</li>
-                        <li><b>Saucers:</b> Low-flying visitors must be ducked under.</li>
-                        <li><b>Escalation:</b> The route accelerates as the score rises, turning a calm survey into an emergency sprint.</li>
+                        <li><b>Craters and moon rocks:</b> Ground hazards grow from single formations into clusters as the route speeds up.</li>
+                        <li><b>Saucers:</b> Visitors cross at three altitudes. Read the route: jump the lowest, duck under the middle, and keep running beneath the highest.</li>
+                        <li><b>Escalation:</b> Score is measured from distance travelled while the route steadily accelerates toward its maximum speed.</li>
                     </ul>
 
                     <h2>Dino Classic</h2>
-                    <p>Switch the theme to <b>Dino</b> for the familiar monochrome offline runner with cacti and birds. Lunar and Dino records are stored separately.</p>
+                    <p>Switch the theme to <b>Dino</b> for the familiar monochrome offline runner with clustered cacti and three bird altitudes. Lunar and Dino share the same rules, while their records are stored separately.</p>
 
                     <h2>Controls</h2>
                     <ul>
-                        <li><b>Space, Up or tap:</b> Start and jump.</li>
-                        <li><b>Down:</b> Duck or descend faster while airborne.</li>
+                        <li><b>Space, Up or press:</b> Start and jump. Hold for a full arc or release for a shorter hop.</li>
+                        <li><b>Down:</b> Duck on the ground or drop quickly while airborne.</li>
                     </ul>
                 `
             }

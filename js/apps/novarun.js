@@ -14,7 +14,7 @@ Apps.register({
       .nr-stage { position: relative; display: flex; flex: 1; min-height: 0; overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-sunk); box-shadow: var(--glass-edge); }
       .nr-canvas { width: 100%; height: 100%; min-height: 250px; outline: none; touch-action: manipulation; cursor: pointer; }
       .nr-canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
-      .nr-caption { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 30px; color: var(--text-muted); font-size: 10px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; }
+      .nr-caption { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 30px; color: var(--text-secondary); font-size: 10px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; }
       .nr-caption__route { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .nr-caption__keys { flex: 0 0 auto; font-variant-numeric: tabular-nums; }
       @media (max-width: 640px) {
@@ -50,7 +50,7 @@ Apps.register({
           <canvas class="nr-canvas" id="nr-canvas-${winId}" width="640" height="280" tabindex="0" aria-label="Nova Run. Press Space or tap to jump. Press Down to duck."></canvas>
         </div>
         <div class="nr-caption">
-          <span class="nr-caption__route" id="nr-route-${winId}">${initialTheme === 'lunar' ? 'Lunar route 07 · jump craters · duck saucers' : 'Offline classic · jump cacti · duck birds'}</span>
+          <span class="nr-caption__route" id="nr-route-${winId}">${initialTheme === 'lunar' ? 'Lunar route 07 · clear terrain · read saucer altitude' : 'Offline classic · clear cacti · read bird altitude'}</span>
           <span class="nr-caption__keys">Space / ↑ jump · ↓ duck</span>
         </div>
       </div>
@@ -70,6 +70,22 @@ Apps.register({
     const HEIGHT = 280;
     const GROUND = 224;
     const PLAYER_X = 72;
+    const RUNNER_CONFIG = {
+      startSpeed: 0.36,
+      maxSpeed: 0.78,
+      acceleration: 0.0000036,
+      scoreCoefficient: 0.025,
+      flyerMinSpeed: 0.51,
+      flyerSpeedOffset: 0.048,
+      gapCoefficient: 0.6,
+      maxGapCoefficient: 1.5,
+      gravity: 0.0024,
+      fastFallGravity: 0.0034,
+      minJumpRise: 32,
+      jumpVelocityMin: -0.66,
+      jumpVelocityMax: -0.705,
+      releasedJumpVelocity: -0.34
+    };
     const canvas = document.getElementById(`nr-canvas-${winId}`);
     const ctx = canvas.getContext('2d');
     const themeSelect = document.getElementById(`nr-theme-${winId}`);
@@ -80,17 +96,25 @@ Apps.register({
     let theme = initialTheme;
     let state = 'ready';
     let score = 0;
-    let scoreFloat = 0;
+    let distanceRan = 0;
     let best = 0;
-    let speed = 0.31;
-    let spawnIn = 1100;
+    let speed = RUNNER_CONFIG.startSpeed;
+    let distanceUntilSpawn = 320;
     let lastFrame = performance.now();
     let animationFrame = 0;
     let worldTime = 0;
     let obstacles = [];
+    let recentObstacleKinds = [];
     let palette = {};
     let downPressed = false;
-    const player = { y: GROUND - 48, vy: 0, grounded: true, ducking: false };
+    let jumpHeld = false;
+    const player = {
+      y: GROUND - 48,
+      vy: 0,
+      grounded: true,
+      ducking: false,
+      fastFalling: false
+    };
 
     const stars = Array.from({ length: 34 }, (_, index) => ({
       x: (index * 83 + 31) % WIDTH,
@@ -249,15 +273,18 @@ Apps.register({
     const reset = () => {
       state = 'ready';
       score = 0;
-      scoreFloat = 0;
-      speed = 0.31;
-      spawnIn = 900;
+      distanceRan = 0;
+      speed = RUNNER_CONFIG.startSpeed;
+      distanceUntilSpawn = 320;
       obstacles = [];
+      recentObstacleKinds = [];
       downPressed = false;
+      jumpHeld = false;
       player.y = GROUND - 48;
       player.vy = 0;
       player.grounded = true;
       player.ducking = false;
+      player.fastFalling = false;
       scoreNode.textContent = '0';
       updateBest();
       canvas.focus({ preventScroll: true });
@@ -280,56 +307,221 @@ Apps.register({
       if (player.grounded) {
         player.ducking = false;
         player.grounded = false;
-        player.vy = -0.72;
+        player.fastFalling = false;
+        const speedProgress =
+          (speed - RUNNER_CONFIG.startSpeed) /
+          (RUNNER_CONFIG.maxSpeed - RUNNER_CONFIG.startSpeed);
+        player.vy =
+          RUNNER_CONFIG.jumpVelocityMin +
+          (RUNNER_CONFIG.jumpVelocityMax - RUNNER_CONFIG.jumpVelocityMin) * speedProgress;
         if (window.AudioMng) {
           window.AudioMng.play('click');
         }
       }
     };
 
+    const releaseJump = () => {
+      jumpHeld = false;
+    };
+
     const setDuck = value => {
       downPressed = value;
+      if (value && !player.grounded && state === 'playing') {
+        player.fastFalling = true;
+        player.vy = Math.max(player.vy, 0.18);
+      }
       player.ducking = value && player.grounded && state === 'playing';
     };
 
-    const spawnObstacle = () => {
-      const chance = Math.random();
-      let obstacle;
-
+    const getObstacleSpecs = () => {
       if (theme === 'lunar') {
-        if (chance < 0.46) {
-          obstacle = { type: 'crater', x: WIDTH + 24, y: GROUND - 10, w: 48, h: 12 };
-        } else if (chance < 0.72) {
-          obstacle = { type: 'moonrock', x: WIDTH + 24, y: GROUND - 30, w: 27, h: 30 };
-        } else {
-          obstacle = { type: 'saucer', x: WIDTH + 24, y: GROUND - 61, w: 48, h: 23 };
-        }
-      } else if (chance < 0.68) {
-        const wide = Math.random() > 0.58;
-        obstacle = {
-          type: 'cactus',
-          x: WIDTH + 24,
-          y: GROUND - 42,
-          w: wide ? 30 : 20,
-          h: 42
-        };
-      } else {
-        obstacle = { type: 'bird', x: WIDTH + 24, y: GROUND - 61, w: 44, h: 22 };
+        return [
+          {
+            kind: 'crater',
+            type: 'crater',
+            family: 'ground',
+            unitW: 42,
+            h: 12,
+            spacing: 4,
+            minGap: 128,
+            minSpeed: 0,
+            multipleMinSpeed: RUNNER_CONFIG.startSpeed,
+            maxCount: 2
+          },
+          {
+            kind: 'moonrock',
+            type: 'moonrock',
+            family: 'ground',
+            unitW: 27,
+            h: 30,
+            spacing: 3,
+            minGap: 120,
+            minSpeed: 0,
+            multipleMinSpeed: 0.42,
+            maxCount: 3
+          },
+          {
+            kind: 'saucer',
+            type: 'saucer',
+            family: 'flyer',
+            unitW: 48,
+            h: 23,
+            spacing: 0,
+            minGap: 150,
+            minSpeed: RUNNER_CONFIG.flyerMinSpeed,
+            maxCount: 1
+          }
+        ];
       }
-
-      obstacles.push(obstacle);
-      const difficulty = Math.max(0.66, 1 - score / 3200);
-      spawnIn = (1050 + Math.random() * 820) * difficulty;
+      return [
+        {
+          kind: 'small-cactus',
+          type: 'cactus',
+          variant: 'small',
+          family: 'ground',
+          unitW: 17,
+          h: 35,
+          spacing: 0,
+          minGap: 120,
+          minSpeed: 0,
+          multipleMinSpeed: 0.24,
+          maxCount: 3
+        },
+        {
+          kind: 'large-cactus',
+          type: 'cactus',
+          variant: 'large',
+          family: 'ground',
+          unitW: 25,
+          h: 50,
+          spacing: 0,
+          minGap: 120,
+          minSpeed: 0,
+          multipleMinSpeed: 0.42,
+          maxCount: 3
+        },
+        {
+          kind: 'bird',
+          type: 'bird',
+          family: 'flyer',
+          unitW: 44,
+          h: 22,
+          spacing: 0,
+          minGap: 150,
+          minSpeed: RUNNER_CONFIG.flyerMinSpeed,
+          maxCount: 1
+        }
+      ];
     };
 
-    const collisionBox = obstacle => {
+    const chooseObstacleSpec = () => {
+      let eligible = getObstacleSpecs().filter(spec => speed >= spec.minSpeed);
+      if (
+        recentObstacleKinds.length === 2 &&
+        recentObstacleKinds[0] === recentObstacleKinds[1]
+      ) {
+        const alternatives = eligible.filter(spec => spec.kind !== recentObstacleKinds[1]);
+        if (alternatives.length) {
+          eligible = alternatives;
+        }
+      }
+      return eligible[Math.floor(Math.random() * eligible.length)];
+    };
+
+    const spawnObstacle = () => {
+      const spec = chooseObstacleSpec();
+      const canMultiply =
+        spec.family === 'ground' &&
+        speed >= (spec.multipleMinSpeed || RUNNER_CONFIG.startSpeed);
+      const count = canMultiply ? 1 + Math.floor(Math.random() * spec.maxCount) : 1;
+      const w = spec.unitW * count + spec.spacing * (count - 1);
+      const flyerBand =
+        spec.family === 'flyer' ? ['low', 'middle', 'high'][Math.floor(Math.random() * 3)] : null;
+      const flyerOffset = flyerBand === 'low' ? spec.h + 4 : flyerBand === 'middle' ? 62 : 99;
+      const obstacle = {
+        ...spec,
+        x: WIDTH + 24,
+        y: spec.family === 'flyer' ? GROUND - flyerOffset : GROUND - spec.h,
+        w,
+        count,
+        flyerBand,
+        speedOffset:
+          spec.family === 'flyer'
+            ? (Math.random() < 0.5 ? -1 : 1) * RUNNER_CONFIG.flyerSpeedOffset
+            : 0
+      };
+      obstacles.push(obstacle);
+      recentObstacleKinds = [...recentObstacleKinds, spec.kind].slice(-2);
+
+      const chromeSpeedUnits = speed / 0.06;
+      const minGap = Math.round(
+        obstacle.w * chromeSpeedUnits + spec.minGap * RUNNER_CONFIG.gapCoefficient
+      );
+      const maxGap = Math.round(minGap * RUNNER_CONFIG.maxGapCoefficient);
+      distanceUntilSpawn =
+        obstacle.w + minGap + Math.round(Math.random() * Math.max(0, maxGap - minGap));
+    };
+
+    const getObstacleCollisionBoxes = obstacle => {
+      const unitOffset = index => index * (obstacle.unitW + obstacle.spacing);
       if (obstacle.type === 'crater') {
-        return { x: obstacle.x + 5, y: obstacle.y + 1, w: obstacle.w - 10, h: 11 };
+        return Array.from({ length: obstacle.count }, (_, index) => ({
+          x: obstacle.x + unitOffset(index) + 4,
+          y: obstacle.y + 2,
+          w: obstacle.unitW - 8,
+          h: obstacle.h - 2
+        }));
       }
-      if (obstacle.type === 'saucer' || obstacle.type === 'bird') {
-        return { x: obstacle.x + 4, y: obstacle.y + 3, w: obstacle.w - 8, h: obstacle.h - 6 };
+      if (obstacle.type === 'moonrock' || obstacle.type === 'cactus') {
+        return Array.from({ length: obstacle.count }, (_, index) => ({
+          x: obstacle.x + unitOffset(index) + 3,
+          y: obstacle.y + 2,
+          w: obstacle.unitW - 6,
+          h: obstacle.h - 2
+        }));
       }
-      return { x: obstacle.x + 3, y: obstacle.y + 2, w: obstacle.w - 6, h: obstacle.h - 2 };
+      return [
+        {
+          x: obstacle.x + (obstacle.type === 'bird' ? 7 : 3),
+          y: obstacle.y + (obstacle.type === 'bird' ? 5 : 6),
+          w: obstacle.w - (obstacle.type === 'bird' ? 9 : 6),
+          h: obstacle.h - (obstacle.type === 'bird' ? 8 : 9)
+        }
+      ];
+    };
+
+    const getPlayerCollisionBoxes = () => {
+      if (theme === 'classic') {
+        const drawX = PLAYER_X - 6;
+        if (player.ducking) {
+          const y = GROUND - dinoDuckSprites[0].length * 3;
+          return [
+            { x: drawX + 36, y, w: 30, h: 18 },
+            { x: drawX + 3, y: y + 9, w: 60, h: 12 },
+            { x: drawX + 9, y: y + 18, w: 48, h: 9 }
+          ];
+        }
+        return [
+          { x: drawX + 30, y: player.y, w: 30, h: 18 },
+          { x: drawX + 6, y: player.y + 18, w: 39, h: 21 },
+          { x: drawX + 9, y: player.y + 39, w: 27, h: 9 }
+        ];
+      }
+
+      const drawX = PLAYER_X - 2;
+      if (player.ducking) {
+        const y = GROUND - astronautDuckSprite.length * 3;
+        return [
+          { x: drawX + 9, y, w: 33, h: 18 },
+          { x: drawX + 3, y: y + 12, w: 48, h: 12 },
+          { x: drawX + 9, y: y + 24, w: 36, h: 6 }
+        ];
+      }
+      return [
+        { x: drawX + 9, y: player.y, w: 33, h: 18 },
+        { x: drawX + 3, y: player.y + 18, w: 42, h: 21 },
+        { x: drawX + 9, y: player.y + 39, w: 30, h: 9 }
+      ];
     };
 
     const intersects = (a, b) =>
@@ -358,39 +550,56 @@ Apps.register({
       }
 
       worldTime += delta;
-      scoreFloat += delta * 0.011;
-      score = Math.floor(scoreFloat);
-      speed = 0.31 + Math.min(0.23, score * 0.00018);
+      distanceRan += speed * delta;
+      score = Math.floor(distanceRan * RUNNER_CONFIG.scoreCoefficient);
+      speed = Math.min(
+        RUNNER_CONFIG.maxSpeed,
+        speed + RUNNER_CONFIG.acceleration * delta
+      );
       scoreNode.textContent = score;
 
       if (!player.grounded) {
-        player.vy += (downPressed ? 0.0031 : 0.00225) * delta;
+        const rise = GROUND - 48 - player.y;
+        if (
+          !jumpHeld &&
+          rise >= RUNNER_CONFIG.minJumpRise &&
+          player.vy < RUNNER_CONFIG.releasedJumpVelocity
+        ) {
+          player.vy = RUNNER_CONFIG.releasedJumpVelocity;
+        }
+        player.vy +=
+          (player.fastFalling ? RUNNER_CONFIG.fastFallGravity : RUNNER_CONFIG.gravity) *
+          delta;
         player.y += player.vy * delta;
         if (player.y >= GROUND - 48) {
           player.y = GROUND - 48;
           player.vy = 0;
           player.grounded = true;
           player.ducking = downPressed;
+          player.fastFalling = false;
         }
       } else {
         player.ducking = downPressed;
       }
 
-      spawnIn -= delta;
-      if (spawnIn <= 0) {
+      distanceUntilSpawn -= speed * delta;
+      if (distanceUntilSpawn <= 0) {
         spawnObstacle();
       }
 
       obstacles.forEach(obstacle => {
-        obstacle.x -= speed * delta;
+        obstacle.x -= Math.max(0.18, speed + obstacle.speedOffset) * delta;
       });
       obstacles = obstacles.filter(obstacle => obstacle.x + obstacle.w > -12);
 
-      const playerBox = player.ducking
-        ? { x: PLAYER_X + 5, y: GROUND - 28, w: 42, h: 27 }
-        : { x: PLAYER_X + 7, y: player.y + 3, w: 31, h: 44 };
-
-      if (obstacles.some(obstacle => intersects(playerBox, collisionBox(obstacle)))) {
+      const playerBoxes = getPlayerCollisionBoxes();
+      if (
+        obstacles.some(obstacle =>
+          getObstacleCollisionBoxes(obstacle).some(obstacleBox =>
+            playerBoxes.some(playerBox => intersects(playerBox, obstacleBox))
+          )
+        )
+      ) {
         endGame();
       }
     };
@@ -524,22 +733,28 @@ Apps.register({
       ctx.translate(obstacle.x, obstacle.y);
 
       if (obstacle.type === 'crater') {
-        ctx.fillStyle = palette.dark ? '#7f8ba5' : '#8f99aa';
-        ctx.fillRect(6, 0, obstacle.w - 12, 3);
-        ctx.fillRect(3, 3, obstacle.w - 6, 3);
-        ctx.fillStyle = palette.dark ? '#080b14' : '#697386';
-        ctx.fillRect(0, 6, obstacle.w, 3);
-        ctx.fillRect(6, 9, obstacle.w - 12, 3);
-        ctx.fillStyle = palette.dark ? '#343b4e' : '#bcc3ce';
-        ctx.fillRect(9, 3, obstacle.w - 18, 3);
+        for (let index = 0; index < obstacle.count; index++) {
+          const x = index * (obstacle.unitW + obstacle.spacing);
+          ctx.fillStyle = palette.dark ? '#94a3b8' : '#7c8799';
+          ctx.fillRect(x + 6, 0, obstacle.unitW - 12, 3);
+          ctx.fillRect(x + 3, 3, obstacle.unitW - 6, 3);
+          ctx.fillStyle = palette.dark ? '#080b14' : '#697386';
+          ctx.fillRect(x, 6, obstacle.unitW, 3);
+          ctx.fillRect(x + 6, 9, obstacle.unitW - 12, 3);
+          ctx.fillStyle = palette.dark ? '#343b4e' : '#c2c8d2';
+          ctx.fillRect(x + 9, 3, obstacle.unitW - 18, 3);
+        }
       } else if (obstacle.type === 'moonrock') {
-        ctx.fillStyle = palette.dark ? '#6b7280' : '#8f99aa';
-        ctx.fillRect(3, 12, obstacle.w - 3, obstacle.h - 12);
-        ctx.fillRect(6, 6, obstacle.w - 9, obstacle.h - 6);
-        ctx.fillRect(12, 0, 9, obstacle.h);
-        ctx.fillStyle = palette.dark ? '#4b5563' : '#c2c8d2';
-        ctx.fillRect(12, 6, 6, 6);
-        ctx.fillRect(6, 18, 6, 6);
+        for (let index = 0; index < obstacle.count; index++) {
+          const x = index * (obstacle.unitW + obstacle.spacing);
+          ctx.fillStyle = palette.dark ? '#7f8ba5' : '#7c8799';
+          ctx.fillRect(x + 3, 12, obstacle.unitW - 3, obstacle.h - 12);
+          ctx.fillRect(x + 6, 6, obstacle.unitW - 9, obstacle.h - 6);
+          ctx.fillRect(x + 12, 0, 9, obstacle.h);
+          ctx.fillStyle = palette.dark ? '#4b5563' : '#c2c8d2';
+          ctx.fillRect(x + 12, 6, 6, 6);
+          ctx.fillRect(x + 6, 18, 6, 6);
+        }
       } else if (obstacle.type === 'saucer') {
         drawPixelSprite(
           [
@@ -562,13 +777,20 @@ Apps.register({
         );
       } else if (obstacle.type === 'cactus') {
         ctx.fillStyle = palette.text;
-        const stems = obstacle.w > 20 ? 2 : 1;
-        ctx.fillRect(7, 0, 8, obstacle.h);
-        ctx.fillRect(0, 15, 8, 7);
-        ctx.fillRect(0, 10, 5, 12);
-        if (stems === 2) {
-          ctx.fillRect(19, 7, 8, obstacle.h - 7);
-          ctx.fillRect(14, 20, 8, 7);
+        for (let index = 0; index < obstacle.count; index++) {
+          const x = index * obstacle.unitW;
+          const trunkX = obstacle.variant === 'large' ? 9 : 6;
+          const trunkW = obstacle.variant === 'large' ? 8 : 7;
+          const branchY = obstacle.variant === 'large' ? 18 : 13;
+          ctx.fillRect(x + trunkX, 0, trunkW, obstacle.h);
+          if (index % 2 === 0) {
+            ctx.fillRect(x, branchY, trunkX + 2, 6);
+            ctx.fillRect(x, branchY - 8, 4, 14);
+          } else {
+            const branchX = x + trunkX + trunkW - 1;
+            ctx.fillRect(branchX, branchY + 2, obstacle.unitW - trunkX - trunkW + 1, 6);
+            ctx.fillRect(x + obstacle.unitW - 4, branchY - 6, 4, 14);
+          }
         }
       } else if (obstacle.type === 'bird') {
         ctx.fillStyle = palette.text;
@@ -628,6 +850,7 @@ Apps.register({
       if (event.code === 'Space' || event.code === 'ArrowUp') {
         event.preventDefault();
         if (!event.repeat) {
+          jumpHeld = true;
           jump();
         }
       } else if (event.code === 'ArrowDown') {
@@ -637,15 +860,22 @@ Apps.register({
     };
 
     const onKeyUp = event => {
-      if (event.code === 'ArrowDown') {
+      if (event.code === 'Space' || event.code === 'ArrowUp') {
+        releaseJump();
+      } else if (event.code === 'ArrowDown') {
         setDuck(false);
       }
     };
 
     const onPointerDown = event => {
       event.preventDefault();
+      jumpHeld = true;
       jump();
       canvas.focus({ preventScroll: true });
+    };
+
+    const onPointerUp = () => {
+      releaseJump();
     };
 
     themeSelect.addEventListener('change', () => {
@@ -653,8 +883,8 @@ Apps.register({
       localStorage.setItem('novaos_novarun_theme', theme);
       routeNode.textContent =
         theme === 'lunar'
-          ? 'Lunar route 07 · jump craters · duck saucers'
-          : 'Offline classic · jump cacti · duck birds';
+          ? 'Lunar route 07 · clear terrain · read saucer altitude'
+          : 'Offline classic · clear cacti · read bird altitude';
       reset();
     });
 
@@ -662,6 +892,8 @@ Apps.register({
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('keyup', onKeyUp);
     canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('pointercancel', onPointerUp);
 
     const themeObserver = new MutationObserver(() => readPalette());
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
@@ -683,6 +915,8 @@ Apps.register({
         document.removeEventListener('keydown', onKeyDown);
         document.removeEventListener('keyup', onKeyUp);
         canvas.removeEventListener('pointerdown', onPointerDown);
+        canvas.removeEventListener('pointerup', onPointerUp);
+        canvas.removeEventListener('pointercancel', onPointerUp);
       };
     }
   }
