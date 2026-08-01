@@ -102,7 +102,10 @@ Apps.register({
     let distanceUntilSpawn = 320;
     let lastFrame = performance.now();
     let animationFrame = 0;
-    let worldTime = 0;
+    let starScroll = 0;
+    let ridgeScroll = 0;
+    let lunarGroundScroll = 0;
+    let classicGroundScroll = 0;
     let obstacles = [];
     let recentObstacleKinds = [];
     let palette = {};
@@ -121,6 +124,12 @@ Apps.register({
       y: 18 + ((index * 47) % 118),
       size: index % 5 === 0 ? 2 : 1
     }));
+    const RIDGE_COLUMN_WIDTH = 12;
+    const RIDGE_HEIGHTS = [
+      26, 30, 38, 50, 66, 80, 70, 58, 48, 40, 34, 30, 36, 48, 62, 78, 92, 84, 70, 56, 46, 38, 32,
+      36, 44, 58, 72, 86, 76, 64, 54, 46, 40, 34, 30, 34, 40, 36, 30, 26
+    ];
+    const RIDGE_TILE_WIDTH = RIDGE_COLUMN_WIDTH * RIDGE_HEIGHTS.length;
 
     const astronautRunSprites = [
       [
@@ -176,40 +185,40 @@ Apps.register({
 
     const dinoRunSprites = [
       [
-        '............OOOOOO..',
-        '..........OOOOOOOOOO',
-        '..........OOOO.OOOOO',
-        '..........OOOOOOOOOO',
-        '..........OOOOOO....',
-        '..........OOOOOOOOO.',
-        '...OO....OOOOO......',
-        '...OO...OOOOOO......',
-        '...OOOOOOOOOOO......',
-        '..OOOOOOOOOO........',
-        '.OOOOOOOOOOO........',
-        'OOOOOOOOOOO.........',
-        '....OOOOOO..........',
-        '....OO...OO.........',
-        '....OO....OO........',
-        '...OOO....OOO.......'
+        '............OOOOOO....',
+        '..........OOOOOOOOOOOO',
+        '..........OOOO.OOOOOOO',
+        '..........OOOOOOOOOOOO',
+        '..........OOOOOO......',
+        '..........OOOOOOOOO...',
+        '......OOOOOOOO........',
+        '....OOOOOOOOOO........',
+        '..OOOOOOOOOOO.OO......',
+        'OOOOOOOOOOOO..........',
+        '...OOOOOOOO...........',
+        '....OOOOOOO...........',
+        '....OOOOOOO...........',
+        '....OOO.OOO...........',
+        '....OO..OO............',
+        '...OOOO.OOOO..........'
       ],
       [
-        '............OOOOOO..',
-        '..........OOOOOOOOOO',
-        '..........OOOO.OOOOO',
-        '..........OOOOOOOOOO',
-        '..........OOOOOO....',
-        '..........OOOOOOOOO.',
-        '...OO....OOOOO......',
-        '...OO...OOOOOO......',
-        '...OOOOOOOOOOO......',
-        '..OOOOOOOOOO........',
-        '.OOOOOOOOOOO........',
-        'OOOOOOOOOOO.........',
-        '....OOOOOO..........',
-        '....OO..OO..........',
-        '...OOO...OO.........',
-        '.........OOO........'
+        '............OOOOOO....',
+        '..........OOOOOOOOOOOO',
+        '..........OOOO.OOOOOOO',
+        '..........OOOOOOOOOOOO',
+        '..........OOOOOO......',
+        '..........OOOOOOOOO...',
+        '......OOOOOOOO........',
+        '....OOOOOOOOOO........',
+        '..OOOOOOOOOOO.OO......',
+        'OOOOOOOOOOOO..........',
+        '...OOOOOOOO...........',
+        '....OOOOOOO...........',
+        '....OOOOOOO...........',
+        '....OOO.OOO...........',
+        '...OOO...OO...........',
+        '..OOOO...OOOO.........'
       ]
     ];
 
@@ -309,8 +318,7 @@ Apps.register({
         player.grounded = false;
         player.fastFalling = false;
         const speedProgress =
-          (speed - RUNNER_CONFIG.startSpeed) /
-          (RUNNER_CONFIG.maxSpeed - RUNNER_CONFIG.startSpeed);
+          (speed - RUNNER_CONFIG.startSpeed) / (RUNNER_CONFIG.maxSpeed - RUNNER_CONFIG.startSpeed);
         player.vy =
           RUNNER_CONFIG.jumpVelocityMin +
           (RUNNER_CONFIG.jumpVelocityMax - RUNNER_CONFIG.jumpVelocityMin) * speedProgress;
@@ -416,10 +424,7 @@ Apps.register({
 
     const chooseObstacleSpec = () => {
       let eligible = getObstacleSpecs().filter(spec => speed >= spec.minSpeed);
-      if (
-        recentObstacleKinds.length === 2 &&
-        recentObstacleKinds[0] === recentObstacleKinds[1]
-      ) {
+      if (recentObstacleKinds.length === 2 && recentObstacleKinds[0] === recentObstacleKinds[1]) {
         const alternatives = eligible.filter(spec => spec.kind !== recentObstacleKinds[1]);
         if (alternatives.length) {
           eligible = alternatives;
@@ -431,8 +436,7 @@ Apps.register({
     const spawnObstacle = () => {
       const spec = chooseObstacleSpec();
       const canMultiply =
-        spec.family === 'ground' &&
-        speed >= (spec.multipleMinSpeed || RUNNER_CONFIG.startSpeed);
+        spec.family === 'ground' && speed >= (spec.multipleMinSpeed || RUNNER_CONFIG.startSpeed);
       const count = canMultiply ? 1 + Math.floor(Math.random() * spec.maxCount) : 1;
       const w = spec.unitW * count + spec.spacing * (count - 1);
       const flyerBand =
@@ -441,7 +445,12 @@ Apps.register({
       const obstacle = {
         ...spec,
         x: WIDTH + 24,
-        y: spec.family === 'flyer' ? GROUND - flyerOffset : GROUND - spec.h,
+        y:
+          spec.family === 'flyer'
+            ? GROUND - flyerOffset
+            : spec.type === 'crater'
+              ? GROUND - 2
+              : GROUND - spec.h,
         w,
         count,
         flyerBand,
@@ -466,10 +475,10 @@ Apps.register({
       const unitOffset = index => index * (obstacle.unitW + obstacle.spacing);
       if (obstacle.type === 'crater') {
         return Array.from({ length: obstacle.count }, (_, index) => ({
-          x: obstacle.x + unitOffset(index) + 4,
-          y: obstacle.y + 2,
-          w: obstacle.unitW - 8,
-          h: obstacle.h - 2
+          x: obstacle.x + unitOffset(index) + 3,
+          y: obstacle.y,
+          w: obstacle.unitW - 6,
+          h: 6
         }));
       }
       if (obstacle.type === 'moonrock' || obstacle.type === 'cactus') {
@@ -502,9 +511,9 @@ Apps.register({
           ];
         }
         return [
-          { x: drawX + 30, y: player.y, w: 30, h: 18 },
+          { x: drawX + 33, y: player.y, w: 30, h: 18 },
           { x: drawX + 6, y: player.y + 18, w: 39, h: 21 },
-          { x: drawX + 9, y: player.y + 39, w: 27, h: 9 }
+          { x: drawX + 9, y: player.y + 39, w: 30, h: 9 }
         ];
       }
 
@@ -549,13 +558,14 @@ Apps.register({
         return;
       }
 
-      worldTime += delta;
-      distanceRan += speed * delta;
+      const worldStep = speed * delta;
+      distanceRan += worldStep;
+      starScroll = (starScroll + worldStep * 0.015) % WIDTH;
+      ridgeScroll = (ridgeScroll + worldStep * 0.025) % RIDGE_TILE_WIDTH;
+      lunarGroundScroll = (lunarGroundScroll + worldStep * 0.34) % 54;
+      classicGroundScroll = (classicGroundScroll + worldStep) % 34;
       score = Math.floor(distanceRan * RUNNER_CONFIG.scoreCoefficient);
-      speed = Math.min(
-        RUNNER_CONFIG.maxSpeed,
-        speed + RUNNER_CONFIG.acceleration * delta
-      );
+      speed = Math.min(RUNNER_CONFIG.maxSpeed, speed + RUNNER_CONFIG.acceleration * delta);
       scoreNode.textContent = score;
 
       if (!player.grounded) {
@@ -568,8 +578,7 @@ Apps.register({
           player.vy = RUNNER_CONFIG.releasedJumpVelocity;
         }
         player.vy +=
-          (player.fastFalling ? RUNNER_CONFIG.fastFallGravity : RUNNER_CONFIG.gravity) *
-          delta;
+          (player.fastFalling ? RUNNER_CONFIG.fastFallGravity : RUNNER_CONFIG.gravity) * delta;
         player.y += player.vy * delta;
         if (player.y >= GROUND - 48) {
           player.y = GROUND - 48;
@@ -617,21 +626,24 @@ Apps.register({
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
       stars.forEach(star => {
-        const offset = (worldTime * speed * 0.015) % WIDTH;
-        const x = (star.x - offset + WIDTH) % WIDTH;
+        const x = (star.x - starScroll + WIDTH) % WIDTH;
         ctx.globalAlpha = palette.dark ? 0.72 : 0.48;
         ctx.fillStyle = star.size === 2 ? palette.cyan : palette.text;
         ctx.fillRect(x, star.y, star.size, star.size);
       });
       ctx.globalAlpha = 1;
 
-      const ridge = [24, 32, 44, 56, 72, 64, 52, 42, 34, 48, 62, 78, 90, 74, 58, 46, 38, 50, 66, 82, 70, 56, 44, 36];
-      const ridgeOffset = Math.floor((worldTime * speed * 0.02) / 8) * 8;
       ctx.fillStyle = palette.dark ? 'rgba(139, 92, 246, 0.17)' : 'rgba(139, 92, 246, 0.10)';
-      for (let x = -16; x < WIDTH + 16; x += 16) {
-        const ridgeIndex = Math.floor((x + ridgeOffset + WIDTH * 4) / 16) % ridge.length;
-        const ridgeHeight = ridge[ridgeIndex];
-        ctx.fillRect(x, GROUND - ridgeHeight, 17, ridgeHeight);
+      const firstRidgeTileX = -ridgeScroll - RIDGE_TILE_WIDTH;
+      for (
+        let tileX = firstRidgeTileX;
+        tileX < WIDTH + RIDGE_TILE_WIDTH;
+        tileX += RIDGE_TILE_WIDTH
+      ) {
+        RIDGE_HEIGHTS.forEach((ridgeHeight, index) => {
+          const x = Math.round(tileX + index * RIDGE_COLUMN_WIDTH);
+          ctx.fillRect(x, GROUND - ridgeHeight, RIDGE_COLUMN_WIDTH + 1, ridgeHeight);
+        });
       }
 
       ctx.fillStyle = palette.dark ? '#22263a' : '#d8dbe5';
@@ -645,8 +657,7 @@ Apps.register({
 
       ctx.strokeStyle = palette.dark ? 'rgba(255,255,255,0.10)' : 'rgba(15,23,42,0.10)';
       ctx.lineWidth = 1;
-      const groundOffset = (worldTime * speed * 0.34) % 54;
-      for (let x = -groundOffset; x < WIDTH; x += 54) {
+      for (let x = -lunarGroundScroll; x < WIDTH; x += 54) {
         ctx.beginPath();
         ctx.moveTo(x, GROUND + 22);
         ctx.lineTo(x + 18, GROUND + 20);
@@ -665,8 +676,7 @@ Apps.register({
       ctx.lineTo(WIDTH, GROUND);
       ctx.stroke();
 
-      const offset = (worldTime * speed) % 34;
-      for (let x = -offset; x < WIDTH; x += 34) {
+      for (let x = -classicGroundScroll; x < WIDTH; x += 34) {
         ctx.fillRect(x, GROUND + 8 + ((x / 34) % 2) * 4, 3, 1);
         ctx.fillRect(x + 12, GROUND + 15, 6, 1);
       }
@@ -735,14 +745,15 @@ Apps.register({
       if (obstacle.type === 'crater') {
         for (let index = 0; index < obstacle.count; index++) {
           const x = index * (obstacle.unitW + obstacle.spacing);
-          ctx.fillStyle = palette.dark ? '#94a3b8' : '#7c8799';
-          ctx.fillRect(x + 6, 0, obstacle.unitW - 12, 3);
-          ctx.fillRect(x + 3, 3, obstacle.unitW - 6, 3);
           ctx.fillStyle = palette.dark ? '#080b14' : '#697386';
-          ctx.fillRect(x, 6, obstacle.unitW, 3);
-          ctx.fillRect(x + 6, 9, obstacle.unitW - 12, 3);
-          ctx.fillStyle = palette.dark ? '#343b4e' : '#c2c8d2';
+          ctx.fillRect(x + 3, 0, obstacle.unitW - 6, 3);
+          ctx.fillRect(x + 6, 3, obstacle.unitW - 12, 6);
+          ctx.fillRect(x + 10, 9, obstacle.unitW - 20, 3);
+          ctx.fillStyle = palette.dark ? '#343b4e' : '#aeb6c3';
           ctx.fillRect(x + 9, 3, obstacle.unitW - 18, 3);
+          ctx.fillStyle = palette.dark ? '#657086' : '#8f99aa';
+          ctx.fillRect(x, 0, 6, 2);
+          ctx.fillRect(x + obstacle.unitW - 6, 0, 6, 2);
         }
       } else if (obstacle.type === 'moonrock') {
         for (let index = 0; index < obstacle.count; index++) {
@@ -817,10 +828,22 @@ Apps.register({
       ctx.textAlign = 'center';
       ctx.fillStyle = palette.text;
       ctx.font = '600 18px Inter, sans-serif';
-      ctx.fillText(state === 'gameover' ? 'MISSION INTERRUPTED' : theme === 'lunar' ? 'LUNAR ROUTE 07' : 'OFFLINE CLASSIC', WIDTH / 2, 108);
+      ctx.fillText(
+        state === 'gameover'
+          ? 'MISSION INTERRUPTED'
+          : theme === 'lunar'
+            ? 'LUNAR ROUTE 07'
+            : 'OFFLINE CLASSIC',
+        WIDTH / 2,
+        108
+      );
       ctx.fillStyle = palette.muted;
       ctx.font = '500 12px Inter, sans-serif';
-      ctx.fillText(state === 'gameover' ? `Score ${score} · Space or tap to retry` : 'Space or tap to run', WIDTH / 2, 134);
+      ctx.fillText(
+        state === 'gameover' ? `Score ${score} · Space or tap to retry` : 'Space or tap to run',
+        WIDTH / 2,
+        134
+      );
     };
 
     const draw = now => {
@@ -896,7 +919,10 @@ Apps.register({
     canvas.addEventListener('pointercancel', onPointerUp);
 
     const themeObserver = new MutationObserver(() => readPalette());
-    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class']
+    });
 
     resizeCanvas();
     readPalette();
