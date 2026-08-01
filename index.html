@@ -64,8 +64,8 @@
                     <span id="island-clock" class="island-clock">---</span>
                 </div>
                 <div class="island-right">
-                    <button class="island-btn" id="btn-search" aria-label="Search">
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><path d="M21 21l-4.35 -4.35"></path></svg>
+                    <button class="island-btn" id="btn-support" type="button" title="Support my work" aria-label="Support my work" aria-expanded="false">
+                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14c.83 .642 2.077 1.017 3.5 1c1.423 .017 2.67 -.358 3.5 -1c.83 -.642 2.077 -1.017 3.5 -1c1.423 -.017 2.67 .358 3.5 1"></path><path d="M8 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2M12 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2"></path><path d="M3 10h14v5a6 6 0 0 1 -6 6H9a6 6 0 0 1 -6 -6v-5zM16.746 16.726a3 3 0 1 0 .252 -5.555"></path></svg>
                     </button>
                     <button class="island-btn" id="btn-mute" aria-label="Audio Toggle">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 8a5 5 0 0 1 0 8M17.7 5a9 9 0 0 1 0 14M6 15h-2a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h2l4 -4v14z"></path></svg>
@@ -113,10 +113,6 @@
         <div id="context-menu" class="context-menu" style="display: none;"></div>
 
         <!-- Ko-fi Donation Widget -->
-        <button type="button" id="kofi-floater" class="kofi-floater" title="Support my work" aria-label="Support my work">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14c.83 .642 2.077 1.017 3.5 1c1.423 .017 2.67 -.358 3.5 -1c.83 -.642 2.077 -1.017 3.5 -1c1.423 -.017 2.67 .358 3.5 1"></path><path d="M8 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2M12 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2"></path><path d="M3 10h14v5a6 6 0 0 1 -6 6H9a6 6 0 0 1 -6 -6v-5zM16.746 16.726a3 3 0 1 0 .252 -5.555"></path></svg>
-        </button>
-
         <div id="kofi-panel" class="kofi-panel hidden">
             <iframe id="kofiframe" class="kofi-frame" src="https://ko-fi.com/gramoflava/?hidefeed=true&amp;widget=true&amp;embed=true&amp;preview=true" height="660" title="Support lava on Ko-fi"></iframe>
         </div>
@@ -127,12 +123,12 @@
 
         <script>
             (function() {
-                const floater = document.getElementById('kofi-floater');
+                const supportBtn = document.getElementById('btn-support');
                 const panel = document.getElementById('kofi-panel');
                 const closeBtn = document.getElementById('kofi-close');
 
-                floater.addEventListener('click', () => {
-                    floater.classList.add('hidden');
+                supportBtn.addEventListener('click', () => {
+                    supportBtn.setAttribute('aria-expanded', 'true');
                     closeBtn.classList.remove('hidden');
                     panel.classList.remove('hidden');
                 });
@@ -140,7 +136,7 @@
                 closeBtn.addEventListener('click', () => {
                     panel.classList.add('hidden');
                     closeBtn.classList.add('hidden');
-                    floater.classList.remove('hidden');
+                    supportBtn.setAttribute('aria-expanded', 'false');
                 });
             })();
         </script>

@@ -23,7 +23,7 @@ Apps.register({
 
             .wl-keyboard { padding: 16px; display: flex; flex-direction: column; gap: 6px; align-items: center; border-top: 1px solid var(--line); background: var(--surface-sunk); }
             .wl-kb-row { display: flex; gap: 6px; }
-            .wl-kb-key { background: var(--glass-hover); border: none; color: var(--text); font-family: var(--font-sans); font-size: 14px; font-weight: 600; padding: 12px 10px; border-radius: var(--radius-xs); cursor: pointer; text-transform: uppercase; transition: background 0.2s; min-width: 32px; display: flex; justify-content: center; align-items: center; }
+            .wl-kb-key { min-height: 44px; background: var(--glass-hover); border: none; color: var(--text); font-family: var(--font-sans); font-size: 14px; font-weight: 600; padding: 12px 10px; border-radius: var(--radius-xs); cursor: pointer; text-transform: uppercase; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: background 0.2s; min-width: 32px; display: flex; justify-content: center; align-items: center; }
             .wl-kb-key.large { min-width: 50px; font-size: 13px; }
             .wl-kb-key:hover { background: var(--glass-active); }
             .wl-kb-key.correct { background-color: #22C55E; color: #fff; }
@@ -34,6 +34,15 @@ Apps.register({
 
             @keyframes shake { 10%, 90% { transform: translateX(-1px); } 20%, 80% { transform: translateX(2px); } 30%, 50%, 70% { transform: translateX(-4px); } 40%, 60% { transform: translateX(4px); } }
             @keyframes flip { 0% { transform: rotateX(0); } 50% { transform: rotateX(90deg); } 100% { transform: rotateX(0); } }
+
+            @media (max-width: 640px) {
+                .wl-board-wrap { padding: 8px; }
+                .wl-wrap .game-select { width: 104px; min-width: 104px; max-width: 104px; }
+                .wl-keyboard { padding: 10px 6px; gap: 5px; }
+                .wl-kb-row { width: 100%; gap: 4px; }
+                .wl-kb-key { flex: 1 1 0; min-width: 0; padding: 10px 2px; font-size: 12px; }
+                .wl-kb-key.large { flex-grow: 1.5; min-width: 0; font-size: 10px; }
+            }
         `;
 
         const html = `
@@ -132,6 +141,7 @@ Apps.register({
         }
 
         const uiBoard = document.getElementById(`wl-board-${winId}`);
+        const uiBoardWrap = uiBoard.parentElement;
         const uiKeyboard = document.getElementById(`wl-keyboard-${winId}`);
         const loadingOverlay = document.getElementById(`wl-loading-${winId}`);
 
@@ -187,6 +197,28 @@ Apps.register({
             }
         }
 
+        function updateCellSize() {
+            const isMobile = window.matchMedia('(max-width: 640px)').matches;
+            const horizontalPadding = isMobile ? 16 : 32;
+            const verticalPadding = isMobile ? 16 : 32;
+            const measuredWidth = uiBoardWrap.clientWidth - horizontalPadding;
+            const measuredHeight = uiBoardWrap.clientHeight - verticalPadding;
+            const maxW = Math.min(400, measuredWidth > 0 ? measuredWidth : 400);
+            const maxH = Math.min(420, measuredHeight > 0 ? measuredHeight : 420);
+            const gap = 6;
+            const cellSize = Math.max(
+                isMobile ? 22 : 28,
+                Math.floor(
+                    Math.min(
+                        (maxW - gap * (wordLength - 1)) / wordLength,
+                        (maxH - gap * (maxGuesses - 1)) / maxGuesses,
+                        56
+                    )
+                )
+            );
+            uiBoard.style.setProperty('--cell-size', `${cellSize}px`);
+        }
+
         function initGame() {
             wordLength = parseInt(document.getElementById(`wl-len-${winId}`).value);
             const list = window.WordlDict[wordLength];
@@ -210,12 +242,7 @@ Apps.register({
             const revealBtn = document.getElementById(`wl-reveal-${winId}`);
             if (revealBtn) revealBtn.style.display = 'none';
 
-            // Calculate optimal cell size
-            const maxW = 400; // Window width padding
-            const maxH = 420; // Available vertical space
-            const gap = 6;
-            const cellSize = Math.floor(Math.min((maxW - gap * (wordLength - 1)) / wordLength, (maxH - gap * (maxGuesses - 1)) / maxGuesses, 56));
-            uiBoard.style.setProperty('--cell-size', `${cellSize}px`);
+            updateCellSize();
 
             // Render Board structure
             uiBoard.style.gridTemplateRows = `repeat(${maxGuesses}, 1fr)`;
@@ -447,6 +474,7 @@ Apps.register({
             }
         };
         document.addEventListener('keydown', onGlobalKey);
+        window.addEventListener('resize', updateCellSize);
 
         // Cleanup on close
         const winObj = WindowManager.windows.get(winId);
@@ -455,6 +483,7 @@ Apps.register({
             if (originalCleanup) originalCleanup();
             if (timer) clearInterval(timer);
             document.removeEventListener('keydown', onGlobalKey);
+            window.removeEventListener('resize', updateCellSize);
         };
 
         // Start

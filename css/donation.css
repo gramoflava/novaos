@@ -39,7 +39,7 @@
 }
 
 .kofi-floater.hidden {
-    display: none;
+    display: none !important;
 }
 
 .kofi-panel {
@@ -68,7 +68,7 @@
 }
 
 .kofi-panel.hidden {
-    display: none;
+    display: none !important;
 }
 
 .kofi-frame {
@@ -90,8 +90,9 @@
     }
 
     .kofi-floater {
+        top: calc(env(safe-area-inset-top) + var(--space-2));
         right: var(--space-2);
-        bottom: 80px;
+        bottom: auto;
         width: 44px;
         height: 44px;
     }

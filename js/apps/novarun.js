@@ -12,15 +12,21 @@ Apps.register({
     const style = `
       .nr-shell { display: flex; height: 100%; padding: 16px; flex-direction: column; color: var(--text); font-family: var(--font-sans); }
       .nr-stage { position: relative; display: flex; flex: 1; min-height: 0; overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-sunk); box-shadow: var(--glass-edge); }
-      .nr-canvas { width: 100%; height: 100%; min-height: 250px; outline: none; touch-action: manipulation; cursor: pointer; }
+      .nr-canvas { width: 100%; height: 100%; min-height: 250px; outline: none; touch-action: none; overscroll-behavior: contain; cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
       .nr-canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
       .nr-caption { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 30px; color: var(--text-secondary); font-size: 10px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; }
       .nr-caption__route { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .nr-caption__keys { flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+      .nr-touch-controls { display: none; width: 100%; gap: var(--space-2); }
+      .nr-touch-btn { display: inline-flex; flex: 1 1 0; min-width: 0; height: 44px; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-sunk); color: var(--text); font: 600 var(--text-sm) var(--font-sans); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+      .nr-touch-btn:active { background: var(--glass-active); transform: scale(0.98); }
       @media (max-width: 640px) {
         .nr-shell { padding: 12px; }
-        .nr-canvas { min-height: 210px; }
-        .nr-caption__keys { display: none; }
+        .nr-stage { flex: 0 0 auto; width: 100%; aspect-ratio: 2 / 1; }
+        .nr-canvas { min-height: 0; }
+        .nr-caption { min-height: 52px; padding-top: var(--space-2); }
+        .nr-caption__route, .nr-caption__keys { display: none; }
+        .nr-touch-controls { display: flex; }
       }
     `;
 
@@ -52,6 +58,10 @@ Apps.register({
         <div class="nr-caption">
           <span class="nr-caption__route" id="nr-route-${winId}">${initialTheme === 'lunar' ? 'Lunar route 07 · clear terrain · read saucer altitude' : 'Offline classic · clear cacti · read bird altitude'}</span>
           <span class="nr-caption__keys">Space / ↑ jump · ↓ duck</span>
+          <div class="nr-touch-controls" aria-label="Touch controls">
+            <button class="nr-touch-btn" id="nr-touch-jump-${winId}" type="button" aria-label="Jump">↑ Jump</button>
+            <button class="nr-touch-btn" id="nr-touch-duck-${winId}" type="button" aria-label="Duck while held">↓ Hold duck</button>
+          </div>
         </div>
       </div>
       <style>${style}</style>
@@ -891,14 +901,66 @@ Apps.register({
     };
 
     const onPointerDown = event => {
+      if (!event.isPrimary || event.button > 0) {
+        return;
+      }
       event.preventDefault();
+      event.stopPropagation();
+      canvas.setPointerCapture(event.pointerId);
       jumpHeld = true;
       jump();
       canvas.focus({ preventScroll: true });
     };
 
-    const onPointerUp = () => {
+    const onPointerUp = event => {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
       releaseJump();
+    };
+
+    const preventRepeatedTapGesture = event => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    const touchJump = document.getElementById(`nr-touch-jump-${winId}`);
+    const touchDuck = document.getElementById(`nr-touch-duck-${winId}`);
+    const onTouchJumpDown = event => {
+      if (!event.isPrimary || event.button > 0) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      touchJump.setPointerCapture(event.pointerId);
+      jumpHeld = true;
+      jump();
+      canvas.focus({ preventScroll: true });
+    };
+    const onTouchJumpUp = event => {
+      event.preventDefault();
+      event.stopPropagation();
+      releaseJump();
+    };
+    const onTouchDuckDown = event => {
+      if (!event.isPrimary || event.button > 0) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      touchDuck.setPointerCapture(event.pointerId);
+      if (state === 'gameover') {
+        reset();
+      }
+      begin();
+      setDuck(true);
+      canvas.focus({ preventScroll: true });
+    };
+    const onTouchDuckUp = event => {
+      event.preventDefault();
+      event.stopPropagation();
+      setDuck(false);
     };
 
     themeSelect.addEventListener('change', () => {
@@ -917,6 +979,16 @@ Apps.register({
     canvas.addEventListener('pointerdown', onPointerDown);
     canvas.addEventListener('pointerup', onPointerUp);
     canvas.addEventListener('pointercancel', onPointerUp);
+    canvas.addEventListener('lostpointercapture', onPointerUp);
+    canvas.addEventListener('dblclick', preventRepeatedTapGesture);
+    touchJump.addEventListener('pointerdown', onTouchJumpDown);
+    touchJump.addEventListener('pointerup', onTouchJumpUp);
+    touchJump.addEventListener('pointercancel', onTouchJumpUp);
+    touchJump.addEventListener('lostpointercapture', onTouchJumpUp);
+    touchDuck.addEventListener('pointerdown', onTouchDuckDown);
+    touchDuck.addEventListener('pointerup', onTouchDuckUp);
+    touchDuck.addEventListener('pointercancel', onTouchDuckUp);
+    touchDuck.addEventListener('lostpointercapture', onTouchDuckUp);
 
     const themeObserver = new MutationObserver(() => readPalette());
     themeObserver.observe(document.documentElement, {
@@ -943,6 +1015,16 @@ Apps.register({
         canvas.removeEventListener('pointerdown', onPointerDown);
         canvas.removeEventListener('pointerup', onPointerUp);
         canvas.removeEventListener('pointercancel', onPointerUp);
+        canvas.removeEventListener('lostpointercapture', onPointerUp);
+        canvas.removeEventListener('dblclick', preventRepeatedTapGesture);
+        touchJump.removeEventListener('pointerdown', onTouchJumpDown);
+        touchJump.removeEventListener('pointerup', onTouchJumpUp);
+        touchJump.removeEventListener('pointercancel', onTouchJumpUp);
+        touchJump.removeEventListener('lostpointercapture', onTouchJumpUp);
+        touchDuck.removeEventListener('pointerdown', onTouchDuckDown);
+        touchDuck.removeEventListener('pointerup', onTouchDuckUp);
+        touchDuck.removeEventListener('pointercancel', onTouchDuckUp);
+        touchDuck.removeEventListener('lostpointercapture', onTouchDuckUp);
       };
     }
   }

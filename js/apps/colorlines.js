@@ -9,12 +9,12 @@ Apps.register({
 
         const style = `
             .cl-container { padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%; font-family: var(--font-sans); color: var(--text); }
-            .cl-grid { display: grid; gap: 2px; padding: 8px; background: var(--surface-sunk); border-radius: var(--radius-md); border: 1px solid var(--line-strong); box-shadow: var(--glass-edge); user-select: none; position: relative; }
-            .cl-cell { width: 32px; height: 32px; background: var(--surface-sunk); border-radius: var(--radius-sm); position: relative; cursor: pointer; transition: background 0.2s; }
+            .cl-grid { --cl-cell-size: 32px; display: grid; gap: 2px; padding: 8px; background: var(--surface-sunk); border-radius: var(--radius-md); border: 1px solid var(--line-strong); box-shadow: var(--glass-edge); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; position: relative; }
+            .cl-cell { width: var(--cl-cell-size); height: var(--cl-cell-size); background: var(--surface-sunk); border-radius: var(--radius-sm); position: relative; cursor: pointer; touch-action: manipulation; transition: background 0.2s; }
             .cl-cell:hover { background: var(--glass-hover); }
             .cl-cell.selected { background: var(--glass-active); box-shadow: var(--glass-edge); }
-            .cl-cell.traced::after { content: ''; position: absolute; top: 12px; left: 12px; width: 8px; height: 8px; border-radius: var(--radius-pill); background: var(--text); opacity: 0.3; pointer-events: none; }
-            .cl-ball { position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: var(--radius-pill); box-shadow: inset -5px -6px 9px rgba(15, 23, 42, 0.48), inset 4px 4px 6px rgba(255, 255, 255, 0.38), 0 3px 7px rgba(15, 23, 42, 0.24); pointer-events: none; transition: transform 0.2s; z-index: 10; }
+            .cl-cell.traced::after { content: ''; position: absolute; top: 37.5%; left: 37.5%; width: 25%; height: 25%; border-radius: var(--radius-pill); background: var(--text); opacity: 0.3; pointer-events: none; }
+            .cl-ball { position: absolute; top: 12.5%; left: 12.5%; width: 75%; height: 75%; border-radius: var(--radius-pill); box-shadow: inset -5px -6px 9px rgba(15, 23, 42, 0.48), inset 4px 4px 6px rgba(255, 255, 255, 0.38), 0 3px 7px rgba(15, 23, 42, 0.24); pointer-events: none; transition: transform 0.2s; z-index: 10; }
             .cl-cell.selected .cl-ball { transform: scale(1.15); animation: pulseBall 1s infinite alternate; }
             .color-0 { color: #EF4444; background: #EF4444; }
             .color-1 { color: #3B82F6; background: #3B82F6; }
@@ -31,6 +31,17 @@ Apps.register({
             .cl-preview-wrap.collapsed { width: 0; opacity: 0; pointer-events: none; }
             .cl-preview-cell { flex-shrink: 0; width: 24px; height: 24px; background: var(--surface-sunk); border-radius: var(--radius-xs); position: relative; border: 1px solid var(--surface-sunk); }
             .cl-preview-cell .cl-ball { top: 3px; left: 3px; width: 16px; height: 16px; box-shadow: inset -3px -3px 5px rgba(15, 23, 42, 0.46), inset 2px 2px 3px rgba(255, 255, 255, 0.36), 0 2px 4px rgba(15, 23, 42, 0.2); }
+            @media (max-width: 640px) {
+                .cl-container { padding: 8px; }
+                .cl-container .game-toolbar { flex: none; }
+                .cl-container .game-select { min-width: 72px !important; width: 72px !important; }
+                .cl-preview-group { flex: 0 0 56px; min-width: 56px; height: 44px; padding: 2px; }
+                .cl-preview-btn { display: none; }
+                .cl-preview-wrap, .cl-preview-wrap.collapsed { width: 52px; opacity: 1; pointer-events: auto; }
+                .cl-preview-cell { width: 16px; height: 16px; }
+                .cl-preview-cell .cl-ball { top: 2px; left: 2px; width: 10px; height: 10px; }
+                .cl-container .game-stat { min-width: 40px; }
+            }
         `;
 
         const html = `
@@ -115,7 +126,18 @@ Apps.register({
 
         const uiGrid = document.getElementById(`cl-grid-${winId}`);
         const uiScore = document.getElementById(`cl-score-${winId}`);
-        uiGrid.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+        const updateGridCellSize = () => {
+            const isMobile = window.matchMedia('(max-width: 640px)').matches;
+            const horizontalPadding = isMobile ? 16 : 32;
+            const contentWidth = Math.max(0, uiGrid.parentElement.clientWidth - horizontalPadding);
+            const chromeWidth = 18 + Math.max(0, size - 1) * 2;
+            const fittedSize = Math.floor((contentWidth - chromeWidth) / size);
+            const cellSize = isMobile ? Math.max(26, Math.min(32, fittedSize)) : 32;
+            uiGrid.style.setProperty('--cl-cell-size', `${cellSize}px`);
+            uiGrid.style.gridTemplateColumns = `repeat(${size}, var(--cl-cell-size))`;
+        };
+        updateGridCellSize();
+        window.addEventListener('resize', updateGridCellSize);
 
         // Setup generic empty grid items
         for(let i=0; i<size*size; i++) {
@@ -417,6 +439,15 @@ Apps.register({
                 render();
             }
         };
+
+        const winObj = WindowManager.windows.get(winId);
+        if (winObj) {
+            const originalCleanup = winObj.cleanup;
+            winObj.cleanup = () => {
+                if (originalCleanup) originalCleanup();
+                window.removeEventListener('resize', updateGridCellSize);
+            };
+        }
 
         initBoard();
     }

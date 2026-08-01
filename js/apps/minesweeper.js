@@ -8,9 +8,9 @@ Apps.register({
         const winId = 'minesweeper-' + Date.now();
 
         const style = `
-            .ms-container { padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%; font-family: var(--font-sans); color: var(--text); }
-            .ms-grid { display: grid; gap: 2px; padding: 12px; background: var(--surface-sunk); border-radius: var(--radius-md); border: 1px solid var(--line-strong); box-shadow: var(--glass-edge); user-select: none; }
-            .ms-cell { width: 32px; height: 32px; background: var(--surface-sunk); border-radius: var(--radius-xs); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; cursor: pointer; transition: background 0.1s; color: var(--text); }
+            .ms-container { padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%; overflow: auto; font-family: var(--font-sans); color: var(--text); }
+            .ms-grid { --ms-cell-size: 32px; display: grid; flex: none; gap: 2px; padding: 12px; background: var(--surface-sunk); border-radius: var(--radius-md); border: 1px solid var(--line-strong); box-shadow: var(--glass-edge); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+            .ms-cell { width: var(--ms-cell-size); height: var(--ms-cell-size); background: var(--surface-sunk); border-radius: var(--radius-xs); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: clamp(12px, calc(var(--ms-cell-size) * 0.5), 16px); cursor: pointer; touch-action: manipulation; transition: background 0.1s; color: var(--text); }
             .ms-cell:hover { background: var(--glass-hover); }
             .ms-cell.revealed { background: var(--glass-active); border: 1px solid var(--surface-sunk); cursor: default; }
             .ms-cell.mine { background: #EF4444; color: #fff;}
@@ -18,6 +18,11 @@ Apps.register({
             .c-1 { color: #3B82F6; } .c-2 { color: #10B981; } .c-3 { color: #EF4444; }
             .c-4 { color: #8B5CF6; } .c-5 { color: #F59E0B; } .c-6 { color: #06B6D4; }
             .c-7 { color: #111827; } .c-8 { color: #6B7280; }
+            @media (max-width: 640px) {
+                .ms-container { padding: 8px; align-items: flex-start; }
+                .ms-container .game-toolbar { flex: none; }
+                .ms-grid { margin: 0 auto; }
+            }
         `;
 
         const html = `
@@ -30,6 +35,7 @@ Apps.register({
                             <option value="hard">Expert</option>
                         </select>
                         <button class="game-icon-btn game-icon-btn--restart" id="ms-restart-${winId}" type="button" title="Restart" aria-label="Restart"></button>
+                        <button class="game-icon-btn game-icon-btn--flag" id="ms-flag-${winId}" type="button" title="Flag mode (or long press a cell)" aria-label="Flag mode" aria-pressed="false"></button>
                     </div>
                     <div class="game-toolbar__spacer"></div>
                     <div class="game-stat-group">
@@ -68,13 +74,80 @@ Apps.register({
         let isFirstClick = true;
         let revealedCount = 0;
         let lastHoveredCell = {r: -1, c: -1};
+        let flagMode = false;
 
         const uiGrid = document.getElementById(`ms-grid-${winId}`);
         const uiTime = document.getElementById(`ms-time-${winId}`);
         const uiMines = document.getElementById(`ms-mines-${winId}`);
+        const uiFlagMode = document.getElementById(`ms-flag-${winId}`);
+
+        const updateGridCellSize = () => {
+            const isMobile = window.matchMedia('(max-width: 640px)').matches;
+            const horizontalPadding = isMobile ? 16 : 32;
+            const contentWidth = Math.max(0, uiGrid.parentElement.clientWidth - horizontalPadding);
+            const chromeWidth = 26 + Math.max(0, cols - 1) * 2;
+            const fittedSize = Math.floor((contentWidth - chromeWidth) / cols);
+            const cellSize = isMobile ? Math.max(26, Math.min(32, fittedSize)) : 32;
+            uiGrid.style.setProperty('--ms-cell-size', `${cellSize}px`);
+            uiGrid.style.gridTemplateColumns = `repeat(${cols}, var(--ms-cell-size))`;
+        };
+
+        const setFlagMode = value => {
+            flagMode = value;
+            uiFlagMode.setAttribute('aria-pressed', String(flagMode));
+            uiFlagMode.title = flagMode ? 'Flag mode on' : 'Flag mode (or long press a cell)';
+        };
+
+        const bindCellInteractions = (div, r, c) => {
+            let longPressTimer = null;
+            let startX = 0;
+            let startY = 0;
+            let suppressNativeActionUntil = 0;
+
+            const cancelLongPress = () => {
+                if (longPressTimer !== null) {
+                    clearTimeout(longPressTimer);
+                    longPressTimer = null;
+                }
+            };
+
+            div.addEventListener('pointerdown', event => {
+                if (event.pointerType === 'mouse') return;
+                event.stopPropagation();
+                startX = event.clientX;
+                startY = event.clientY;
+                cancelLongPress();
+                longPressTimer = setTimeout(() => {
+                    longPressTimer = null;
+                    suppressNativeActionUntil = Date.now() + 1000;
+                    handleRightClick(r, c);
+                    if (navigator.vibrate) navigator.vibrate(12);
+                }, 450);
+            });
+
+            div.addEventListener('pointermove', event => {
+                if (Math.hypot(event.clientX - startX, event.clientY - startY) > 10) {
+                    cancelLongPress();
+                }
+            });
+            div.addEventListener('pointerup', cancelLongPress);
+            div.addEventListener('pointercancel', cancelLongPress);
+
+            div.addEventListener('click', event => {
+                event.preventDefault();
+                if (Date.now() < suppressNativeActionUntil) return;
+                if (flagMode) handleRightClick(r, c);
+                else handleLeftClick(r, c);
+            });
+            div.addEventListener('contextmenu', event => {
+                event.preventDefault();
+                if (Date.now() < suppressNativeActionUntil) return;
+                handleRightClick(r, c);
+            });
+        };
 
         const initBoard = () => {
-            uiGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+            updateGridCellSize();
             board = [];
             isGameOver = false;
             isFirstClick = true;
@@ -97,8 +170,7 @@ Apps.register({
                     div.className = 'ms-cell';
                     div.dataset.r = r;
                     div.dataset.c = c;
-                    div.addEventListener('click', () => handleLeftClick(r, c));
-                    div.addEventListener('contextmenu', (e) => { e.preventDefault(); handleRightClick(r, c); });
+                    bindCellInteractions(div, r, c);
                     div.addEventListener('mouseenter', () => { lastHoveredCell = {r, c}; });
                     div.addEventListener('mouseleave', () => { if (lastHoveredCell.r === r && lastHoveredCell.c === c) lastHoveredCell = {r: -1, c: -1}; });
                     uiGrid.appendChild(div);
@@ -235,6 +307,8 @@ Apps.register({
         };
 
         document.getElementById(`ms-restart-${winId}`).onclick = initBoard;
+        uiFlagMode.addEventListener('click', () => setFlagMode(!flagMode));
+        window.addEventListener('resize', updateGridCellSize);
 
         document.getElementById(`ms-level-${winId}`).onchange = (e) => {
             const val = e.target.value;
@@ -270,6 +344,7 @@ Apps.register({
                 if (originalCleanup) originalCleanup();
                 if(timer) clearInterval(timer);
                 document.removeEventListener('keydown', onGlobalKey);
+                window.removeEventListener('resize', updateGridCellSize);
             };
         }
 

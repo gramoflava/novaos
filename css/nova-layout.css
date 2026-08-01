@@ -491,6 +491,16 @@
     color: var(--warn);
 }
 
+.game-icon-btn--flag {
+    --game-action-icon: url("../gramofdesign/icons/flag.svg");
+    color: var(--warn);
+}
+
+.game-icon-btn--flag[aria-pressed="true"] {
+    background: color-mix(in srgb, var(--warn) 16%, var(--surface-sunk));
+    border-color: color-mix(in srgb, var(--warn) 45%, var(--line));
+}
+
 .game-icon-btn--reveal {
     --game-action-icon: url("../gramofdesign/icons/eye.svg");
     color: var(--danger);
@@ -561,6 +571,42 @@
 }
 
 @media (max-width: 640px) {
+    .game-toolbar {
+        min-height: 44px;
+        margin-bottom: var(--space-3);
+        gap: var(--space-1);
+    }
+
+    .game-toolbar__group,
+    .game-stat-group {
+        gap: var(--space-1);
+    }
+
+    .game-select,
+    .game-icon-btn,
+    .game-stat {
+        height: 44px;
+    }
+
+    .game-icon-btn {
+        width: 44px;
+        flex-basis: 44px;
+    }
+
+    .game-select {
+        width: 84px;
+        min-width: 84px;
+        max-width: 84px;
+        padding-right: 24px;
+        padding-left: var(--space-2);
+    }
+
+    .game-stat {
+        min-width: 44px;
+        padding-right: var(--space-1);
+        padding-left: var(--space-1);
+    }
+
     #nova-island-container {
         top: var(--space-2);
         left: var(--space-2);
@@ -594,6 +640,11 @@
 
     .island-right {
         gap: var(--space-1);
+    }
+
+    .island-btn {
+        width: 40px;
+        height: 40px;
     }
 
     #nova-shelf-container {

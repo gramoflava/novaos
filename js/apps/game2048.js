@@ -9,10 +9,10 @@ Apps.register({
 
         const style = `
             .game-container { padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%; font-family: var(--font-sans); color: var(--text); }
-            .grid-2048 { position: relative; width: 316px; height: 316px; background: var(--surface-sunk); border-radius: var(--radius-md); border: 1px solid var(--line-strong); box-shadow: var(--glass-edge); overflow: hidden; }
-            .grid-bg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 12px; width: 100%; height: 100%; position: absolute; top:0; left:0; }
-            .tile-bg { background: var(--surface-sunk); border-radius: var(--radius-sm); width: 64px; height: 64px; }
-            .tile { width: 64px; height: 64px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 600; color: #fff; position: absolute; transition: left 0.075s ease-in-out, top 0.075s ease-in-out, background 0.075s ease-in-out; z-index: 10; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+            .grid-2048 { --grid-inset: 3.797468%; --tile-size: 20.253165%; position: relative; width: min(316px, calc(100vw - 50px)); height: auto; aspect-ratio: 1; background: var(--surface-sunk); border-radius: var(--radius-md); border: 1px solid var(--line-strong); box-shadow: var(--glass-edge); overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+            .grid-bg { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); gap: var(--grid-inset); padding: var(--grid-inset); width: 100%; height: 100%; position: absolute; top:0; left:0; }
+            .tile-bg { background: var(--surface-sunk); border-radius: var(--radius-sm); width: 100%; height: 100%; }
+            .tile { width: var(--tile-size); height: var(--tile-size); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 6.3vw, 24px); font-weight: 600; color: #fff; position: absolute; transition: left 0.075s ease-in-out, top 0.075s ease-in-out, background 0.075s ease-in-out; z-index: 10; text-shadow: 0 2px 4px rgba(0,0,0,0.3); }
             .tile-2 { background: #3730A3; box-shadow: 0 0 8px rgba(55,48,163,0.5); }
             .tile-4 { background: #4F46E5; box-shadow: 0 0 10px rgba(79,70,229,0.5); }
             .tile-8 { background: #6366F1; box-shadow: 0 0 12px rgba(99,102,241,0.5); }
@@ -68,6 +68,7 @@ Apps.register({
 
         const uiScore = document.getElementById(`score-${winId}`);
         const uiTiles = document.getElementById(`tiles-${winId}`);
+        const uiGrid = document.getElementById(`grid-${winId}`);
 
         const render = () => {
             uiScore.textContent = score;
@@ -79,8 +80,8 @@ Apps.register({
                 }
                 t.el.className = `tile ${t.val > 0 ? 'tile-'+(t.val > 2048 ? 2048 : t.val) : ''}`;
                 t.el.textContent = t.val;
-                t.el.style.left = `${12 + t.c * 76}px`;
-                t.el.style.top = `${12 + t.r * 76}px`;
+                t.el.style.left = `${((12 + t.c * 76) / 316) * 100}%`;
+                t.el.style.top = `${((12 + t.r * 76) / 316) * 100}%`;
 
                 if(t.mergedThisTurn) {
                     t.el.animate([{transform:'scale(1)'}, {transform:'scale(1.15)'}, {transform:'scale(1)'}], {duration:100});
@@ -220,12 +221,50 @@ Apps.register({
         };
         document.addEventListener('keydown', keyHandler);
 
+        let swipeStart = null;
+        const onSwipeStart = event => {
+            if (!event.isPrimary || event.button > 0) return;
+            event.preventDefault();
+            event.stopPropagation();
+            swipeStart = { id: event.pointerId, x: event.clientX, y: event.clientY };
+            uiGrid.setPointerCapture(event.pointerId);
+        };
+        const onSwipeMove = event => {
+            if (!swipeStart || swipeStart.id !== event.pointerId) return;
+            event.preventDefault();
+            event.stopPropagation();
+        };
+        const onSwipeEnd = event => {
+            if (!swipeStart || swipeStart.id !== event.pointerId) return;
+            event.preventDefault();
+            event.stopPropagation();
+            const dx = event.clientX - swipeStart.x;
+            const dy = event.clientY - swipeStart.y;
+            const threshold = Math.max(18, uiGrid.clientWidth * 0.08);
+            swipeStart = null;
+            if (Math.max(Math.abs(dx), Math.abs(dy)) < threshold) return;
+            if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? 'ArrowRight' : 'ArrowLeft');
+            else move(dy > 0 ? 'ArrowDown' : 'ArrowUp');
+        };
+        const onSwipeCancel = event => {
+            if (swipeStart && swipeStart.id === event.pointerId) swipeStart = null;
+        };
+
+        uiGrid.addEventListener('pointerdown', onSwipeStart);
+        uiGrid.addEventListener('pointermove', onSwipeMove);
+        uiGrid.addEventListener('pointerup', onSwipeEnd);
+        uiGrid.addEventListener('pointercancel', onSwipeCancel);
+
         const winObj = WindowManager.windows.get(winId);
         if(winObj) {
             const originalCleanup = winObj.cleanup;
             winObj.cleanup = () => {
                 if (originalCleanup) originalCleanup();
                 document.removeEventListener('keydown', keyHandler);
+                uiGrid.removeEventListener('pointerdown', onSwipeStart);
+                uiGrid.removeEventListener('pointermove', onSwipeMove);
+                uiGrid.removeEventListener('pointerup', onSwipeEnd);
+                uiGrid.removeEventListener('pointercancel', onSwipeCancel);
             };
         }
 
