@@ -71,6 +71,19 @@ class ScoreManager {
             return;
         }
 
+        let container = document.body;
+        if (targetWinId) {
+            const targetWinObj = WindowManager.windows.get(targetWinId);
+            if (targetWinObj) container = targetWinObj.content;
+        }
+
+        // A game window may only own one pending result at a time. Besides
+        // preventing visual duplicates, this keeps repeated end-game signals
+        // from registering the same run twice.
+        if (container.querySelector('.score-prompt-overlay')) {
+            return;
+        }
+
         const winId = 'score-' + Date.now();
         const html = `
             <div id="${winId}-overlay" class="score-prompt-overlay">
@@ -97,12 +110,6 @@ class ScoreManager {
                 #initials-${winId}:focus { border-color: var(--accent); box-shadow: var(--shadow-sm); }
             </style>
         `;
-
-        let container = document.body;
-        if (targetWinId) {
-            const targetWinObj = WindowManager.windows.get(targetWinId);
-            if (targetWinObj) container = targetWinObj.content;
-        }
 
         const wrapper = document.createElement('div');
         wrapper.innerHTML = html;

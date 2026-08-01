@@ -125,6 +125,7 @@ Apps.register({
     let palette = {};
     let downPressed = false;
     let jumpHeld = false;
+    let scorePromptOpen = false;
     const player = {
       y: GROUND - 48,
       vy: 0,
@@ -340,6 +341,9 @@ Apps.register({
 
     const jump = () => {
       if (state === 'gameover') {
+        if (scorePromptOpen) {
+          return;
+        }
         reset();
         begin();
         return;
@@ -581,7 +585,17 @@ Apps.register({
         window.AudioMng.play('lose');
       }
       if (window.Scores) {
-        window.Scores.showScorePrompt(getGameId(), finalScore, false, null, winId);
+        scorePromptOpen = true;
+        window.Scores.showScorePrompt(
+          getGameId(),
+          finalScore,
+          false,
+          () => {
+            scorePromptOpen = false;
+            canvas.focus({ preventScroll: true });
+          },
+          winId
+        );
       }
     };
 
@@ -932,6 +946,13 @@ Apps.register({
       if (WindowManager.activeWindowId !== winId) {
         return;
       }
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest('input, textarea, select, button, [contenteditable="true"]')
+      ) {
+        return;
+      }
       if (event.code === 'Space' || event.code === 'ArrowUp') {
         event.preventDefault();
         if (!event.repeat) {
@@ -1001,6 +1022,9 @@ Apps.register({
       }
       event.preventDefault();
       event.stopPropagation();
+      if (state === 'gameover' && scorePromptOpen) {
+        return;
+      }
       touchDuck.setPointerCapture(event.pointerId);
       if (state === 'gameover') {
         reset();
