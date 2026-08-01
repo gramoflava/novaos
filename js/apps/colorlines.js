@@ -15,6 +15,7 @@ Apps.register({
             .cl-cell.selected { background: var(--glass-active); box-shadow: var(--glass-edge); }
             .cl-cell.traced::after { content: ''; position: absolute; top: 37.5%; left: 37.5%; width: 25%; height: 25%; border-radius: var(--radius-pill); background: var(--text); opacity: 0.3; pointer-events: none; }
             .cl-ball { position: absolute; top: 12.5%; left: 12.5%; width: 75%; height: 75%; border-radius: var(--radius-pill); box-shadow: inset -5px -6px 9px rgba(15, 23, 42, 0.48), inset 4px 4px 6px rgba(255, 255, 255, 0.38), 0 3px 7px rgba(15, 23, 42, 0.24); pointer-events: none; transition: transform 0.2s; z-index: 10; }
+            .cl-ball--moving { top: 0; left: 0; width: calc(var(--cl-cell-size) * 0.75); height: calc(var(--cl-cell-size) * 0.75); }
             .cl-cell.selected .cl-ball { transform: scale(1.15); animation: pulseBall 1s infinite alternate; }
             .color-0 { color: #EF4444; background: #EF4444; }
             .color-1 { color: #3B82F6; background: #3B82F6; }
@@ -385,13 +386,14 @@ Apps.register({
 
                     // Create floating animated ball
                     const animBall = document.createElement('div');
-                    animBall.className = `cl-ball color-${startColorIdx}`;
+                    animBall.className = `cl-ball cl-ball--moving color-${startColorIdx}`;
                     uiGrid.appendChild(animBall);
 
                     // Map path indices to physical offsets
                     const keyframes = path.map(p => {
                         const cell = uiGrid.children[p];
-                        return { left: cell.offsetLeft + 4 + 'px', top: cell.offsetTop + 4 + 'px' };
+                        const inset = (cell.offsetWidth - animBall.offsetWidth) / 2;
+                        return { left: cell.offsetLeft + inset + 'px', top: cell.offsetTop + inset + 'px' };
                     });
 
                     const timing = { duration: path.length * 35, easing: 'linear' };

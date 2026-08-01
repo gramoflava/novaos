@@ -22,6 +22,7 @@ Apps.register({
                     <div class="scores-menu-item active" data-game="minesweeper-easy">Minesweeper</div>
                     <div class="scores-menu-item" data-game="game2048">2048</div>
                     <div class="scores-menu-item" data-game="colorlines-5">Color Lines</div>
+                    <div class="scores-menu-item" data-game="columns-classic">Columns</div>
                     <div class="scores-menu-item" data-game="wordl-5">Wordl</div>
                     <div class="scores-menu-item" data-game="novarun-lunar">Nova Run</div>
                 </div>
@@ -47,6 +48,7 @@ Apps.register({
             'minesweeper': 'Minesweeper',
             'game2048': '2048',
             'colorlines': 'Color Lines',
+            'columns': 'Columns',
             'wordl': 'Wordl',
             'novarun': 'Nova Run'
         };

@@ -83,7 +83,7 @@ class ScoreManager {
                 <button class="btn btn--primary score-prompt-save" id="save-btn-${winId}">Save Score</button>
             </div>
             <style id="style-${winId}">
-                .score-prompt-overlay { position: absolute; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(var(--blur-panel)); opacity: 0; pointer-events: none; animation: scoreFadeIn var(--dur-slow) var(--ease-smooth) forwards; transition: opacity var(--dur-slow) var(--ease-smooth); }
+                .score-prompt-overlay { position: absolute; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(var(--blur-panel)); opacity: 0; pointer-events: auto; animation: scoreFadeIn var(--dur-slow) var(--ease-smooth) forwards; transition: opacity var(--dur-slow) var(--ease-smooth); }
                 .score-prompt-result--win, .score-prompt-result--loss { margin-bottom: 8px; }
                 .score-prompt-result--win { color: var(--success); }
                 .score-prompt-result--loss { color: var(--danger); }
@@ -91,7 +91,7 @@ class ScoreManager {
                 .score-prompt-copy { margin-bottom: 16px; color: var(--text-secondary); font-size: 14px; }
                 .score-prompt-input { width: 100px; margin-bottom: 24px; padding: 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); outline: none; background: var(--glass-hover); box-shadow: var(--glass-edge); color: var(--text); text-align: center; text-transform: uppercase; font-size: 24px; letter-spacing: 4px; }
                 .score-prompt-save { padding: 12px 24px; font-size: 16px; }
-                @keyframes scoreFadeIn { from { opacity: 0; transform: scale(1.1); } to { opacity: 1; transform: scale(1); pointer-events: auto; } }
+                @keyframes scoreFadeIn { from { opacity: 0; transform: scale(1.1); } to { opacity: 1; transform: scale(1); } }
                 #save-btn-${winId}:hover { filter: brightness(1.1); transform: translateY(-1px); }
                 #save-btn-${winId}:active { transform: translateY(1px); }
                 #initials-${winId}:focus { border-color: var(--accent); box-shadow: var(--shadow-sm); }

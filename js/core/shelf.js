@@ -22,7 +22,7 @@ class Shelf {
         // Logical Order & Grouping
         const GROUPS = [
             { id: 'utils', apps: ['codex', 'settings', 'calculator'] },
-            { id: 'games', apps: ['minesweeper', 'game2048', 'colorlines', 'wordl', 'novarun'] },
+            { id: 'games', apps: ['minesweeper', 'game2048', 'colorlines', 'columns', 'wordl', 'novarun'] },
             { id: 'stats', apps: ['scores'] }
         ];
 

@@ -39,6 +39,16 @@ Apps.register({
             .cx-content ul { padding-left: 20px; margin-bottom: 16px; opacity: 0.9; }
             .cx-content li { margin-bottom: 8px; font-size: 15px; }
             .cx-content code { background: var(--glass-hover); padding: 2px 6px; border-radius: var(--radius-xs); font-family: monospace; font-size: 13px; }
+            @media (max-width: 640px) {
+                .cx-wrap { flex-direction: column; }
+                .cx-sidebar { width: 100%; height: 52px; min-height: 52px; padding: 4px 8px; flex-direction: row; overflow-x: auto; overflow-y: hidden; border-right: 0; border-bottom: 1px solid var(--line); scrollbar-width: none; touch-action: pan-x; }
+                .cx-sidebar::-webkit-scrollbar { display: none; }
+                .cx-nav-item { display: flex; min-height: 42px; padding: 8px 12px; flex: 0 0 auto; align-items: center; white-space: nowrap; }
+                .cx-nav-item.active { border-bottom: 3px solid var(--accent); border-left: 0; }
+                .cx-content { width: 100%; padding: 20px 16px 92px; }
+                .cx-content h1 { font-size: 26px; }
+                .cx-content h2 { font-size: 19px; }
+            }
         `;
 
         const pages = {
@@ -120,6 +130,29 @@ Apps.register({
                     </ul>
                 `
             },
+            'columns': {
+                title: 'Columns',
+                html: `
+                    <h1>Columns</h1>
+                    <p>Nova's glass-and-gem interpretation of Sega's classic falling-column puzzle.</p>
+
+                    <h2>Core Rules</h2>
+                    <ul>
+                        <li>Place vertical columns of <b>three jewels</b> on a 6 × 13 field.</li>
+                        <li>Align <b>three or more</b> matching jewels horizontally, vertically, or diagonally.</li>
+                        <li>Cleared jewels make the board settle. New matches created by gravity become score-multiplying chain reactions.</li>
+                        <li>The descent becomes faster as the level rises. Later levels may send a Magic Column that clears one colour.</li>
+                    </ul>
+
+                    <h2>Controls</h2>
+                    <ul>
+                        <li><b>Left / Right:</b> Move the falling column.</li>
+                        <li><b>Up:</b> Cycle all three colours upward.</li>
+                        <li><b>Down:</b> Drop and lock the column.</li>
+                        <li><b>Phone:</b> Use the same four directions as swipes across the playfield.</li>
+                    </ul>
+                `
+            },
             'game2048': {
                 title: '2048',
                 html: `
@@ -194,6 +227,7 @@ Apps.register({
                     <div class="cx-nav-item active" data-page="novaos">NovaOS</div>
                     <div class="cx-nav-item" data-page="wordl">Wordl</div>
                     <div class="cx-nav-item" data-page="colorlines">Color Lines</div>
+                    <div class="cx-nav-item" data-page="columns">Columns</div>
                     <div class="cx-nav-item" data-page="game2048">2048</div>
                     <div class="cx-nav-item" data-page="minesweeper">Minesweeper</div>
                     <div class="cx-nav-item" data-page="novarun">Nova Run</div>

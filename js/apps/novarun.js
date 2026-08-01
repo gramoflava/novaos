@@ -11,7 +11,7 @@ Apps.register({
 
     const style = `
       .nr-shell { display: flex; height: 100%; padding: 16px; flex-direction: column; color: var(--text); font-family: var(--font-sans); }
-      .nr-stage { position: relative; display: flex; flex: 1; min-height: 0; overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-sunk); box-shadow: var(--glass-edge); }
+      .nr-stage { position: relative; display: flex; width: 100%; aspect-ratio: 16 / 7; flex: 0 1 auto; min-height: 0; overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-sunk); box-shadow: var(--glass-edge); }
       .nr-canvas { width: 100%; height: 100%; min-height: 250px; outline: none; touch-action: none; overscroll-behavior: contain; cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
       .nr-canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
       .nr-caption { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 30px; color: var(--text-secondary); font-size: 10px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; }
@@ -22,7 +22,7 @@ Apps.register({
       .nr-touch-btn:active { background: var(--glass-active); transform: scale(0.98); }
       @media (max-width: 640px) {
         .nr-shell { padding: 12px; }
-        .nr-stage { flex: 0 0 auto; width: 100%; aspect-ratio: 2 / 1; }
+        .nr-stage { flex: 0 0 auto; width: 100%; aspect-ratio: 8 / 7; }
         .nr-canvas { min-height: 0; }
         .nr-caption { min-height: 52px; padding-top: var(--space-2); }
         .nr-caption__route, .nr-caption__keys { display: none; }
@@ -77,8 +77,11 @@ Apps.register({
     });
 
     const WIDTH = 640;
-    const HEIGHT = 280;
-    const GROUND = 224;
+    const DESKTOP_HEIGHT = 280;
+    const MOBILE_HEIGHT = 560;
+    const GROUND_MARGIN = 56;
+    let HEIGHT = DESKTOP_HEIGHT;
+    let GROUND = HEIGHT - GROUND_MARGIN;
     const PLAYER_X = 72;
     const RUNNER_CONFIG = {
       startSpeed: 0.36,
@@ -116,6 +119,7 @@ Apps.register({
     let ridgeScroll = 0;
     let lunarGroundScroll = 0;
     let classicGroundScroll = 0;
+    let cloudScroll = 0;
     let obstacles = [];
     let recentObstacleKinds = [];
     let palette = {};
@@ -129,10 +133,15 @@ Apps.register({
       fastFalling: false
     };
 
-    const stars = Array.from({ length: 34 }, (_, index) => ({
+    const stars = Array.from({ length: 42 }, (_, index) => ({
       x: (index * 83 + 31) % WIDTH,
-      y: 18 + ((index * 47) % 118),
+      yRatio: ((index * 47) % 101) / 100,
       size: index % 5 === 0 ? 2 : 1
+    }));
+    const clouds = Array.from({ length: 6 }, (_, index) => ({
+      x: (index * 137 + 54) % (WIDTH + 120),
+      yRatio: ((index * 29) % 83) / 100,
+      scale: index % 3 === 0 ? 2 : 1
     }));
     const RIDGE_COLUMN_WIDTH = 12;
     const RIDGE_HEIGHTS = [
@@ -276,6 +285,19 @@ Apps.register({
     };
 
     const resizeCanvas = () => {
+      const nextHeight = window.matchMedia('(max-width: 640px)').matches
+        ? MOBILE_HEIGHT
+        : DESKTOP_HEIGHT;
+      const nextGround = nextHeight - GROUND_MARGIN;
+      const groundShift = nextGround - GROUND;
+      if (groundShift !== 0) {
+        player.y += groundShift;
+        obstacles.forEach(obstacle => {
+          obstacle.y += groundShift;
+        });
+      }
+      HEIGHT = nextHeight;
+      GROUND = nextGround;
       const ratio = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = WIDTH * ratio;
       canvas.height = HEIGHT * ratio;
@@ -574,6 +596,7 @@ Apps.register({
       ridgeScroll = (ridgeScroll + worldStep * 0.025) % RIDGE_TILE_WIDTH;
       lunarGroundScroll = (lunarGroundScroll + worldStep * 0.34) % 54;
       classicGroundScroll = (classicGroundScroll + worldStep) % 34;
+      cloudScroll = (cloudScroll + worldStep * 0.045) % (WIDTH + 160);
       score = Math.floor(distanceRan * RUNNER_CONFIG.scoreCoefficient);
       speed = Math.min(RUNNER_CONFIG.maxSpeed, speed + RUNNER_CONFIG.acceleration * delta);
       scoreNode.textContent = score;
@@ -626,20 +649,23 @@ Apps.register({
     const drawLunarBackground = () => {
       const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT);
       if (palette.dark) {
-        sky.addColorStop(0, '#0a1020');
+        sky.addColorStop(0, '#030712');
+        sky.addColorStop(0.58, '#111827');
         sky.addColorStop(1, '#21162f');
       } else {
-        sky.addColorStop(0, '#dcecff');
-        sky.addColorStop(1, '#f4efff');
+        sky.addColorStop(0, '#0f1d3d');
+        sky.addColorStop(0.58, '#536a9d');
+        sky.addColorStop(1, '#eeeaff');
       }
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
       stars.forEach(star => {
         const x = (star.x - starScroll + WIDTH) % WIDTH;
-        ctx.globalAlpha = palette.dark ? 0.72 : 0.48;
-        ctx.fillStyle = star.size === 2 ? palette.cyan : palette.text;
-        ctx.fillRect(x, star.y, star.size, star.size);
+        const y = 18 + star.yRatio * Math.max(80, GROUND - 72);
+        ctx.globalAlpha = palette.dark ? 0.76 : 0.82;
+        ctx.fillStyle = star.size === 2 ? palette.cyan : '#f8fafc';
+        ctx.fillRect(x, y, star.size, star.size);
       });
       ctx.globalAlpha = 1;
 
@@ -678,6 +704,17 @@ Apps.register({
     const drawClassicBackground = () => {
       ctx.fillStyle = palette.dark ? '#111318' : '#f7f7f5';
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+      ctx.fillStyle = palette.dark ? 'rgba(226, 232, 240, 0.20)' : 'rgba(71, 85, 105, 0.22)';
+      clouds.forEach(cloud => {
+        const x = ((cloud.x - cloudScroll + WIDTH + 160) % (WIDTH + 160)) - 80;
+        const y = 26 + cloud.yRatio * Math.max(70, GROUND - 150);
+        const scale = cloud.scale;
+        ctx.fillRect(Math.round(x + 8 * scale), Math.round(y), 18 * scale, 3 * scale);
+        ctx.fillRect(Math.round(x + 4 * scale), Math.round(y + 3 * scale), 30 * scale, 4 * scale);
+        ctx.fillRect(Math.round(x), Math.round(y + 7 * scale), 42 * scale, 3 * scale);
+      });
+
       ctx.strokeStyle = palette.text;
       ctx.globalAlpha = 0.72;
       ctx.lineWidth = 1;
@@ -845,14 +882,14 @@ Apps.register({
             ? 'LUNAR ROUTE 07'
             : 'OFFLINE CLASSIC',
         WIDTH / 2,
-        108
+        HEIGHT * 0.42
       );
       ctx.fillStyle = palette.muted;
       ctx.font = '500 12px Inter, sans-serif';
       ctx.fillText(
         state === 'gameover' ? `Score ${score} · Space or tap to retry` : 'Space or tap to run',
         WIDTH / 2,
-        134
+        HEIGHT * 0.42 + 26
       );
     };
 
@@ -997,6 +1034,7 @@ Apps.register({
     });
 
     resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
     readPalette();
     reset();
     animationFrame = requestAnimationFrame(frame);
@@ -1010,6 +1048,7 @@ Apps.register({
         }
         cancelAnimationFrame(animationFrame);
         themeObserver.disconnect();
+        window.removeEventListener('resize', resizeCanvas);
         document.removeEventListener('keydown', onKeyDown);
         document.removeEventListener('keyup', onKeyUp);
         canvas.removeEventListener('pointerdown', onPointerDown);

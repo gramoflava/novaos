@@ -39,6 +39,12 @@ const Icons = {
             <path d="M3 12h18" stroke-dasharray="2 4"></path>
         </svg>`,
 
+        'columns': `<svg viewBox="0 0 24 24" fill="none" stroke-linejoin="round">
+            <path d="M12 1.5l4.5 3.5L12 8.5 7.5 5z" fill="#EC4899" stroke="#BE185D" stroke-width="1"></path>
+            <path d="M12 8l4.5 3.5L12 15l-4.5-3.5z" fill="#06B6D4" stroke="#0E7490" stroke-width="1"></path>
+            <path d="M12 14.5l4.5 3.5-4.5 4.5L7.5 18z" fill="#F59E0B" stroke="#B45309" stroke-width="1"></path>
+        </svg>`,
+
         'game2048': `<svg viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
             <line x1="3" y1="9" x2="21" y2="9"></line>

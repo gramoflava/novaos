@@ -10,8 +10,11 @@ Apps.register({
         const style = `
             .ms-container { padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%; overflow: auto; font-family: var(--font-sans); color: var(--text); }
             .ms-grid { --ms-cell-size: 32px; display: grid; flex: none; gap: 2px; padding: 12px; background: var(--surface-sunk); border-radius: var(--radius-md); border: 1px solid var(--line-strong); box-shadow: var(--glass-edge); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-            .ms-cell { width: var(--ms-cell-size); height: var(--ms-cell-size); background: var(--surface-sunk); border-radius: var(--radius-xs); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: clamp(12px, calc(var(--ms-cell-size) * 0.5), 16px); cursor: pointer; touch-action: manipulation; transition: background 0.1s; color: var(--text); }
-            .ms-cell:hover { background: var(--glass-hover); }
+            .ms-cell { width: var(--ms-cell-size); height: var(--ms-cell-size); background: var(--surface-sunk); border-radius: var(--radius-xs); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: clamp(12px, calc(var(--ms-cell-size) * 0.5), 16px); cursor: pointer; touch-action: manipulation; transition: background 0.1s, transform 0.1s; color: var(--text); -webkit-tap-highlight-color: transparent; }
+            .ms-cell.is-pressing { background: var(--glass-hover); transform: scale(0.96); }
+            @media (hover: hover) and (pointer: fine) {
+                .ms-cell:hover { background: var(--glass-hover); }
+            }
             .ms-cell.revealed { background: var(--glass-active); border: 1px solid var(--surface-sunk); cursor: default; }
             .ms-cell.mine { background: #EF4444; color: #fff;}
             .ms-cell.flagged { color: #F59E0B; }
@@ -111,27 +114,36 @@ Apps.register({
                 }
             };
 
+            const finishPress = () => {
+                cancelLongPress();
+                div.classList.remove('is-pressing');
+            };
+
             div.addEventListener('pointerdown', event => {
                 if (event.pointerType === 'mouse') return;
                 event.stopPropagation();
+                if (div.setPointerCapture) div.setPointerCapture(event.pointerId);
                 startX = event.clientX;
                 startY = event.clientY;
                 cancelLongPress();
+                div.classList.add('is-pressing');
                 longPressTimer = setTimeout(() => {
                     longPressTimer = null;
                     suppressNativeActionUntil = Date.now() + 1000;
                     handleRightClick(r, c);
+                    div.classList.remove('is-pressing');
                     if (navigator.vibrate) navigator.vibrate(12);
                 }, 450);
             });
 
             div.addEventListener('pointermove', event => {
                 if (Math.hypot(event.clientX - startX, event.clientY - startY) > 10) {
-                    cancelLongPress();
+                    finishPress();
                 }
             });
-            div.addEventListener('pointerup', cancelLongPress);
-            div.addEventListener('pointercancel', cancelLongPress);
+            div.addEventListener('pointerup', finishPress);
+            div.addEventListener('pointercancel', finishPress);
+            div.addEventListener('lostpointercapture', finishPress);
 
             div.addEventListener('click', event => {
                 event.preventDefault();
