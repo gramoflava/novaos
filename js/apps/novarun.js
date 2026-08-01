@@ -669,18 +669,33 @@ Apps.register({
       });
       ctx.globalAlpha = 1;
 
-      ctx.fillStyle = palette.dark ? 'rgba(139, 92, 246, 0.17)' : 'rgba(139, 92, 246, 0.10)';
-      const firstRidgeTileX = -ridgeScroll - RIDGE_TILE_WIDTH;
-      for (
-        let tileX = firstRidgeTileX;
-        tileX < WIDTH + RIDGE_TILE_WIDTH;
-        tileX += RIDGE_TILE_WIDTH
-      ) {
-        RIDGE_HEIGHTS.forEach((ridgeHeight, index) => {
-          const x = Math.round(tileX + index * RIDGE_COLUMN_WIDTH);
-          ctx.fillRect(x, GROUND - ridgeHeight, RIDGE_COLUMN_WIDTH + 1, ridgeHeight);
-        });
-      }
+      const drawRidgeLayer = (scroll, heightScale, fillStyle) => {
+        ctx.fillStyle = fillStyle;
+        const firstRidgeTileX = -scroll - RIDGE_TILE_WIDTH;
+        for (
+          let tileX = firstRidgeTileX;
+          tileX < WIDTH + RIDGE_TILE_WIDTH;
+          tileX += RIDGE_TILE_WIDTH
+        ) {
+          RIDGE_HEIGHTS.forEach((ridgeHeight, index) => {
+            const height = Math.round(ridgeHeight * heightScale);
+            const x = Math.round(tileX + index * RIDGE_COLUMN_WIDTH);
+            ctx.fillRect(x, GROUND - height, RIDGE_COLUMN_WIDTH + 1, height);
+          });
+        }
+      };
+
+      const farRidgeScroll = (ridgeScroll * 0.52 + RIDGE_TILE_WIDTH * 0.37) % RIDGE_TILE_WIDTH;
+      drawRidgeLayer(
+        farRidgeScroll,
+        0.78,
+        palette.dark ? 'rgba(56, 189, 248, 0.11)' : 'rgba(30, 64, 175, 0.16)'
+      );
+      drawRidgeLayer(
+        ridgeScroll,
+        1,
+        palette.dark ? 'rgba(167, 139, 250, 0.27)' : 'rgba(76, 64, 168, 0.31)'
+      );
 
       ctx.fillStyle = palette.dark ? '#22263a' : '#d8dbe5';
       ctx.fillRect(0, GROUND, WIDTH, HEIGHT - GROUND);
