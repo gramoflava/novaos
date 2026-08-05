@@ -10,6 +10,7 @@
 }
 
 .nova-window {
+    --window-radius: var(--radius-xl);
     position: absolute;
     pointer-events: auto;
     display: flex;
@@ -18,7 +19,7 @@
     backdrop-filter: blur(var(--blur-panel)) saturate(180%);
     -webkit-backdrop-filter: blur(var(--blur-panel)) saturate(180%);
     border: 1px solid var(--line);
-    border-radius: var(--radius-lg);
+    border-radius: var(--window-radius);
     box-shadow: var(--shadow-md), var(--glass-edge);
     overflow: hidden;
     will-change: transform, width, height, top, left;
@@ -56,11 +57,11 @@
    Window Titlebar
    ========================================================================== */
 .window-titlebar {
-    height: 48px;
+    height: 52px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 16px;
+    padding: 0 10px;
     user-select: none;
     border-bottom: 1px solid var(--line);
     cursor: grab;
@@ -79,11 +80,13 @@
 .window-btn {
     width: 30px;
     height: 30px;
+    padding: 0;
+    flex: 0 0 30px;
     display: flex;
     align-items: center;
     justify-content: center;
     border: 1px solid var(--line);
-    border-radius: var(--radius-sm);
+    border-radius: 50%;
     outline: none;
     background: var(--surface-sunk);
     box-shadow: var(--glass-edge);
@@ -99,7 +102,9 @@
 .window-btn svg {
     width: 14px;
     height: 14px;
-    stroke-width: 1.75;
+    flex: none;
+    color: currentColor;
+    stroke-width: 2;
 }
 
 .window-btn:hover {
@@ -123,10 +128,6 @@
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
-.window-btn:hover svg {
-    color: var(--text-on-accent);
-}
-
 .window-title {
     display: flex;
     align-items: center;
@@ -146,7 +147,8 @@
 }
 
 .window-placeholder {
-    width: 106px;
+    width: 64px;
+    flex: 0 0 64px;
 }
 
 /* ==========================================================================
@@ -158,8 +160,8 @@
     overflow: hidden auto; /* hidden horizontally, auto vertically */
     min-height: 0; /* Critical: allows flex children to scroll */
     background: var(--surface-sunk);
-    border-bottom-left-radius: var(--radius-lg);
-    border-bottom-right-radius: var(--radius-lg);
+    border-bottom-left-radius: calc(var(--window-radius) - 1px);
+    border-bottom-right-radius: calc(var(--window-radius) - 1px);
     color: var(--text);
     display: flex;
     flex-direction: column;
@@ -209,7 +211,7 @@
         display: none;
         width: auto !important;
         height: auto !important;
-        border-radius: var(--radius-lg);
+        border-radius: var(--window-radius);
         animation: windowOpen var(--dur-slow) var(--ease-out) forwards;
     }
 
@@ -219,7 +221,7 @@
 
     .window-titlebar {
         height: 52px;
-        padding: 0 var(--space-2);
+        padding: 0 3px;
         cursor: default;
     }
 
@@ -230,6 +232,7 @@
     .window-btn {
         width: 44px;
         height: 44px;
+        flex-basis: 44px;
     }
 
     .window-btn.close svg {
@@ -243,6 +246,7 @@
 
     .window-placeholder {
         width: 44px;
+        flex-basis: 44px;
     }
 
     .bh-preview,
