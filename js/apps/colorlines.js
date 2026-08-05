@@ -63,7 +63,6 @@ Apps.register({
                         <div class="game-stat__value" id="cl-score-${winId}">0</div>
                     </div>
                     <button class="game-icon-btn game-icon-btn--restart" id="cl-restart-${winId}" type="button" title="Restart" aria-label="Restart"></button>
-                    <button class="game-icon-btn game-icon-btn--pause" id="cl-pause-${winId}" type="button" title="Pause" aria-label="Pause" aria-pressed="false"></button>
                     <button class="game-icon-btn game-icon-btn--forfeit" id="cl-forfeit-${winId}" type="button" title="Forfeit" aria-label="Forfeit"></button>
                 </div>
                 <div class="cl-grid" id="cl-grid-${winId}"></div>
@@ -90,7 +89,6 @@ Apps.register({
         let nextBalls = [];
         let lineLength = 5;
         let isPreviewVisible = localStorage.getItem('novaos_colorlines_preview') !== 'false';
-        let pauseController = null;
 
         const getGameId = () => 'colorlines-' + lineLength;
 
@@ -368,7 +366,7 @@ Apps.register({
         };
 
         const handleClick = async (idx) => {
-            if((pauseController && pauseController.isPaused()) || isGameOver || isAnimating) return;
+            if(isGameOver || isAnimating) return;
             if(window.AudioMng) AudioMng.play('click');
 
             if(board[idx] !== -1) {
@@ -423,7 +421,6 @@ Apps.register({
         };
 
         const initBoard = async () => {
-            if (pauseController) pauseController.reset();
             board = Array(size*size).fill(-1);
             score = 0;
             selectedIdx = -1;
@@ -439,26 +436,17 @@ Apps.register({
         document.getElementById(`cl-level-${winId}`).onchange = initBoard;
         document.getElementById(`cl-forfeit-${winId}`).onclick = () => {
             if (!isGameOver) {
-                pauseController.reset();
                 gameOver();
                 board = Array(size*size).fill(-1);
                 render();
             }
         };
 
-        pauseController = new GamePauseController({
-            winId,
-            button: document.getElementById(`cl-pause-${winId}`),
-            surface: uiGrid,
-            canPause: () => !isGameOver
-        });
-
         const winObj = WindowManager.windows.get(winId);
         if (winObj) {
             const originalCleanup = winObj.cleanup;
             winObj.cleanup = () => {
                 if (originalCleanup) originalCleanup();
-                pauseController.destroy();
                 window.removeEventListener('resize', updateGridCellSize);
             };
         }

@@ -34,7 +34,6 @@ Apps.register({
             <div class="game-container" id="game-container-${winId}">
                 <div class="game-toolbar">
                     <button class="game-icon-btn game-icon-btn--restart" id="btn-restart-${winId}" type="button" title="Restart" aria-label="Restart"></button>
-                    <button class="game-icon-btn game-icon-btn--pause" id="btn-pause-${winId}" type="button" title="Pause" aria-label="Pause" aria-pressed="false"></button>
                     <div class="game-toolbar__spacer"></div>
                     <div class="game-stat-group">
                         <div class="game-stat">
@@ -66,7 +65,6 @@ Apps.register({
         let score = 0;
         let isGameOver = false;
         let hasWon = false;
-        let pauseController = null;
 
         const uiScore = document.getElementById(`score-${winId}`);
         const uiTiles = document.getElementById(`tiles-${winId}`);
@@ -168,7 +166,7 @@ Apps.register({
         };
 
         const move = (dir) => {
-            if((pauseController && pauseController.isPaused()) || isGameOver) return;
+            if(isGameOver) return;
             if (window.AudioMng) AudioMng.play('click');
             let moved = false;
             activeTiles.forEach(t => t.mergedThisTurn = false);
@@ -225,7 +223,6 @@ Apps.register({
 
         let swipeStart = null;
         const onSwipeStart = event => {
-            if (pauseController && pauseController.isPaused()) return;
             if (!event.isPrimary || event.button > 0) return;
             event.preventDefault();
             event.stopPropagation();
@@ -263,7 +260,6 @@ Apps.register({
             const originalCleanup = winObj.cleanup;
             winObj.cleanup = () => {
                 if (originalCleanup) originalCleanup();
-                pauseController.destroy();
                 document.removeEventListener('keydown', keyHandler);
                 uiGrid.removeEventListener('pointerdown', onSwipeStart);
                 uiGrid.removeEventListener('pointermove', onSwipeMove);
@@ -273,7 +269,6 @@ Apps.register({
         }
 
         const initBoard = () => {
-            if (pauseController) pauseController.reset();
             activeTiles = [];
             nextId = 0;
             score = 0;
@@ -287,13 +282,6 @@ Apps.register({
         };
 
         document.getElementById(`btn-restart-${winId}`).onclick = initBoard;
-
-        pauseController = new GamePauseController({
-            winId,
-            button: document.getElementById(`btn-pause-${winId}`),
-            surface: uiGrid,
-            canPause: () => !isGameOver
-        });
 
         initBoard();
     }

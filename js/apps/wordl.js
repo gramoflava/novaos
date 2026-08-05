@@ -58,7 +58,6 @@ Apps.register({
                         </select>
                         <button class="game-icon-btn game-icon-btn--reveal" id="wl-reveal-${winId}" type="button" title="Reveal word" aria-label="Reveal word" style="display:none;"></button>
                         <button class="game-icon-btn game-icon-btn--restart" id="wl-restart-${winId}" type="button" title="Restart" aria-label="Restart"></button>
-                        <button class="game-icon-btn game-icon-btn--pause" id="wl-pause-${winId}" type="button" title="Pause" aria-label="Pause" aria-pressed="false"></button>
                     </div>
                     <div class="game-toolbar__spacer"></div>
                     <div class="game-stat-group">
@@ -136,7 +135,6 @@ Apps.register({
         let isAnimating = false;
         let time = 0;
         let timer = null;
-        let pauseController = null;
 
         // Global Dictionary Storage
         if (!window.WordlDict) {
@@ -147,7 +145,6 @@ Apps.register({
         const uiBoard = document.getElementById(`wl-board-${winId}`);
         const uiBoardWrap = uiBoard.parentElement;
         const uiKeyboard = document.getElementById(`wl-keyboard-${winId}`);
-        const uiPlayArea = document.getElementById(`wl-play-area-${winId}`);
         const loadingOverlay = document.getElementById(`wl-loading-${winId}`);
 
         const stopTimer = () => {
@@ -240,7 +237,6 @@ Apps.register({
         }
 
         function initGame() {
-            if (pauseController) pauseController.reset();
             wordLength = parseInt(document.getElementById(`wl-len-${winId}`).value);
             const list = window.WordlDict[wordLength];
             targetWord = list[Math.floor(Math.random() * list.length)];
@@ -447,7 +443,7 @@ Apps.register({
         }
 
         function handleKeypress(key) {
-            if ((pauseController && pauseController.isPaused()) || gameOver || isAnimating || loadingOverlay.style.display !== 'none') return;
+            if (gameOver || isAnimating || loadingOverlay.style.display !== 'none') return;
 
             if (key === 'Enter') {
                 submitGuess();
@@ -490,24 +486,12 @@ Apps.register({
         document.addEventListener('keydown', onGlobalKey);
         window.addEventListener('resize', updateCellSize);
 
-        pauseController = new GamePauseController({
-            winId,
-            button: document.getElementById(`wl-pause-${winId}`),
-            surface: uiPlayArea,
-            canPause: () => !gameOver && !isAnimating && loadingOverlay.style.display === 'none',
-            onPause: stopTimer,
-            onResume: () => {
-                if (!gameOver && loadingOverlay.style.display === 'none') startTimer();
-            }
-        });
-
         // Cleanup on close
         const winObj = WindowManager.windows.get(winId);
         const originalCleanup = winObj.cleanup;
         winObj.cleanup = () => {
             if (originalCleanup) originalCleanup();
             stopTimer();
-            pauseController.destroy();
             document.removeEventListener('keydown', onGlobalKey);
             window.removeEventListener('resize', updateCellSize);
         };

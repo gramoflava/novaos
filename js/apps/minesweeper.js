@@ -9,6 +9,7 @@ Apps.register({
 
         const style = `
             .ms-container { padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; height: 100%; overflow: auto; font-family: var(--font-sans); color: var(--text); }
+            .ms-grid-wrap { flex: none; border-radius: var(--radius-md); }
             .ms-grid { --ms-cell-size: 32px; display: grid; flex: none; gap: 2px; padding: 12px; background: var(--surface-sunk); border-radius: var(--radius-md); border: 1px solid var(--line-strong); box-shadow: var(--glass-edge); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
             .ms-cell { width: var(--ms-cell-size); height: var(--ms-cell-size); background: var(--surface-sunk); border-radius: var(--radius-xs); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: clamp(12px, calc(var(--ms-cell-size) * 0.5), 16px); cursor: pointer; touch-action: manipulation; transition: background 0.1s, transform 0.1s; color: var(--text); -webkit-tap-highlight-color: transparent; }
             .ms-cell.is-pressing { background: var(--glass-hover); transform: scale(0.96); }
@@ -24,7 +25,7 @@ Apps.register({
             @media (max-width: 640px) {
                 .ms-container { padding: 8px; align-items: flex-start; }
                 .ms-container .game-toolbar { flex: none; }
-                .ms-grid { margin: 0 auto; }
+                .ms-grid-wrap { margin: 0 auto; }
             }
         `;
 
@@ -53,7 +54,9 @@ Apps.register({
                         </div>
                     </div>
                 </div>
-                <div class="ms-grid" id="ms-grid-${winId}"></div>
+                <div class="ms-grid-wrap" id="ms-grid-wrap-${winId}">
+                    <div class="ms-grid" id="ms-grid-${winId}"></div>
+                </div>
             </div>
             <style>${style}</style>
         `;
@@ -82,9 +85,17 @@ Apps.register({
         let pauseController = null;
 
         const uiGrid = document.getElementById(`ms-grid-${winId}`);
+        const uiGridWrap = document.getElementById(`ms-grid-wrap-${winId}`);
         const uiTime = document.getElementById(`ms-time-${winId}`);
         const uiMines = document.getElementById(`ms-mines-${winId}`);
         const uiFlagMode = document.getElementById(`ms-flag-${winId}`);
+        const uiPause = document.getElementById(`ms-pause-${winId}`);
+
+        const setPauseAvailable = available => {
+            uiPause.disabled = !available;
+            uiPause.title = available ? 'Pause' : 'Pause starts after the first move';
+            uiPause.setAttribute('aria-label', available ? 'Pause' : 'Pause unavailable before the first move');
+        };
 
         const stopTimer = () => {
             if (timer) clearInterval(timer);
@@ -186,6 +197,7 @@ Apps.register({
             uiTime.textContent = time;
             uiMines.textContent = minesLeft;
             stopTimer();
+            setPauseAvailable(false);
 
             uiGrid.innerHTML = '';
             for(let r=0; r<rows; r++) {
@@ -280,6 +292,7 @@ Apps.register({
             if(isFirstClick) {
                 isFirstClick = false;
                 placeMines(r, c);
+                setPauseAvailable(true);
                 startTimer();
             }
 
@@ -311,6 +324,7 @@ Apps.register({
         const gameOver = (win) => {
             isGameOver = true;
             stopTimer();
+            setPauseAvailable(false);
 
             // Reveal all mines
             for(let r=0; r<rows; r++) {
@@ -367,8 +381,8 @@ Apps.register({
 
         pauseController = new GamePauseController({
             winId,
-            button: document.getElementById(`ms-pause-${winId}`),
-            surface: uiGrid,
+            button: uiPause,
+            surface: uiGridWrap,
             canPause: () => !isGameOver && !isFirstClick,
             onPause: stopTimer,
             onResume: () => {
