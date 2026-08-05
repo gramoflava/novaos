@@ -73,52 +73,54 @@
 
 .window-controls {
     display: flex;
-    gap: 8px;
+    gap: var(--space-1);
 }
 
 .window-btn {
-    position: relative;
     width: 30px;
     height: 30px;
-    border-radius: var(--radius-pill);
-    border: none;
     display: flex;
     align-items: center;
     justify-content: center;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    outline: none;
+    background: var(--surface-sunk);
+    box-shadow: var(--glass-edge);
+    color: var(--text-secondary);
     cursor: pointer;
-    transition: transform 0.2s;
-    background: transparent;
+    transition:
+        background var(--dur-base) var(--ease-smooth),
+        border-color var(--dur-base) var(--ease-smooth),
+        color var(--dur-base) var(--ease-smooth),
+        transform var(--dur-fast) var(--ease-out);
 }
-
-.window-btn::before {
-    content: '';
-    position: absolute;
-    width: 14px;
-    height: 14px;
-    border-radius: var(--radius-pill);
-}
-
-.window-btn.close::before { background: var(--color-wc-close); }
-.window-btn.minimize::before { background: var(--color-wc-minimize); }
-.window-btn.maximize::before { background: var(--color-wc-maximize); }
 
 .window-btn svg {
-    position: relative;
-    z-index: 1;
-    width: 8px;
-    height: 8px;
-    stroke-width: 3;
-    opacity: 0;
-    transition: opacity 0.2s;
-}
-
-.nova-window:hover .window-btn svg {
-    color: var(--text-on-accent);
-    opacity: 1;
+    width: 14px;
+    height: 14px;
+    stroke-width: 1.75;
 }
 
 .window-btn:hover {
-    transform: scale(1.1);
+    border-color: var(--line-strong);
+    background: var(--glass-hover);
+    color: var(--text);
+}
+
+.window-btn.close:hover {
+    border-color: color-mix(in srgb, var(--danger) 42%, var(--line));
+    background: color-mix(in srgb, var(--danger) 12%, var(--surface-sunk));
+    color: var(--danger);
+}
+
+.window-btn:active {
+    transform: scale(0.94);
+}
+
+.window-btn:focus-visible {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 .window-btn:hover svg {
@@ -230,19 +232,12 @@
         height: 44px;
     }
 
-    .window-btn.close::before {
-        width: 30px;
-        height: 30px;
-    }
-
     .window-btn.close svg {
-        width: 14px;
-        height: 14px;
-        opacity: 1;
+        width: 18px;
+        height: 18px;
     }
 
-    .window-btn.minimize,
-    .window-btn.maximize {
+    .window-btn.minimize {
         display: none;
     }
 

@@ -395,15 +395,8 @@ class WindowManagerClass {
         minBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>';
         minBtn.onclick = (e) => { e.stopPropagation(); this.minimize(id); };
 
-        const maxBtn = document.createElement('button');
-        maxBtn.className = 'window-btn maximize';
-        maxBtn.setAttribute('aria-label', 'Maximize window');
-        maxBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h5v5M14 10l6 -6M9 20h-5v-5M4 20l6 -6"></path></svg>';
-        maxBtn.onclick = (e) => { e.stopPropagation(); this.maximize(id); };
-
         controls.appendChild(closeBtn);
         controls.appendChild(minBtn);
-        controls.appendChild(maxBtn);
 
         const title = document.createElement('div');
         title.className = 'window-title';
@@ -717,6 +710,7 @@ class WindowManagerClass {
         win.el.style.opacity = '0';
         win.el.style.pointerEvents = 'none';
         win.el.dataset.minimized = 'true';
+        Bus.emit('window:minimized', id);
 
         const box = {
             x: parseFloat(win.el.dataset.x),
@@ -789,6 +783,7 @@ class WindowManagerClass {
 
         if (this.isMobile()) {
             win.el.dataset.minimized = 'false';
+            Bus.emit('window:restored', id);
             this.focus(id);
             return;
         }
@@ -804,6 +799,7 @@ class WindowManagerClass {
         win.el.style.opacity = '1';
         win.el.style.pointerEvents = 'auto';
         win.el.dataset.minimized = 'false';
+        Bus.emit('window:restored', id);
 
         const box = {
             x: parseFloat(win.el.dataset.x),
@@ -823,66 +819,6 @@ class WindowManagerClass {
         this.focus(id);
     }
 
-    maximize(id) {
-        if (this.isMobile()) return;
-        const win = this.windows.get(id);
-        if (!win) return;
-
-        if (win.el.dataset.maximized === 'true') {
-            // Restore
-            win.el.dataset.maximized = 'false';
-            win.el.style.transition = 'all 0.3s var(--ease-spring)';
-
-            const prevW = parseFloat(win.el.dataset.prevW);
-            const prevH = parseFloat(win.el.dataset.prevH);
-            const prevX = parseFloat(win.el.dataset.prevX);
-            const prevY = parseFloat(win.el.dataset.prevY);
-
-            win.el.style.width = prevW + 'px';
-            win.el.style.height = prevH + 'px';
-            win.el.style.left = prevX + 'px';
-            win.el.style.top = prevY + 'px';
-            win.el.dataset.w = prevW;
-            win.el.dataset.h = prevH;
-            win.el.dataset.x = prevX;
-            win.el.dataset.y = prevY;
-
-            this.pushWindowsOut(id, {x: prevX, y: prevY, w: prevW, h: prevH});
-
-            setTimeout(() => {
-                win.el.style.transition = '';
-            }, 300);
-        } else {
-            // Maximize over logical viewport
-            win.el.dataset.maximized = 'true';
-            win.el.dataset.prevW = win.el.dataset.w;
-            win.el.dataset.prevH = win.el.dataset.h;
-            win.el.dataset.prevX = win.el.dataset.x;
-            win.el.dataset.prevY = win.el.dataset.y;
-
-            win.el.style.transition = 'all 0.4s var(--ease-spring)';
-
-            const vpW = window.innerWidth / this.cameraZ;
-            const vpH = window.innerHeight / this.cameraZ;
-            const vpX = -this.cameraX / this.cameraZ;
-            const vpY = -this.cameraY / this.cameraZ;
-
-            win.el.style.width = vpW + 'px';
-            win.el.style.height = vpH + 'px';
-            win.el.style.left = vpX + 'px';
-            win.el.style.top = vpY + 'px';
-            win.el.dataset.w = vpW;
-            win.el.dataset.h = vpH;
-            win.el.dataset.x = vpX;
-            win.el.dataset.y = vpY;
-
-            this.pushWindowsOut(id, {x: vpX, y: vpY, w: vpW, h: vpH});
-
-            setTimeout(() => {
-                win.el.style.transition = '';
-            }, 400);
-        }
-    }
 }
 
 window.WindowManager = new WindowManagerClass();

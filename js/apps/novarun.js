@@ -11,6 +11,7 @@ Apps.register({
 
     const style = `
       .nr-shell { display: flex; height: 100%; padding: 16px; flex-direction: column; color: var(--text); font-family: var(--font-sans); }
+      .nr-play-area { display: flex; min-height: 0; flex: 1; flex-direction: column; }
       .nr-stage { position: relative; display: flex; width: 100%; aspect-ratio: 16 / 7; flex: 0 1 auto; min-height: 0; overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-sunk); box-shadow: var(--glass-edge); }
       .nr-canvas { width: 100%; height: 100%; min-height: 250px; outline: none; touch-action: none; overscroll-behavior: contain; cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
       .nr-canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
@@ -39,6 +40,7 @@ Apps.register({
               <option value="classic" ${initialTheme === 'classic' ? 'selected' : ''}>Dino</option>
             </select>
             <button class="game-icon-btn game-icon-btn--restart" id="nr-restart-${winId}" type="button" title="Restart" aria-label="Restart"></button>
+            <button class="game-icon-btn game-icon-btn--pause" id="nr-pause-${winId}" type="button" title="Pause" aria-label="Pause" aria-pressed="false"></button>
           </div>
           <div class="game-toolbar__spacer"></div>
           <div class="game-stat-group">
@@ -52,15 +54,17 @@ Apps.register({
             </div>
           </div>
         </div>
-        <div class="nr-stage">
-          <canvas class="nr-canvas" id="nr-canvas-${winId}" width="640" height="280" tabindex="0" aria-label="Nova Run. Press Space or tap to jump. Press Down to duck."></canvas>
-        </div>
-        <div class="nr-caption">
-          <span class="nr-caption__route" id="nr-route-${winId}">${initialTheme === 'lunar' ? 'Lunar route 07 · clear terrain · read saucer altitude' : 'Offline classic · clear cacti · read bird altitude'}</span>
-          <span class="nr-caption__keys">Space / ↑ jump · ↓ duck</span>
-          <div class="nr-touch-controls" aria-label="Touch controls">
-            <button class="nr-touch-btn" id="nr-touch-jump-${winId}" type="button" aria-label="Jump">↑ Jump</button>
-            <button class="nr-touch-btn" id="nr-touch-duck-${winId}" type="button" aria-label="Duck while held">↓ Hold duck</button>
+        <div class="nr-play-area" id="nr-play-area-${winId}">
+          <div class="nr-stage">
+            <canvas class="nr-canvas" id="nr-canvas-${winId}" width="640" height="280" tabindex="0" aria-label="Nova Run. Press Space or tap to jump. Press Down to duck."></canvas>
+          </div>
+          <div class="nr-caption">
+            <span class="nr-caption__route" id="nr-route-${winId}">${initialTheme === 'lunar' ? 'Lunar route 07 · clear terrain · read saucer altitude' : 'Offline classic · clear cacti · read bird altitude'}</span>
+            <span class="nr-caption__keys">Space / ↑ jump · ↓ duck</span>
+            <div class="nr-touch-controls" aria-label="Touch controls">
+              <button class="nr-touch-btn" id="nr-touch-jump-${winId}" type="button" aria-label="Jump">↑ Jump</button>
+              <button class="nr-touch-btn" id="nr-touch-duck-${winId}" type="button" aria-label="Duck while held">↓ Hold duck</button>
+            </div>
           </div>
         </div>
       </div>
@@ -126,6 +130,7 @@ Apps.register({
     let downPressed = false;
     let jumpHeld = false;
     let scorePromptOpen = false;
+    let pauseController = null;
     const player = {
       y: GROUND - 48,
       vy: 0,
@@ -313,6 +318,7 @@ Apps.register({
     };
 
     const reset = () => {
+      if (pauseController) pauseController.reset();
       state = 'ready';
       score = 0;
       distanceRan = 0;
@@ -333,6 +339,9 @@ Apps.register({
     };
 
     const begin = () => {
+      if (pauseController && pauseController.isPaused()) {
+        return;
+      }
       if (state === 'ready') {
         state = 'playing';
         lastFrame = performance.now();
@@ -935,15 +944,21 @@ Apps.register({
     };
 
     const frame = now => {
+      animationFrame = 0;
       const delta = Math.min(now - lastFrame, 34);
       lastFrame = now;
       update(delta);
       draw(now);
-      animationFrame = requestAnimationFrame(frame);
+      if (!(pauseController && pauseController.isPaused())) {
+        animationFrame = requestAnimationFrame(frame);
+      }
     };
 
     const onKeyDown = event => {
       if (WindowManager.activeWindowId !== winId) {
+        return;
+      }
+      if (pauseController && pauseController.isPaused()) {
         return;
       }
       const target = event.target;
@@ -974,6 +989,9 @@ Apps.register({
     };
 
     const onPointerDown = event => {
+      if (pauseController && pauseController.isPaused()) {
+        return;
+      }
       if (!event.isPrimary || event.button > 0) {
         return;
       }
@@ -1001,6 +1019,9 @@ Apps.register({
     const touchJump = document.getElementById(`nr-touch-jump-${winId}`);
     const touchDuck = document.getElementById(`nr-touch-duck-${winId}`);
     const onTouchJumpDown = event => {
+      if (pauseController && pauseController.isPaused()) {
+        return;
+      }
       if (!event.isPrimary || event.button > 0) {
         return;
       }
@@ -1017,6 +1038,9 @@ Apps.register({
       releaseJump();
     };
     const onTouchDuckDown = event => {
+      if (pauseController && pauseController.isPaused()) {
+        return;
+      }
       if (!event.isPrimary || event.button > 0) {
         return;
       }
@@ -1066,6 +1090,23 @@ Apps.register({
     touchDuck.addEventListener('pointercancel', onTouchDuckUp);
     touchDuck.addEventListener('lostpointercapture', onTouchDuckUp);
 
+    pauseController = new GamePauseController({
+      winId,
+      button: document.getElementById(`nr-pause-${winId}`),
+      surface: document.getElementById(`nr-play-area-${winId}`),
+      canPause: () => state === 'playing',
+      onPause: () => {
+        if (animationFrame) cancelAnimationFrame(animationFrame);
+        animationFrame = 0;
+        releaseJump();
+        setDuck(false);
+      },
+      onResume: () => {
+        lastFrame = performance.now();
+        if (!animationFrame) animationFrame = requestAnimationFrame(frame);
+      }
+    });
+
     const themeObserver = new MutationObserver(() => readPalette());
     themeObserver.observe(document.documentElement, {
       attributes: true,
@@ -1085,6 +1126,7 @@ Apps.register({
         if (originalCleanup) {
           originalCleanup();
         }
+        pauseController.destroy();
         cancelAnimationFrame(animationFrame);
         themeObserver.disconnect();
         window.removeEventListener('resize', resizeCanvas);

@@ -9,6 +9,7 @@ Apps.register({
 
     const style = `
       .co-shell { display: flex; height: 100%; padding: 16px; flex-direction: column; color: var(--text); font-family: var(--font-sans); }
+      .co-game-area { display: flex; min-height: 0; flex: 1; flex-direction: column; }
       .co-game { display: flex; min-height: 0; flex: 1; align-items: flex-start; justify-content: center; gap: 12px; }
       .co-board-wrap { position: relative; flex: 0 0 auto; overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius-md); outline: none; background: var(--surface-sunk); box-shadow: var(--glass-edge); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
       .co-board-wrap:focus-visible { border-color: var(--accent); box-shadow: var(--glass-edge), 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent); }
@@ -16,13 +17,13 @@ Apps.register({
       .co-cell { position: relative; width: var(--co-cell-size); height: var(--co-cell-size); overflow: hidden; border-radius: var(--radius-xs); background: color-mix(in srgb, var(--surface-sunk) 80%, var(--glass-hover)); }
       .co-gem { --gem: #64748b; position: absolute; inset: 2px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--gem) 66%, var(--line-strong)); border-radius: 30% 30% 38% 38%; background: linear-gradient(145deg, color-mix(in srgb, var(--gem) 42%, white) 0 18%, var(--gem) 46%, color-mix(in srgb, var(--gem) 72%, black)); box-shadow: inset 2px 2px 3px rgba(255, 255, 255, 0.42), inset -3px -4px 5px rgba(15, 23, 42, 0.34), 0 2px 4px rgba(15, 23, 42, 0.2); }
       .co-gem::before { position: absolute; inset: 18% 22% 34%; border: 1px solid rgba(255, 255, 255, 0.44); border-width: 1px 0 0 1px; border-radius: 30%; content: ''; transform: skewX(-12deg); }
-      .co-gem--0 { --gem: #ef4444; }
+      .co-gem--0 { --gem: #dc2626; }
       .co-gem--1 { --gem: #3b82f6; }
       .co-gem--2 { --gem: #10b981; }
       .co-gem--3 { --gem: #f59e0b; }
       .co-gem--4 { --gem: #8b5cf6; }
-      .co-gem--5 { --gem: #ec4899; }
-      .co-gem--magic { --gem: #f8fafc; animation: coMagic 700ms steps(3, end) infinite; background: conic-gradient(from 45deg, #06b6d4, #8b5cf6, #ec4899, #f59e0b, #10b981, #06b6d4); }
+      .co-gem--5 { --gem: #f472b6; }
+      .co-gem--magic { --gem: #f8fafc; animation: coMagic 700ms steps(3, end) infinite; background: conic-gradient(from 45deg, #06b6d4, #8b5cf6, #f472b6, #f59e0b, #10b981, #06b6d4); }
       .co-gem.is-clearing { animation: coClear 170ms var(--ease-out) forwards; }
       .co-side { display: flex; width: 76px; flex: 0 0 76px; flex-direction: column; gap: 10px; }
       .co-next, .co-chain { padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-sunk); box-shadow: var(--glass-edge); }
@@ -53,6 +54,7 @@ Apps.register({
         <div class="game-toolbar">
           <div class="game-toolbar__group">
             <button class="game-icon-btn game-icon-btn--restart" id="co-restart-${winId}" type="button" title="Restart" aria-label="Restart"></button>
+            <button class="game-icon-btn game-icon-btn--pause" id="co-pause-${winId}" type="button" title="Pause" aria-label="Pause" aria-pressed="false"></button>
           </div>
           <div class="game-toolbar__spacer"></div>
           <div class="game-stat-group">
@@ -70,25 +72,27 @@ Apps.register({
             </div>
           </div>
         </div>
-        <div class="co-game">
-          <div class="co-board-wrap" id="co-board-wrap-${winId}" role="application" tabindex="0" aria-label="Columns game board. Swipe left or right to move, up to cycle colours, and down to drop.">
-            <div class="co-board" id="co-board-${winId}"></div>
-            <div class="co-status" id="co-status-${winId}">Arrows or swipe to begin</div>
+        <div class="co-game-area" id="co-game-area-${winId}">
+          <div class="co-game">
+            <div class="co-board-wrap" id="co-board-wrap-${winId}" role="application" tabindex="0" aria-label="Columns game board. Swipe left or right to move, up to cycle colours, and down to drop.">
+              <div class="co-board" id="co-board-${winId}"></div>
+              <div class="co-status" id="co-status-${winId}">Arrows or swipe to begin</div>
+            </div>
+            <aside class="co-side" aria-label="Next column and current chain">
+              <div class="co-next">
+                <div class="co-side-label">Next</div>
+                <div class="co-next-stack" id="co-next-${winId}"></div>
+              </div>
+              <div class="co-chain">
+                Chain
+                <strong id="co-chain-${winId}">×1</strong>
+              </div>
+            </aside>
           </div>
-          <aside class="co-side" aria-label="Next column and current chain">
-            <div class="co-next">
-              <div class="co-side-label">Next</div>
-              <div class="co-next-stack" id="co-next-${winId}"></div>
-            </div>
-            <div class="co-chain">
-              Chain
-              <strong id="co-chain-${winId}">×1</strong>
-            </div>
-          </aside>
-        </div>
-        <div class="co-caption">
-          <span class="co-caption-desktop">← → move · ↑ cycle colours · ↓ drop</span>
-          <span class="co-caption-mobile">Swipe ← → move · ↑ cycle · ↓ drop</span>
+          <div class="co-caption">
+            <span class="co-caption-desktop">← → move · ↑ cycle colours · ↓ drop</span>
+            <span class="co-caption-mobile">Swipe ← → move · ↑ cycle · ↓ drop</span>
+          </div>
         </div>
       </div>
       <style>${style}</style>
@@ -111,6 +115,7 @@ Apps.register({
     const shell = document.getElementById(`co-shell-${winId}`);
     const boardNode = document.getElementById(`co-board-${winId}`);
     const boardWrap = document.getElementById(`co-board-wrap-${winId}`);
+    const gameArea = document.getElementById(`co-game-area-${winId}`);
     const scoreNode = document.getElementById(`co-score-${winId}`);
     const levelNode = document.getElementById(`co-level-${winId}`);
     const bestNode = document.getElementById(`co-best-${winId}`);
@@ -136,8 +141,19 @@ Apps.register({
     let clearingCells = new Set();
     let pointerStart = null;
     let resizeObserver = null;
+    let pauseController = null;
 
-    const wait = duration => new Promise(resolve => setTimeout(resolve, duration));
+    const wait = async duration => {
+      let remaining = duration;
+      while (remaining > 0) {
+        const slice = Math.min(remaining, 40);
+        const started = performance.now();
+        await new Promise(resolve => setTimeout(resolve, slice));
+        if (!(pauseController && pauseController.isPaused())) {
+          remaining -= performance.now() - started;
+        }
+      }
+    };
     const randomColor = () => Math.floor(Math.random() * COLOR_COUNT);
     const playSound = type => {
       if (window.AudioMng) {
@@ -267,6 +283,9 @@ Apps.register({
     };
 
     const begin = () => {
+      if (pauseController && pauseController.isPaused()) {
+        return;
+      }
       if (state === 'ready') {
         state = 'playing';
         lastFrame = performance.now();
@@ -275,7 +294,7 @@ Apps.register({
     };
 
     const move = direction => {
-      if (state === 'gameover' || state === 'resolving') {
+      if ((pauseController && pauseController.isPaused()) || state === 'gameover' || state === 'resolving') {
         return;
       }
       begin();
@@ -287,7 +306,7 @@ Apps.register({
     };
 
     const cycleColours = () => {
-      if (state === 'gameover' || state === 'resolving') {
+      if ((pauseController && pauseController.isPaused()) || state === 'gameover' || state === 'resolving') {
         return;
       }
       begin();
@@ -487,7 +506,7 @@ Apps.register({
     };
 
     const hardDrop = () => {
-      if (state === 'gameover' || state === 'resolving') {
+      if ((pauseController && pauseController.isPaused()) || state === 'gameover' || state === 'resolving') {
         return;
       }
       begin();
@@ -519,6 +538,7 @@ Apps.register({
     };
 
     const reset = () => {
+      if (pauseController) pauseController.reset();
       roundToken += 1;
       board = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
       score = 0;
@@ -538,6 +558,7 @@ Apps.register({
 
     const dropInterval = () => Math.max(110, Math.round(820 * 0.86 ** (level - 1)));
     const frame = now => {
+      animationFrame = 0;
       const delta = Math.min(50, now - lastFrame);
       lastFrame = now;
       if (state === 'playing') {
@@ -547,7 +568,9 @@ Apps.register({
           stepDown();
         }
       }
-      animationFrame = requestAnimationFrame(frame);
+      if (!destroyed && !(pauseController && pauseController.isPaused())) {
+        animationFrame = requestAnimationFrame(frame);
+      }
     };
 
     const onKeyDown = event => {
@@ -572,6 +595,9 @@ Apps.register({
     };
 
     const onPointerDown = event => {
+      if (pauseController && pauseController.isPaused()) {
+        return;
+      }
       if (!event.isPrimary || event.button > 0) {
         return;
       }
@@ -637,6 +663,21 @@ Apps.register({
       resizeObserver.observe(shell);
     }
 
+    pauseController = new GamePauseController({
+      winId,
+      button: document.getElementById(`co-pause-${winId}`),
+      surface: gameArea,
+      canPause: () => state !== 'ready' && state !== 'gameover',
+      onPause: () => {
+        if (animationFrame) cancelAnimationFrame(animationFrame);
+        animationFrame = 0;
+      },
+      onResume: () => {
+        lastFrame = performance.now();
+        if (!destroyed && !animationFrame) animationFrame = requestAnimationFrame(frame);
+      }
+    });
+
     updateLayout();
     requestAnimationFrame(updateLayout);
     reset();
@@ -651,6 +692,7 @@ Apps.register({
         }
         destroyed = true;
         roundToken += 1;
+        pauseController.destroy();
         cancelAnimationFrame(animationFrame);
         document.removeEventListener('keydown', onKeyDown);
         boardWrap.removeEventListener('pointerdown', onPointerDown);

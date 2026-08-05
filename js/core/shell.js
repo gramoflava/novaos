@@ -1,6 +1,7 @@
 // Nova OS Shell (System context and settings)
 class Shell {
     constructor() {
+        this.codexWelcomeKey = 'novaos_codex_welcome_seen';
         this.clockEl = document.getElementById('island-clock');
         this.initClock();
 
@@ -27,8 +28,19 @@ class Shell {
     }
 
     welcome() {
-        // Automatically open the Codex rulebook
-        Apps.launch('codex');
+        let shouldOpenCodex = true;
+        try {
+            shouldOpenCodex = localStorage.getItem(this.codexWelcomeKey) !== 'true';
+            if (shouldOpenCodex) {
+                localStorage.setItem(this.codexWelcomeKey, 'true');
+            }
+        } catch (error) {
+            // Without persistent storage, keep the introduction available.
+        }
+
+        if (shouldOpenCodex) {
+            Apps.launch('codex');
+        }
     }
 }
 

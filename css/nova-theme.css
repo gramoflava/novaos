@@ -13,11 +13,6 @@
   --color-app-wordl-amber: #eab308;
   --color-app-scores: #fbbf24;
 
-  /* Window controls are part of Nova's desktop metaphor. */
-  --color-wc-close: #ef4444;
-  --color-wc-minimize: #f59e0b;
-  --color-wc-maximize: #10b981;
-
   /* Nova-only gradient endpoints. */
   --nova-accent-alt: #ec4899;
   --nova-accent-pop: #10b981;

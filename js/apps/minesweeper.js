@@ -38,6 +38,7 @@ Apps.register({
                             <option value="hard">Expert</option>
                         </select>
                         <button class="game-icon-btn game-icon-btn--restart" id="ms-restart-${winId}" type="button" title="Restart" aria-label="Restart"></button>
+                        <button class="game-icon-btn game-icon-btn--pause" id="ms-pause-${winId}" type="button" title="Pause" aria-label="Pause" aria-pressed="false"></button>
                         <button class="game-icon-btn game-icon-btn--flag" id="ms-flag-${winId}" type="button" title="Flag mode (or long press a cell)" aria-label="Flag mode" aria-pressed="false"></button>
                     </div>
                     <div class="game-toolbar__spacer"></div>
@@ -78,11 +79,25 @@ Apps.register({
         let revealedCount = 0;
         let lastHoveredCell = {r: -1, c: -1};
         let flagMode = false;
+        let pauseController = null;
 
         const uiGrid = document.getElementById(`ms-grid-${winId}`);
         const uiTime = document.getElementById(`ms-time-${winId}`);
         const uiMines = document.getElementById(`ms-mines-${winId}`);
         const uiFlagMode = document.getElementById(`ms-flag-${winId}`);
+
+        const stopTimer = () => {
+            if (timer) clearInterval(timer);
+            timer = null;
+        };
+
+        const startTimer = () => {
+            stopTimer();
+            timer = setInterval(() => {
+                time++;
+                uiTime.textContent = time;
+            }, 1000);
+        };
 
         const updateGridCellSize = () => {
             const isMobile = window.matchMedia('(max-width: 640px)').matches;
@@ -120,6 +135,7 @@ Apps.register({
             };
 
             div.addEventListener('pointerdown', event => {
+                if (pauseController && pauseController.isPaused()) return;
                 if (event.pointerType === 'mouse') return;
                 event.stopPropagation();
                 if (div.setPointerCapture) div.setPointerCapture(event.pointerId);
@@ -159,6 +175,7 @@ Apps.register({
         };
 
         const initBoard = () => {
+            if (pauseController) pauseController.reset();
             updateGridCellSize();
             board = [];
             isGameOver = false;
@@ -168,8 +185,7 @@ Apps.register({
             time = 0;
             uiTime.textContent = time;
             uiMines.textContent = minesLeft;
-            if(timer) clearInterval(timer);
-            timer = null;
+            stopTimer();
 
             uiGrid.innerHTML = '';
             for(let r=0; r<rows; r++) {
@@ -259,12 +275,12 @@ Apps.register({
         };
 
         const handleLeftClick = (r, c) => {
-            if(isGameOver || board[r][c].isFlagged) return;
+            if((pauseController && pauseController.isPaused()) || isGameOver || board[r][c].isFlagged) return;
 
             if(isFirstClick) {
                 isFirstClick = false;
                 placeMines(r, c);
-                timer = setInterval(() => { time++; uiTime.textContent = time; }, 1000);
+                startTimer();
             }
 
             if(board[r][c].isMine) {
@@ -277,7 +293,7 @@ Apps.register({
         };
 
         const handleRightClick = (r, c) => {
-            if(isGameOver || board[r][c].isRevealed) return;
+            if((pauseController && pauseController.isPaused()) || isGameOver || board[r][c].isRevealed) return;
 
             board[r][c].isFlagged = !board[r][c].isFlagged;
             minesLeft += board[r][c].isFlagged ? -1 : 1;
@@ -294,7 +310,7 @@ Apps.register({
 
         const gameOver = (win) => {
             isGameOver = true;
-            if(timer) clearInterval(timer);
+            stopTimer();
 
             // Reveal all mines
             for(let r=0; r<rows; r++) {
@@ -349,12 +365,24 @@ Apps.register({
         };
         document.addEventListener('keydown', onGlobalKey);
 
+        pauseController = new GamePauseController({
+            winId,
+            button: document.getElementById(`ms-pause-${winId}`),
+            surface: uiGrid,
+            canPause: () => !isGameOver && !isFirstClick,
+            onPause: stopTimer,
+            onResume: () => {
+                if (!isGameOver && !isFirstClick) startTimer();
+            }
+        });
+
         const winObj = WindowManager.windows.get(winId);
         if(winObj) {
             const originalCleanup = winObj.cleanup;
             winObj.cleanup = () => {
                 if (originalCleanup) originalCleanup();
-                if(timer) clearInterval(timer);
+                stopTimer();
+                pauseController.destroy();
                 document.removeEventListener('keydown', onGlobalKey);
                 window.removeEventListener('resize', updateGridCellSize);
             };

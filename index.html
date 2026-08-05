@@ -70,9 +70,6 @@
                     <button class="island-btn" id="btn-mute" aria-label="Audio Toggle">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 8a5 5 0 0 1 0 8M17.7 5a9 9 0 0 1 0 14M6 15h-2a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h2l4 -4v14z"></path></svg>
                     </button>
-                    <button class="island-btn" id="btn-notify" aria-label="Notifications">
-                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3l2 2h-16l2 -2v-3a7 7 0 0 1 4 -6M9 16v1a3 3 0 0 0 6 0v-1"></path></svg>
-                    </button>
                     <div class="segmented segmented--icon island-theme" role="group" aria-label="Color theme" data-theme-switch>
                         <button class="segmented__btn" type="button" data-theme="light" aria-label="Light" title="Light" aria-pressed="false">
                             <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M6.343 17.657l-1.414 1.414M6.343 6.343L4.929 4.929M17.657 6.343l1.414 -1.414M17.657 17.657l1.414 1.414M12 20v2M12 2v2M20 12h2M2 12h2"></path></svg>
@@ -105,9 +102,6 @@
                 <!-- Shelf items (apps) injected here -->
             </div>
         </div>
-
-        <!-- Notifications -->
-        <div id="notifications-container" class="notifications-container"></div>
 
         <!-- Context Menu -->
         <div id="context-menu" class="context-menu" style="display: none;"></div>
@@ -148,6 +142,7 @@
     <!-- Core OS Logic -->
     <script src="js/core/audio.js"></script>
     <script src="js/core/bus.js"></script>
+    <script src="js/core/game-pause.js"></script>
     <script src="js/core/fs.js"></script>
     <script src="js/core/scores.js"></script>
     <script src="js/core/window-manager.js"></script>
