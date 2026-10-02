@@ -408,26 +408,8 @@ class Horizon {
             ctx.restore();
         }
 
-        // ── The craft: white lines only ──
-        // Seen from the seat: two leading edges sweeping in from the lower
-        // corners toward the nose, the notch of the tail behind, a thin canopy
-        // bow overhead.
-        const line = a => `rgba(235, 240, 255, ${a})`;
-        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-        ctx.lineWidth = 1.4 * u;
-        ctx.strokeStyle = line(0.55);
-        ctx.beginPath();
-        ctx.moveTo(-10 * u, H * 0.9); ctx.lineTo(W * 0.2, H * 0.62); ctx.lineTo(W * 0.32, H * 0.5);
-        ctx.moveTo(W + 10 * u, H * 0.9); ctx.lineTo(W * 0.8, H * 0.62); ctx.lineTo(W * 0.68, H * 0.5);
-        ctx.stroke();
-        ctx.strokeStyle = line(0.35);
-        ctx.beginPath();                                   // tail notch, low in the view
-        ctx.moveTo(W * 0.06, H + 4 * u); ctx.lineTo(W * 0.5, H * 0.86); ctx.lineTo(W * 0.94, H + 4 * u);
-        ctx.stroke();
-        ctx.strokeStyle = line(0.22);
-        ctx.beginPath();                                   // canopy bow
-        ctx.moveTo(-10 * u, H * 0.18); ctx.quadraticCurveTo(W / 2, -H * 0.05, W + 10 * u, H * 0.18);
-        ctx.stroke();
+        // ── The craft: a white wireframe cockpit ──
+        ctx.drawImage(this.cockpitFrame(W, H, u), 0, 0);
 
         // ── Readouts, small, in the corners ──
         const mono = s => `${Math.round(s * u)}px "JetBrains Mono", ui-monospace, monospace`;
@@ -469,6 +451,79 @@ class Horizon {
         }
         ctx.shadowBlur = 0;
         ctx.textAlign = 'left';
+    }
+
+    // The cockpit as white lines, built once per size: overhead panel, a
+    // front pane narrowing toward the dash, two pillars, side panes, and the
+    // dash lip below. Surfaces are a dark veil, edges white; both fade toward
+    // the middle of the view and grow stronger toward the corners, so the
+    // frame reads without getting in the way.
+    cockpitFrame(W, H, u) {
+        if (this.frameCache && this.frameCache.width === W && this.frameCache.height === H) return this.frameCache;
+        const c = this.frameCache || document.createElement('canvas');
+        c.width = W; c.height = H;
+        const g = c.getContext('2d');
+        g.clearRect(0, 0, W, H);
+        const P = (x, y) => [x * W, y * H];
+        // key points (fractions of the view)
+        const tl = P(0.29, 0.17), tr = P(0.71, 0.17);      // front pane, top corners
+        const bl = P(0.385, 0.66), br = P(0.615, 0.66);     // front pane, bottom corners
+        const veil = 'rgba(6, 8, 14, 0.72)';
+        const poly = (pts, fill) => {
+            g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
+            for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
+            g.closePath(); g.fillStyle = fill; g.fill();
+        };
+        const pw = 0.035;                                   // pillar width, in W
+        // overhead panel
+        poly([P(-0.02, -0.02), P(1.02, -0.02), P(1.02, 0.04), tr, tl, P(-0.02, 0.04)], veil);
+        // pillars (front pane edges), thick at the top, thinner at the dash
+        poly([tl, [tl[0] - pw * W, tl[1] - 0.01 * H], [bl[0] - pw * 0.5 * W, bl[1]], bl], veil);
+        poly([tr, [tr[0] + pw * W, tr[1] - 0.01 * H], [br[0] + pw * 0.5 * W, br[1]], br], veil);
+        // side-pane struts from the overhead corners down to the sills
+        poly([P(-0.02, 0.06), P(0.12, 0.02), P(0.03, 0.62), P(-0.02, 0.64)], veil);
+        poly([P(1.02, 0.06), P(0.88, 0.02), P(0.97, 0.62), P(1.02, 0.64)], veil);
+        // dash: lip from the sides to the bottom of the front pane, console below
+        poly([P(-0.02, 0.8), P(0.18, 0.7), bl, br, P(0.82, 0.7), P(1.02, 0.8), P(1.02, 1.02), P(-0.02, 1.02)], veil);
+
+        // edges
+        g.lineCap = 'round'; g.lineJoin = 'round';
+        const edge = (pts, a, w) => {
+            g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
+            for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
+            g.strokeStyle = `rgba(235, 240, 255, ${a})`; g.lineWidth = w * u; g.stroke();
+        };
+        edge([tl, tr, br, bl, tl], 0.9, 1.3);                                  // front pane
+        edge([[tl[0] - pw * W, tl[1] - 0.01 * H], [bl[0] - pw * 0.5 * W, bl[1]]], 0.7, 1.1);
+        edge([[tr[0] + pw * W, tr[1] - 0.01 * H], [br[0] + pw * 0.5 * W, br[1]]], 0.7, 1.1);
+        edge([P(-0.02, 0.04), [tl[0] - pw * W, tl[1] - 0.01 * H]], 0.7, 1.1);  // overhead
+        edge([P(1.02, 0.04), [tr[0] + pw * W, tr[1] - 0.01 * H]], 0.7, 1.1);
+        edge([P(0.12, 0.02), P(0.03, 0.62)], 0.6, 1.1);                        // side struts
+        edge([P(0.88, 0.02), P(0.97, 0.62)], 0.6, 1.1);
+        edge([P(-0.02, 0.8), P(0.18, 0.7), bl], 0.8, 1.2);                     // dash lip
+        edge([br, P(0.82, 0.7), P(1.02, 0.8)], 0.8, 1.2);
+        edge([P(0.3, 1.02), P(0.36, 0.76), P(0.64, 0.76), P(0.7, 1.02)], 0.45, 1); // console
+        // overhead warning strip: four small empty panels
+        for (let i = 0; i < 4; i++) {
+            const x0 = 0.33 + i * 0.087;
+            edge([P(x0, 0.07), P(x0 + 0.075, 0.07), P(x0 + 0.075, 0.12), P(x0, 0.12), P(x0, 0.07)], 0.35, 0.9);
+        }
+        // a few ribs on the overhead, for scale
+        for (let i = 0; i < 14; i++) {
+            const x = 0.35 + i * 0.022;
+            edge([P(x, 0.015), P(x, 0.04)], 0.3, 0.8);
+        }
+
+        // fade toward the middle, stronger toward the corners
+        g.globalCompositeOperation = 'destination-in';
+        const m = g.createRadialGradient(W / 2, H * 0.42, Math.min(W, H) * 0.12, W / 2, H * 0.42, Math.hypot(W, H) * 0.55);
+        m.addColorStop(0, 'rgba(0,0,0,0.12)');
+        m.addColorStop(0.45, 'rgba(0,0,0,0.45)');
+        m.addColorStop(1, 'rgba(0,0,0,1)');
+        g.fillStyle = m; g.fillRect(0, 0, W, H);
+        g.globalCompositeOperation = 'source-over';
+        this.frameCache = c;
+        return c;
     }
 
     updateCockpit(t, years, ly) {
