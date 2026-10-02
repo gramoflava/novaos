@@ -177,3 +177,72 @@ body.is-asteroids { cursor: default; }
 /* The game-over prompt sits on the desktop, not in a window. */
 body > .score-prompt-overlay { position: fixed; z-index: 3000; }
 .score-prompt-overlay .score-prompt-input { width: 100px; }
+
+.ast-canvas, .ast-hud { transition: opacity 600ms var(--ease-smooth); }
+.ast-canvas.is-hidden, .ast-hud.is-hidden { opacity: 0; }
+
+/* ── Horizon (js/core/horizon.js) ────────────────────────────────────────── */
+.hz-root {
+  position: fixed;
+  inset: 0;
+  z-index: 6000;
+  display: grid;
+  place-items: center;
+  cursor: default;
+}
+.hz-sky, .hz-shade, .hz-black, .hz-flash {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.hz-shade { background: radial-gradient(ellipse at center, transparent 30%, #000 100%); opacity: 0.25; }
+.hz-black { background: #000; opacity: 0; }
+.hz-flash { background: #fff; opacity: 0; }
+.hz-flash.is-on { opacity: 1; transition: opacity 140ms ease-in; }
+.hz-flash.is-fading { opacity: 0; transition: opacity 2.6s var(--ease-out); }
+
+.hz-cockpit {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: min(760px, 92vw);
+  height: min(600px, 84vh);
+  overflow: hidden;
+  color: #d8def0;
+  background: rgba(10, 12, 18, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 30px 120px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  animation: hz-in 1.6s var(--ease-out) both;
+}
+.hz-cockpit.is-falling { animation: hz-shake 0.12s linear infinite; }
+@keyframes hz-in { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: none; } }
+@keyframes hz-shake {
+  0% { translate: 0 0; } 25% { translate: 1.5px -1px; } 50% { translate: -1px 1.5px; } 75% { translate: 1px 1px; } 100% { translate: 0 0; }
+}
+
+.hz-head {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-3);
+  background: linear-gradient(rgba(10, 12, 18, 0.85), transparent);
+}
+.hz-title { color: #8b93a8; font-size: var(--text-sm); letter-spacing: 0.02em; }
+.hz-clock { display: grid; justify-items: end; gap: 2px; text-align: right; }
+.hz-clock__label { color: #8b93a8; font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: 0.08em; text-transform: uppercase; }
+.hz-clock__value { color: #f2f5ff; font-family: var(--font-mono); font-size: var(--text-lg); font-weight: 500; font-variant-numeric: tabular-nums; }
+.hz-clock__rate { color: #9fb6ff; font-family: var(--font-mono); font-size: var(--text-xs); }
+.hz-cockpit.is-falling .hz-clock__rate { color: #ff6a4a; }
+
+.hz-view { flex: 1; width: 100%; min-height: 0; display: block; }
+
+.nova-window .hz-crack { position: absolute; inset: 0; z-index: 50; pointer-events: none; opacity: 0; }
+.hz-crack svg { width: 100%; height: 100%; fill: none; stroke: rgba(255, 255, 255, 0.55); stroke-width: 1.2; vector-effect: non-scaling-stroke; }

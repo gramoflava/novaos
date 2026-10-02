@@ -6,6 +6,20 @@
 // their own gravity. Touching a window or a black hole destroys the ship;
 // asteroids bounce off windows and fall into black holes. Remnants of closed
 // windows are scenery and do nothing.
+//
+// Finding rocks: every rock off screen has a marker on the screen edge (bigger
+// and brighter when close), and rocks that stray too far are steered back.
+// A wave ends when no rocks are left; a short calm follows, then the next wave
+// is announced with its size and enters from the edges.
+//
+// Black holes: touching one ends the ship. After End of times has played once,
+// the secret Phantoms mode is on for good: once the hole's pull beats the
+// engine there is no way back. At that moment the ship is lost and a new one
+// appears; where the old one was, a phantom stays — seen from outside, a falling ship never quite reaches
+// the horizon: it slows, stretches, reddens and fades over about half a minute.
+// Either way, that moment may start End of times (js/core/horizon.js): the
+// chance is n/8 for the n-th fall, counted across games and visits, and the
+// count resets when it plays.
 class AsteroidsGame {
     constructor() {
         this.code = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
@@ -98,11 +112,13 @@ class AsteroidsGame {
         this.bullets = [];
         this.particles = [];
         this.trail = [];
+        this.phantoms = [];
         this.score = 0;
         this.lives = T.lives;
         this.wave = 0;
         this.fireTimer = 0;
         this.colorTimer = 0;
+        this.waveBreak = 0;
         this.state = 'play';
         this.keys.clear();
         this.nextWave();
@@ -216,8 +232,14 @@ class AsteroidsGame {
         this.waveArea = this.areaFactor();
         const count = Math.round((3 + this.wave) * this.waveArea);
         for (let i = 0; i < count; i++) this.spawnRock(0);
-        this.showBanner(`Wave ${this.wave}`);
-        if (this.hud) this.hud.querySelector('.ast-hud__wave').textContent = `Wave ${this.wave}`;
+        this.showBanner(`Wave ${this.wave} · ${count} incoming`);
+    }
+
+    // All rocks gone: say so, give the player a breath, then the next wave.
+    clearWave() {
+        this.waveBreak = 2.6;
+        this.showBanner(`Wave ${this.wave} cleared`);
+        if (window.AudioMng) AudioMng.play('win');
     }
 
     // Visible world area relative to a 1440×900 view at 100% zoom (never < 1).
@@ -340,8 +362,12 @@ class AsteroidsGame {
             // Ship collisions
             if (s.safe <= 0) {
                 if (rects.some(r => this.circleRect(s.x, s.y, T.shipR, r))) this.crash('window');
-                else if (holes.some(h => Math.hypot(h.x - s.x, h.y - s.y) < T.holeRadius)) this.crash('hole');
                 else if (this.rocks.some(k => Math.hypot(k.x - s.x, k.y - s.y) < k.r * 0.86 + T.shipR)) this.crash('rock');
+                else {
+                    const reach = this.phantomsOn() ? this.noReturn() : T.holeRadius;
+                    const lost = holes.find(h => Math.hypot(h.x - s.x, h.y - s.y) < reach);
+                    if (lost) this.lostToHole(lost);
+                }
             }
         } else if (this.trail.length) {
             this.trail.shift();
@@ -368,9 +394,10 @@ class AsteroidsGame {
             return true;
         });
 
-        // Rocks: fall toward holes, bounce off windows.
+        // Rocks: fall toward holes, bounce off windows, and stay near the ship.
         const v = this.view();
-        const far = Math.hypot(v.w, v.h) * 1.6;
+        const diag = Math.hypot(v.w, v.h);
+        const leash = diag * 1.1;
         for (let i = this.rocks.length - 1; i >= 0; i--) {
             const k = this.rocks[i];
             const g = this.pull(k.x, k.y, rects, holes);
@@ -384,12 +411,27 @@ class AsteroidsGame {
                 this.rocks.splice(i, 1);
                 continue;
             }
-            // Drifted far away: bring it back from the other side of the view.
-            if (Math.hypot(k.x - s.x, k.y - s.y) > far) {
+            // Past the leash, the rock is turned gently back toward the ship.
+            // Way past it (after a big zoom change), it simply re-enters.
+            const dx = s.x - k.x, dy = s.y - k.y, dist = Math.hypot(dx, dy);
+            if (dist > diag * 3) {
                 this.rocks.splice(i, 1);
                 this.spawnRock(k.size);
+            } else if (dist > leash) {
+                const sp = Math.max(60, Math.hypot(k.vx, k.vy));
+                const turn = Math.min(1, 1.2 * dt * (dist / leash));
+                k.vx += (dx / dist * sp - k.vx) * turn;
+                k.vy += (dy / dist * sp - k.vy) * turn;
             }
         }
+
+        // Phantoms follow their hole; if the hole is gone (window restored), they go too.
+        this.phantoms = this.phantoms.filter(ph => {
+            ph.t += dt;
+            const h = holes.find(o => Math.hypot(o.x - ph.hx, o.y - ph.hy) < 60);
+            if (h) { ph.hx = h.x; ph.hy = h.y; } else ph.gone = (ph.gone || 0) + dt;
+            return ph.t < AsteroidsGame.PHANTOM && (ph.gone || 0) < 0.8;
+        });
 
         // Particles
         this.particles = this.particles.filter(p => {
@@ -398,7 +440,12 @@ class AsteroidsGame {
             return (p.life -= dt) > 0;
         });
 
-        if (this.state === 'play' && this.rocks.length === 0) this.nextWave();
+        if (this.waveBreak > 0) {
+            this.waveBreak -= dt;
+            if (this.waveBreak <= 0) { this.waveBreak = 0; this.nextWave(); }
+        } else if (this.state === 'play' && this.rocks.length === 0) {
+            this.clearWave();
+        }
         this.updateHud();
     }
 
@@ -492,6 +539,96 @@ class AsteroidsGame {
         this.ship = this.newShip(spot.x, spot.y);
         this.trail = [];
         this.state = 'play';
+    }
+
+    // Distance at which the hole pulls harder than the engine can push.
+    noReturn() {
+        const T = AsteroidsGame.T;
+        return Math.max(T.holeRadius, Math.sqrt(Math.max(0, T.holePull / T.thrust - 1600)));
+    }
+
+    static get PHANTOM() { return 36; } // seconds a phantom lingers, about the Horizon's length
+
+    phantomsOn() {
+        return !!(window.NovaHorizon && NovaHorizon.phantomsUnlocked());
+    }
+
+    lostToHole(h) {
+        if (window.NovaHorizon && NovaHorizon.roll()) {
+            this.enterHorizon();
+            return;
+        }
+        if (!this.phantomsOn()) { this.crash('hole'); return; }
+        const s = this.ship;
+        const dx = s.x - h.x, dy = s.y - h.y;
+        this.phantoms.push({ hx: h.x, hy: h.y, ang: Math.atan2(dy, dx), d0: Math.hypot(dx, dy), a: s.a, t: 0 });
+        if (window.AudioMng) AudioMng.play('collapse');
+        this.lives--;
+        this.keys.clear();
+        this.trail = [];
+        this.showBanner('Beyond return');
+        if (this.lives > 0) this.respawn();
+        else { this.state = 'dead'; setTimeout(() => this.state === 'dead' && this.gameOver(), 1300); }
+    }
+
+    // What an outside observer sees of a falling ship: it creeps toward the
+    // horizon ever more slowly, is stretched along the fall, and its light
+    // is redshifted and dimmed until it is gone.
+    drawPhantoms(px) {
+        if (!this.phantoms.length) return;
+        const ctx = this.ctx, D = AsteroidsGame.PHANTOM;
+        const rh = AsteroidsGame.T.holeRadius;
+        const mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
+        this.phantoms.forEach(ph => {
+            const k = ph.t / D;
+            const red = 1 - Math.exp(-ph.t / 5);
+            const dist = rh + (ph.d0 - rh) * Math.exp(-ph.t / 4);
+            const x = ph.hx + Math.cos(ph.ang) * dist, y = ph.hy + Math.sin(ph.ang) * dist;
+            let col = mix([165, 180, 252], [255, 64, 32], Math.min(1, red * 1.3));
+            col = mix(col, [70, 8, 4], Math.max(0, red - 0.6) / 0.4);
+            const alpha = Math.pow(1 - k, 1.6) * (1 - 0.5 * red) * (1 - Math.min(1, (ph.gone || 0) / 0.8));
+            if (alpha <= 0.01) return;
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(ph.ang);                       // radial axis
+            ctx.scale(1 + 2.6 * k + 0.6 * red, Math.max(0.15, 1 - 0.7 * k));
+            ctx.rotate(ph.a - ph.ang);
+            ctx.beginPath();
+            ctx.moveTo(15, 0); ctx.lineTo(-9, -9.5); ctx.lineTo(-5, 0); ctx.lineTo(-9, 9.5);
+            ctx.closePath();
+            ctx.globalAlpha = alpha * 0.35;
+            ctx.fillStyle = `rgb(${col})`;
+            ctx.fill();
+            ctx.globalAlpha = alpha;
+            ctx.strokeStyle = `rgb(${col})`;
+            ctx.lineWidth = 1.5 * px;
+            ctx.stroke();
+            ctx.restore();
+        });
+        ctx.globalAlpha = 1;
+    }
+
+    // The Horizon ends the game whatever lives are left. The game freezes
+    // underneath, then shows "Game over" once the player wakes up.
+    enterHorizon() {
+        this.state = 'over';
+        this.keys.clear();
+        if (this.canvas) this.canvas.classList.add('is-hidden');
+        if (this.hud) this.hud.classList.add('is-hidden');
+        NovaHorizon.play(() => {
+            if (this.canvas) this.canvas.classList.remove('is-hidden');
+            if (this.hud) this.hud.classList.remove('is-hidden');
+            this.rocks = []; this.bullets = []; this.particles = []; this.trail = []; this.phantoms = [];
+            this.state = 'dead';
+            this.lives = 0;
+            this.updateHud();
+            if (NovaHorizon.unlockedNow) {
+                this.showBanner('Phantoms mode unlocked');
+                setTimeout(() => this.gameOver(), 1800);
+            } else {
+                this.gameOver();
+            }
+        });
     }
 
     gameOver() {
@@ -638,11 +775,50 @@ class AsteroidsGame {
             ctx.stroke();
             ctx.restore();
         }
+
+        this.drawPhantoms(px);
+        this.drawMarkers();
+    }
+
+    // Off-screen rocks: a diamond on the screen edge pointing at each one.
+    // Closer rocks get bigger, brighter diamonds; the last two pulse.
+    drawMarkers() {
+        if (!this.rocks.length) return;
+        const ctx = this.ctx, d = this.dpr, Z = WindowManager.cameraZ;
+        const W = window.innerWidth, H = window.innerHeight;
+        const top = 132, bottom = H - 104, left = 22, right = W - 22; // clear of HUD and shelf
+        const cx = W / 2, cy = (top + bottom) / 2;
+        const diag = Math.hypot(W, H) / Z;
+        const last = this.rocks.length <= 2;
+        const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 160);
+        ctx.setTransform(d, 0, 0, d, 0, 0);
+        this.rocks.forEach(k => {
+            const sx = WindowManager.cameraX + k.x * Z, sy = WindowManager.cameraY + k.y * Z;
+            const m = k.r * Z;
+            if (sx > -m && sx < W + m && sy > -m && sy < H + m) return; // visible
+            const dx = sx - cx, dy = sy - cy;
+            const t = Math.min((dx > 0 ? (right - cx) / dx : dx < 0 ? (left - cx) / dx : Infinity),
+                               (dy > 0 ? (bottom - cy) / dy : dy < 0 ? (top - cy) / dy : Infinity));
+            const mx = cx + dx * t, my = cy + dy * t;
+            const dist = Math.hypot(k.x - this.ship.x, k.y - this.ship.y);
+            const near = Math.max(0, 1 - dist / (diag * 1.6));
+            const size = 3.5 + near * 4 + (last ? pulse * 2.5 : 0);
+            ctx.globalAlpha = 0.35 + near * 0.55;
+            ctx.fillStyle = last ? this.colors.accent : this.colors.secondary;
+            ctx.beginPath();
+            ctx.moveTo(mx, my - size); ctx.lineTo(mx + size, my); ctx.lineTo(mx, my + size); ctx.lineTo(mx - size, my);
+            ctx.closePath();
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1;
     }
 
     updateHud() {
         if (!this.hud) return;
         this.hud.querySelector('.ast-hud__score').textContent = this.score.toLocaleString();
+        const wave = this.waveBreak > 0 ? `Wave ${this.wave} cleared` : `Wave ${this.wave} · ${this.rocks.length} left`;
+        const waveEl = this.hud.querySelector('.ast-hud__wave');
+        if (waveEl.textContent !== wave) waveEl.textContent = wave;
         const lives = this.hud.querySelector('.ast-hud__lives');
         const want = Math.max(0, this.lives);
         if (lives.childElementCount !== want) {
