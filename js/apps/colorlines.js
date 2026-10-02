@@ -25,9 +25,13 @@ Apps.register({
             .color-5 { color: #EC4899; background: #EC4899; }
             .color-6 { color: #06B6D4; background: #06B6D4; }
             @keyframes pulseBall { from { transform: scale(1.1); } to { transform: scale(1.2); } }
-            .cl-preview-group { display: flex; flex: 1 1 auto; min-width: 34px; height: 36px; align-items: center; background: var(--surface-sunk); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 4px; gap: 2px; transition: background 0.2s; }
+            .cl-preview-group { display: flex; flex: none; min-width: 34px; height: 36px; align-items: center; background: var(--surface-sunk); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 4px; gap: 2px; transition: background 0.2s; }
             .cl-preview-btn { background: transparent; border: none; color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; opacity: 0.6; transition: opacity 0.2s; }
             .cl-preview-btn:hover { opacity: 1; }
+            /* the preview never shrinks; the level select gives way instead */
+            .cl-container .game-toolbar { gap: 4px; }
+            .cl-container .game-select { min-width: 0; flex: 0 1 auto; padding: 0 22px 0 8px; }
+            .cl-container .game-stat { min-width: 44px; }
             .cl-preview-wrap { overflow: hidden; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; width: 76px; opacity: 1; display: flex; gap: 2px; align-items: center; }
             .cl-preview-wrap.collapsed { width: 0; opacity: 0; pointer-events: none; }
             .cl-preview-cell { flex-shrink: 0; width: 24px; height: 24px; background: var(--surface-sunk); border-radius: var(--radius-xs); position: relative; border: 1px solid var(--surface-sunk); }
