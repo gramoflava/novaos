@@ -1,4 +1,6 @@
 // Boot sequence manager
+const BOOT_KEY = 'novaos_booted';
+
 class BootSequence {
     constructor() {
         this.screen = document.getElementById('boot-screen');
@@ -6,20 +8,32 @@ class BootSequence {
         this.desktop = document.getElementById('desktop');
     }
 
+    // Full sequence on the first visit and after a factory reset; a short one otherwise.
+    isFirstBoot() {
+        try { return localStorage.getItem(BOOT_KEY) !== 'true'; } catch (e) { return false; }
+    }
+
     start() {
+        this.full = this.isFirstBoot();
+        try { localStorage.setItem(BOOT_KEY, 'true'); } catch (e) { }
+        if (!this.full) this.screen.classList.add('boot-screen--quick');
+
         let pct = 0;
+        const step = this.full ? 15 : 45;
         const interval = setInterval(() => {
-            pct += Math.random() * 15;
+            pct += this.full ? Math.random() * step : step;
             if (pct >= 100) {
                 pct = 100;
                 clearInterval(interval);
                 this.finish();
             }
             this.progress.style.width = pct + '%';
-        }, 100);
+        }, this.full ? 100 : 70);
     }
 
     finish() {
+        const hold = this.full ? 500 : 60;
+        const fade = this.full ? 1000 : 180;
         setTimeout(() => {
             this.screen.style.opacity = '0';
             setTimeout(() => {
@@ -48,8 +62,8 @@ class BootSequence {
                 });
 
                 Bus.emit('system:ready');
-            }, 1000);
-        }, 500);
+            }, fade);
+        }, hold);
     }
 }
 

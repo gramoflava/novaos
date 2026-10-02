@@ -37,33 +37,30 @@ shown at a time and the shelf becomes the shared `.tabbar`.
 
 ### Brand mark
 
-[`assets/gemini-blackhole.svg`](assets/gemini-blackhole.svg) is the Nova OS
-brand mark. It appears in the boot sequence, system island, title bars and
-favicon. Do not redraw or replace it with a UI icon.
+[`assets/nova-emblem.svg`](assets/nova-emblem.svg) is the Nova OS emblem: a
+four-point star (the nova) inside a tilted orbit, indigo to pink like the
+wordmark. It appears on the boot screen and in the system island. The favicon
+is the same star and orbit in white on the indigo squircle
+(`gramofdesign/marks/novaos.svg`). Title bars show the app's own mark.
 
 ### App marks
 
-Nova's geometric icon library is reserved for app identities:
+Every app, Settings included, has its own mark in `js/utils/icons.js`. One
+construction for all of them: 24 grid, 1.75 rounded stroke in the app's hue,
+the same hue as a soft fill (opacity .2), and one solid spark detail. Hues live
+in `css/nova-theme.css` (`.app-mark--<id>`): 400 tones in dark mode, 600 tones
+in light. Multicolour games (Color Lines, Columns, Wordl) keep fixed piece
+colours. Marks use no gradients or ids, so one can appear several times on a
+page (shelf, title bar, spotlight).
 
-- Files
-- Calculator
-- Codex
-- Minesweeper
-- 2048
-- Color Lines
-- Wordl
-- Nova Run
-- Scores
-
-Settings and every interface action use Tabler sources from
-`../gramofdesign/icons/`. UI icons do not belong in the geometric app-mark
-library.
+Interface actions use Tabler sources from `../gramofdesign/icons/`. App marks
+never stand in for UI icons, and Tabler icons never stand in for apps.
 
 ### Nova vocabulary
 
 Project-only tokens in `css/nova-theme.css` are limited to:
 
-- `--color-app-*` for app marks;
+- `.app-mark--*` hues for app marks;
 - `--color-wc-*` for desktop window controls;
 - Nova gradient endpoints.
 

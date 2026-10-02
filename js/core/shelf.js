@@ -5,13 +5,24 @@ class Shelf {
         this.mobileQuery = window.matchMedia('(max-width: 640px)');
         const syncMobileClass = () => this.container.classList.toggle('tabbar', this.mobileQuery.matches);
         syncMobileClass();
-        this.mobileQuery.addEventListener('change', syncMobileClass);
+        this.mobileQuery.addEventListener('change', () => { syncMobileClass(); this.syncFade(); });
+
+        // On phones the row scrolls; fade whichever edge still hides apps.
+        this.container.addEventListener('scroll', () => this.syncFade(), { passive: true });
+        window.addEventListener('resize', () => this.syncFade());
 
         // Listen to app lifecycle events
         Bus.on('app:registered', (app) => this.render());
         Bus.on('app:launching', (appId) => this.render());
         Bus.on('app:closed', (appId) => this.render());
         window.ShelfInstance = this;
+    }
+
+    syncFade() {
+        const el = this.container;
+        const max = el.scrollWidth - el.clientWidth;
+        el.classList.toggle('has-more-left', el.scrollLeft > 2);
+        el.classList.toggle('has-more-right', max - el.scrollLeft > 2);
     }
 
     render() {
@@ -95,6 +106,8 @@ class Shelf {
                 }
             }
         });
+
+        requestAnimationFrame(() => this.syncFade());
     }
 }
 

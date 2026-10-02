@@ -26,12 +26,12 @@
     <link rel="stylesheet" href="css/nova-layout.css">
     <link rel="stylesheet" href="css/nova-window.css">
     <link rel="stylesheet" href="css/nova-effects.css">
-    <link rel="stylesheet" href="css/donation.css">
 
     <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
     <script defer src="gramofdesign/theme.js"></script>
+    <script defer src="gramofdesign/kofi.js"></script>
 </head>
 <body>
     <div id="nova-background" class="cosmos">
@@ -45,7 +45,7 @@
     <!-- Boot Screen -->
     <div id="boot-screen" class="boot-screen">
         <div class="boot-logo">
-            <img src="design_handbook/assets/gemini-blackhole.svg" alt="Nova OS">
+            <img src="design_handbook/assets/nova-emblem.svg" alt="Nova OS">
         </div>
         <div class="boot-progress-bar">
             <div id="boot-progress" class="boot-progress-fill"></div>
@@ -59,14 +59,14 @@
         <div id="nova-island-container">
             <div id="nova-island" class="nova-island">
                 <div class="island-left">
-                    <img class="island-mark" src="design_handbook/assets/gemini-blackhole.svg" alt="">
+                    <img class="island-mark" src="design_handbook/assets/nova-emblem.svg" alt="">
                     <span id="island-app-name" class="island-app-name">Nova</span>
                 </div>
                 <div class="island-center">
                     <span id="island-clock" class="island-clock">---</span>
                 </div>
                 <div class="island-right">
-                    <button class="island-btn" id="btn-support" type="button" title="Support my work" aria-label="Support my work" aria-expanded="false">
+                    <button class="island-btn" id="btn-support" type="button" data-kofi title="Support my work" aria-label="Support my work" aria-expanded="false">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14c.83 .642 2.077 1.017 3.5 1c1.423 .017 2.67 -.358 3.5 -1c.83 -.642 2.077 -1.017 3.5 -1c1.423 -.017 2.67 .358 3.5 1"></path><path d="M8 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2M12 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2"></path><path d="M3 10h14v5a6 6 0 0 1 -6 6H9a6 6 0 0 1 -6 -6v-5zM16.746 16.726a3 3 0 1 0 .252 -5.555"></path></svg>
                     </button>
                     <button class="island-btn" id="btn-mute" aria-label="Audio Toggle">
@@ -108,34 +108,6 @@
         <!-- Context Menu -->
         <div id="context-menu" class="context-menu" style="display: none;"></div>
 
-        <!-- Ko-fi Donation Widget -->
-        <div id="kofi-panel" class="kofi-panel hidden">
-            <iframe id="kofiframe" class="kofi-frame" src="https://ko-fi.com/gramoflava/?hidefeed=true&amp;widget=true&amp;embed=true&amp;preview=true" height="660" title="Support lava on Ko-fi"></iframe>
-        </div>
-
-        <button type="button" id="kofi-close" class="kofi-floater hidden" aria-label="Close support panel">
-            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M10 10l4 4m0-4l-4 4"></path></svg>
-        </button>
-
-        <script>
-            (function() {
-                const supportBtn = document.getElementById('btn-support');
-                const panel = document.getElementById('kofi-panel');
-                const closeBtn = document.getElementById('kofi-close');
-
-                supportBtn.addEventListener('click', () => {
-                    supportBtn.setAttribute('aria-expanded', 'true');
-                    closeBtn.classList.remove('hidden');
-                    panel.classList.remove('hidden');
-                });
-
-                closeBtn.addEventListener('click', () => {
-                    panel.classList.add('hidden');
-                    closeBtn.classList.add('hidden');
-                    supportBtn.setAttribute('aria-expanded', 'false');
-                });
-            })();
-        </script>
     </div>
 
     <!-- Utilities -->

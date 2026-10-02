@@ -35,7 +35,6 @@ Apps.register({
             @media (max-width: 640px) {
                 .cl-container { padding: 8px; }
                 .cl-container .game-toolbar { flex: none; }
-                .cl-container .game-select { min-width: 72px !important; width: 72px !important; }
                 .cl-preview-group { flex: 0 0 56px; min-width: 56px; height: 44px; padding: 2px; }
                 .cl-preview-btn { display: none; }
                 .cl-preview-wrap, .cl-preview-wrap.collapsed { width: 52px; opacity: 1; pointer-events: auto; }
@@ -48,7 +47,7 @@ Apps.register({
         const html = `
             <div class="cl-container" id="cl-container-${winId}">
                 <div class="game-toolbar">
-                    <select id="cl-level-${winId}" class="game-select" aria-label="Line length" style="min-width: 80px; width: 80px;">
+                    <select id="cl-level-${winId}" class="game-select" aria-label="Line length">
                         <option value="5" selected>Classic</option>
                         <option value="4">Quick</option>
                     </select>

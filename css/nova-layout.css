@@ -60,6 +60,7 @@
 }
 
 .island-app-name {
+    font-family: var(--font-display);
     font-weight: 700;
     background: linear-gradient(90deg, var(--accent), var(--nova-accent-alt));
     -webkit-background-clip: text;
@@ -136,18 +137,10 @@
 .shelf-item svg {
     width: 28px;
     height: 28px;
-    color: var(--text);
     transition: transform 0.2s var(--ease-spring);
 }
 
-.tabler-app-mark {
-    width: 28px;
-    height: 28px;
-    opacity: 0.8;
-    transition: transform var(--dur-base) var(--ease-spring);
-}
-
-.spotlight-item .tabler-app-mark {
+.spotlight-item .app-mark {
     width: 24px;
     height: 24px;
 }
@@ -398,6 +391,7 @@
 }
 
 .game-select {
+    flex: none;
     min-width: 96px;
     padding: 0 28px 0 10px;
     outline: none;
@@ -543,7 +537,7 @@
 
 .game-stat__label {
     color: var(--text-muted);
-    font-size: 8px;
+    font-size: var(--text-2xs);
     font-weight: 500;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -587,9 +581,13 @@
     font-weight: 500;
 }
 
+.settings-row .hint {
+    color: var(--text-secondary);
+}
+
 .settings-version {
     margin-top: auto;
-    color: var(--text-muted);
+    color: var(--text-secondary);
     font-size: var(--text-sm);
     text-align: center;
 }
@@ -618,9 +616,8 @@
     }
 
     .game-select {
-        width: 84px;
+        width: auto;
         min-width: 84px;
-        max-width: 84px;
         padding-right: 24px;
         padding-left: var(--space-2);
     }
@@ -670,16 +667,26 @@
         height: 40px;
     }
 
+    /* The glass sits on the fixed container so the scrolling row can fade at
+       its edges without fading the bar itself. */
     #nova-shelf-container {
         position: fixed;
         right: 0;
         bottom: 0;
         left: 0;
         display: block;
+        height: 72px;
+        background: var(--glass);
+        backdrop-filter: blur(var(--blur-bar)) saturate(150%);
+        -webkit-backdrop-filter: blur(var(--blur-bar)) saturate(150%);
+        border-top: 1px solid var(--line-strong);
+        box-shadow: var(--shadow-lg), var(--glass-edge);
         pointer-events: none;
     }
 
     .nova-shelf.tabbar {
+        --fade-l: 0px;
+        --fade-r: 0px;
         position: fixed;
         display: flex;
         justify-content: flex-start;
@@ -687,13 +694,20 @@
         height: 72px;
         padding: var(--space-2) var(--space-3);
         overflow-x: auto;
-        border-right: 0;
-        border-bottom: 0;
-        border-left: 0;
+        background: transparent;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        border: 0;
         border-radius: var(--radius-none);
+        box-shadow: none;
         pointer-events: auto;
         scrollbar-width: none;
+        -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+                mask-image: linear-gradient(90deg, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
     }
+
+    .nova-shelf.tabbar.has-more-left  { --fade-l: 40px; }
+    .nova-shelf.tabbar.has-more-right { --fade-r: 40px; }
 
     .nova-shelf.tabbar::-webkit-scrollbar {
         display: none;

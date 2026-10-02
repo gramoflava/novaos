@@ -27,14 +27,14 @@ Apps.register({
       .co-gem.is-clearing { animation: coClear 170ms var(--ease-out) forwards; }
       .co-side { display: flex; width: 76px; flex: 0 0 76px; flex-direction: column; gap: 10px; }
       .co-next, .co-chain { padding: 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-sunk); box-shadow: var(--glass-edge); }
-      .co-side-label { margin-bottom: 6px; color: var(--text-muted); font-size: 8px; font-weight: 600; letter-spacing: 0.07em; text-align: center; text-transform: uppercase; }
+      .co-side-label { margin-bottom: 6px; color: var(--text-muted); font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-align: center; text-transform: uppercase; }
       .co-next-stack { display: flex; align-items: center; flex-direction: column; gap: 3px; }
       .co-next-cell { position: relative; width: 28px; height: 28px; border-radius: var(--radius-xs); background: var(--surface-sunk); }
-      .co-chain { color: var(--text-secondary); font-size: 9px; font-weight: 600; line-height: 1.45; text-align: center; text-transform: uppercase; }
+      .co-chain { color: var(--text-secondary); font-size: 10px; font-weight: 600; line-height: 1.45; text-align: center; text-transform: uppercase; }
       .co-chain strong { display: block; color: var(--accent); font-size: 18px; font-variant-numeric: tabular-nums; }
       .co-status { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; background: color-mix(in srgb, var(--bg) 72%, transparent); color: var(--text); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-align: center; text-transform: uppercase; pointer-events: none; }
       .co-status.hidden { display: none; }
-      .co-caption { display: flex; min-height: 28px; align-items: flex-end; justify-content: center; color: var(--text-muted); font-size: 9px; font-weight: 500; letter-spacing: 0.05em; text-align: center; text-transform: uppercase; }
+      .co-caption { display: flex; min-height: 28px; align-items: flex-end; justify-content: center; color: var(--text-muted); font-size: 10px; font-weight: 500; letter-spacing: 0.04em; text-align: center; text-transform: uppercase; }
       .co-caption-mobile { display: none; }
       @keyframes coClear { to { opacity: 0; transform: scale(1.35) rotate(8deg); } }
       @keyframes coMagic { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(120deg); } }

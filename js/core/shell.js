@@ -12,15 +12,9 @@ class Shell {
 
     initClock() {
         const update = () => {
-            const now = new Date();
-            let h = now.getHours();
-            let m = now.getMinutes();
-            const ampm = h >= 12 ? 'PM' : 'AM';
-            h = h % 12 || 12;
-            m = m < 10 ? '0' + m : m;
-
+            // Hour cycle follows the visitor's locale: 21:10 in Vilnius, 9:10 PM in New York.
             if (this.clockEl) {
-                this.clockEl.textContent = `${h}:${m} ${ampm}`;
+                this.clockEl.textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
             }
         };
         update();

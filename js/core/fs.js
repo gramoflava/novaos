@@ -129,6 +129,7 @@ class FileSystem {
 
     factoryReset() {
         localStorage.removeItem(FS_KEY);
+        localStorage.removeItem('novaos_booted'); // next start plays the full boot
         this.tree = this.createDefaultStructure();
         this.save();
         location.reload();

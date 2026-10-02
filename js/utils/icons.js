@@ -1,86 +1,97 @@
-// Advanced Geometric SVG Icons for Nova OS
+// Nova OS app marks.
+// One construction for every app: 24 grid, 1.75 rounded stroke in the app's
+// hue, the same hue as a soft fill (opacity .2), and one solid "spark" detail.
+// Hues come from css/nova-theme.css (.app-mark--<id>): lighter in dark mode,
+// deeper in light mode. No gradients or ids, so a mark can repeat on a page.
+// Interface actions use the shared Tabler set in gramofdesign/icons/, never these.
 const Icons = {
-    cache: new Map(),
-
     library: {
-        // Core System
-        'finder': `<svg viewBox="0 0 24 24" fill="none" stroke="url(#finderGrad)" stroke-width="2" stroke-linejoin="round">
-            <defs>
-                <linearGradient id="finderGrad" x1="0" y1="0" x2="24" y2="24"><stop stop-color="#4F46E5"/><stop offset="1" stop-color="#EC4899"/></linearGradient>
-            </defs>
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+        // Fallback for anything without a mark of its own.
+        'finder': `<svg class="app-mark app-mark--finder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1 -2 2h-13a2 2 0 0 1 -2 -2z" fill="currentColor" fill-opacity=".2"/>
         </svg>`,
 
-        // Settings is a system affordance, so it comes from the shared Tabler set.
-        'settings': `<img class="tabler-app-mark" src="gramofdesign/icons/adjustments-x.svg" alt="">`,
-
-        // Apps
-        'calculator': `<svg viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2">
-            <rect x="4" y="2" width="16" height="20" rx="4"></rect>
-            <path d="M8 6h8"></path><path d="M12 10v8"></path><path d="M8 14h8"></path>
+        // Codex: an open book with a star on the right page.
+        'codex': `<svg class="app-mark app-mark--codex" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 6.5c-2.2 -1.6 -5.4 -2 -8.5 -1.5v13.5c3.1 -.5 6.3 -.1 8.5 1.5c2.2 -1.6 5.4 -2 8.5 -1.5v-13.5c-3.1 -.5 -6.3 -.1 -8.5 1.5z" fill="currentColor" fill-opacity=".2"/>
+            <path d="M12 6.5v13"/>
+            <path d="M16.5 8.6c.2 1.5 .9 2.2 2.4 2.4c-1.5 .2 -2.2 .9 -2.4 2.4c-.2 -1.5 -.9 -2.2 -2.4 -2.4c1.5 -.2 2.2 -.9 2.4 -2.4z" style="fill:var(--spark)" stroke="none"/>
         </svg>`,
 
-        'codex': `<svg viewBox="0 0 24 24" fill="none" stroke="#6366F1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path>
+        // Settings: a dial with three knobs on its rim.
+        'settings': `<svg class="app-mark app-mark--settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="7.5" fill="currentColor" fill-opacity=".2"/>
+            <circle cx="12" cy="12" r="2.6"/>
+            <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4 -1.4M17.3 6.7l1.4 -1.4"/>
+            <circle cx="12" cy="12" r="1.1" style="fill:var(--spark)" stroke="none"/>
         </svg>`,
 
-        'minesweeper': `<svg viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2">
-            <circle cx="12" cy="12" r="8"></circle>
-            <path d="M12 2v2"></path><path d="M12 20v2"></path>
-            <path d="M4.93 4.93l1.41 1.41"></path><path d="M17.66 17.66l1.41 1.41"></path>
-            <path d="M2 12h2"></path><path d="M20 12h2"></path>
-            <path d="M6.34 17.66l-1.41 1.41"></path><path d="M19.07 4.93l-1.41 1.41"></path>
+        // Calculator: a body, a lit display and an equals key.
+        'calculator': `<svg class="app-mark app-mark--calculator" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="5" y="2.75" width="14" height="18.5" rx="3.5" fill="currentColor" fill-opacity=".2"/>
+            <rect x="8" y="6" width="8" height="3.5" rx="1" style="fill:var(--spark)" stroke="none"/>
+            <path d="M8.5 13.25h.01M12 13.25h.01M15.5 13.25h.01M8.5 17h.01M12 17h.01"/>
+            <path d="M14.75 16.25h2M14.75 18h2" stroke-width="1.5"/>
         </svg>`,
 
-        'colorlines': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="6" cy="12" r="3" fill="#3B82F6" stroke="none"></circle>
-            <circle cx="12" cy="12" r="3" fill="#10B981" stroke="none"></circle>
-            <circle cx="18" cy="12" r="3" fill="#EC4899" stroke="none"></circle>
-            <path d="M3 12h18" stroke-dasharray="2 4"></path>
+        // Minesweeper: a mine with eight spikes and a glint.
+        'minesweeper': `<svg class="app-mark app-mark--minesweeper" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="5.75" fill="currentColor" fill-opacity=".2"/>
+            <path d="M12 3.5v2.75M12 17.75v2.75M3.5 12h2.75M17.75 12h2.75M6 6l1.9 1.9M16.1 16.1l1.9 1.9M6 18l1.9 -1.9M16.1 7.9l1.9 -1.9"/>
+            <circle cx="10.1" cy="10.1" r="1.5" style="fill:var(--spark)" stroke="none"/>
         </svg>`,
 
-        'columns': `<svg viewBox="0 0 24 24" fill="none" stroke-linejoin="round">
-            <path d="M12 1.5l4.5 3.5L12 8.5 7.5 5z" fill="#EC4899" stroke="#BE185D" stroke-width="1"></path>
-            <path d="M12 8l4.5 3.5L12 15l-4.5-3.5z" fill="#06B6D4" stroke="#0E7490" stroke-width="1"></path>
-            <path d="M12 14.5l4.5 3.5-4.5 4.5L7.5 18z" fill="#F59E0B" stroke="#B45309" stroke-width="1"></path>
+        // 2048: four tiles that grow toward the merged corner.
+        'game2048': `<svg class="app-mark app-mark--game2048" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3.5" y="3.5" width="7" height="7" rx="2"/>
+            <rect x="13.5" y="3.5" width="7" height="7" rx="2" fill="currentColor" fill-opacity=".2"/>
+            <rect x="3.5" y="13.5" width="7" height="7" rx="2" fill="currentColor" fill-opacity=".2"/>
+            <rect x="13.5" y="13.5" width="7" height="7" rx="2" fill="currentColor" stroke="none"/>
         </svg>`,
 
-        'game2048': `<svg viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2">
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-            <line x1="3" y1="9" x2="21" y2="9"></line>
-            <line x1="3" y1="15" x2="21" y2="15"></line>
-            <line x1="9" y1="3" x2="9" y2="21"></line>
-            <line x1="15" y1="3" x2="15" y2="21"></line>
+        // Color Lines: five in a row, three of them showing.
+        'colorlines': `<svg class="app-mark app-mark--colorlines" viewBox="0 0 24 24" fill="none" stroke-linecap="round" aria-hidden="true">
+            <path d="M4 20l16 -16" style="stroke:var(--neutral)" stroke-width="1.5" stroke-dasharray=".01 3.5" opacity=".7"/>
+            <circle cx="6.5" cy="17.5" r="3.25" fill="#60a5fa"/>
+            <circle cx="12" cy="12" r="3.25" fill="#34d399"/>
+            <circle cx="17.5" cy="6.5" r="3.25" fill="#f472b6"/>
+            <circle cx="5.5" cy="16.5" r="1" fill="#fff" opacity=".55"/>
+            <circle cx="11" cy="11" r="1" fill="#fff" opacity=".55"/>
+            <circle cx="16.5" cy="5.5" r="1" fill="#fff" opacity=".55"/>
         </svg>`,
 
-        'novarun': `<svg viewBox="0 0 24 24" fill="none" stroke="#06B6D4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M7 14v-4a5 5 0 0 1 10 0v4"></path>
-            <path d="M8 10h8"></path>
-            <path d="M9 10a3 3 0 0 1 6 0" fill="#8B5CF6" stroke="none"></path>
-            <path d="M5 19c3 -2 11 -2 14 0"></path>
-            <circle cx="18.5" cy="5.5" r="1.5" fill="#F59E0B" stroke="none"></circle>
+        // Columns: three gems falling into a well.
+        'columns': `<svg class="app-mark app-mark--columns" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5.5 4v14.5a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-14.5" style="stroke:var(--neutral)" stroke-width="1.75"/>
+            <path d="M12 3l3 2.5l-3 2.5l-3 -2.5z" fill="#f472b6"/>
+            <path d="M12 8.75l3 2.5l-3 2.5l-3 -2.5z" fill="#22d3ee"/>
+            <path d="M12 14.5l3 2.5l-3 2.5l-3 -2.5z" fill="#fbbf24"/>
         </svg>`,
 
-        'scores': `<svg viewBox="0 0 24 24" fill="none" stroke="#FBBF24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path>
-            <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path>
-            <path d="M4 22h16"></path>
-            <path d="M10 14.66V17c0 .55-.45 1-1 1H7v4h10v-4h-2c-.55 0-1-.45-1-1v-2.34"></path>
-            <path d="M8 2h8a4 4 0 0 1 4 4v3a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7V6a4 4 0 0 1 4-4z"></path>
+        // Wordl: a guess row that turns from grey to amber to green.
+        'wordl': `<svg class="app-mark app-mark--wordl" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="2.75" y="4" width="5.5" height="5.5" rx="1.5" style="stroke:var(--neutral)"/>
+            <rect x="9.25" y="4" width="5.5" height="5.5" rx="1.5" style="stroke:var(--neutral)"/>
+            <rect x="15.75" y="4" width="5.5" height="5.5" rx="1.5" style="stroke:var(--neutral)"/>
+            <rect x="2.75" y="14.5" width="5.5" height="5.5" rx="1.5" fill="#facc15" stroke="none"/>
+            <rect x="9.25" y="14.5" width="5.5" height="5.5" rx="1.5" fill="currentColor" stroke="none"/>
+            <rect x="15.75" y="14.5" width="5.5" height="5.5" rx="1.5" fill="currentColor" stroke="none"/>
         </svg>`,
 
-        'wordl': `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <rect x="3" y="4" width="4" height="4" rx="1" stroke="#4B5563"></rect>
-            <rect x="10" y="4" width="4" height="4" rx="1" stroke="#4B5563"></rect>
-            <rect x="17" y="4" width="4" height="4" rx="1" stroke="#4B5563"></rect>
-            <rect x="3" y="10" width="4" height="4" rx="1" fill="#EAB308" stroke="none"></rect>
-            <rect x="10" y="10" width="4" height="4" rx="1" fill="#22C55E" stroke="none"></rect>
-            <rect x="17" y="10" width="4" height="4" rx="1" stroke="#4B5563"></rect>
-            <rect x="3" y="16" width="4" height="4" rx="1" fill="#22C55E" stroke="none"></rect>
-            <rect x="10" y="16" width="4" height="4" rx="1" fill="#22C55E" stroke="none"></rect>
-            <rect x="17" y="16" width="4" height="4" rx="1" fill="#22C55E" stroke="none"></rect>
+        // Nova Run: a helmet cresting the lunar horizon, with speed lines.
+        'novarun': `<svg class="app-mark app-mark--novarun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M2.5 19.5c5.5 -3 13.5 -3 19 0"/>
+            <circle cx="13" cy="10" r="5" fill="currentColor" fill-opacity=".2"/>
+            <path d="M10.5 9.5a2.5 2 0 0 1 5 0v.5a1 1 0 0 1 -1 1h-3a1 1 0 0 1 -1 -1z" style="fill:var(--spark)" stroke="none"/>
+            <path d="M3 9h3M2.5 12h2.5"/>
         </svg>`,
 
+        // Scores: a medal on a ribbon, with a star.
+        'scores': `<svg class="app-mark app-mark--scores" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 2.75l2.5 6M16 2.75l-2.5 6"/>
+            <circle cx="12" cy="15" r="6" fill="currentColor" fill-opacity=".2"/>
+            <path d="M12 11.6l1 2.1l2.3 .3l-1.65 1.6l.4 2.3l-2.05 -1.1l-2.05 1.1l.4 -2.3l-1.65 -1.6l2.3 -.3z" style="fill:var(--spark)" stroke="none"/>
+        </svg>`,
     },
 
     get(id) {

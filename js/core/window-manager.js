@@ -400,7 +400,8 @@ class WindowManagerClass {
 
         const title = document.createElement('div');
         title.className = 'window-title';
-        title.innerHTML = `<img class="window-title-mark" src="design_handbook/assets/gemini-blackhole.svg" alt=""><span>${this.escapeTitle(options.title || '')}</span>`;
+        const mark = window.Icons ? Icons.get(options.appId) : '';
+        title.innerHTML = `<span class="window-title-mark">${mark}</span><span>${this.escapeTitle(options.title || '')}</span>`;
 
         const placeholder = document.createElement('div');
         placeholder.className = 'window-placeholder';
@@ -521,11 +522,23 @@ class WindowManagerClass {
         win.el.classList.add('is-active');
 
         this.activeWindowId = id;
+        Bus.emit('window:focused', id);
+    }
+
+    // Leaves focus on nothing when the active window goes away; the island
+    // then falls back to "Nova" instead of keeping a closed app's name.
+    releaseFocus(id) {
+        if (this.activeWindowId !== id) return;
+        const win = this.windows.get(id);
+        if (win) win.el.classList.remove('is-active');
+        this.activeWindowId = null;
+        Bus.emit('window:focused', null);
     }
 
     close(id) {
         const win = this.windows.get(id);
         if (!win) return;
+        this.releaseFocus(id);
 
         if (this.isMobile()) {
             if (win.cleanup) win.cleanup();
@@ -710,6 +723,7 @@ class WindowManagerClass {
         win.el.style.opacity = '0';
         win.el.style.pointerEvents = 'none';
         win.el.dataset.minimized = 'true';
+        this.releaseFocus(id);
         Bus.emit('window:minimized', id);
 
         const box = {

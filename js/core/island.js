@@ -4,17 +4,15 @@ class Island {
         this.islandNode = document.getElementById('nova-island');
         this.appNameEl = document.getElementById('island-app-name');
 
-        // Listen to app focus changes
+        // The name follows the focused window, and falls back to "Nova" when a
+        // window closes or minimises or the desktop itself is clicked.
+        Bus.on('window:focused', (id) => {
+            const win = id && WindowManager.windows.get(id);
+            const app = win && win.appId && Apps.get(win.appId);
+            this.setAppName(app ? app.name : 'Nova');
+        });
         document.body.addEventListener('mousedown', (e) => {
-            const winEl = e.target.closest('.nova-window');
-            if (winEl) {
-                const appId = winEl.dataset.appId;
-                if (appId) {
-                    const app = Apps.get(appId);
-                    if (app) this.setAppName(app.name);
-                }
-            } else if (!e.target.closest('#nova-island') && !e.target.closest('#nova-shelf')) {
-                // Clicked on desktop background
+            if (!e.target.closest('.nova-window, #nova-island, #nova-shelf, .kofi-panel')) {
                 this.setAppName('Nova');
             }
         });

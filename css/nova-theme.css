@@ -1,18 +1,6 @@
 /* Nova OS vocabulary on top of gramof design. */
 
 :root {
-  /* App marks keep their own accents. */
-  --color-app-files: linear-gradient(135deg, #4f46e5, #ec4899);
-  --color-app-calculator: #10b981;
-  --color-app-codex: #6366f1;
-  --color-app-minesweeper: #ef4444;
-  --color-app-2048: #8b5cf6;
-  --color-app-novarun: #06b6d4;
-  --color-app-colorlines: #3b82f6;
-  --color-app-wordl-green: #22c55e;
-  --color-app-wordl-amber: #eab308;
-  --color-app-scores: #fbbf24;
-
   /* Nova-only gradient endpoints. */
   --nova-accent-alt: #ec4899;
   --nova-accent-pop: #10b981;
@@ -106,6 +94,8 @@ textarea {
   transition: opacity var(--dur-slow) var(--ease-smooth);
 }
 
+.boot-screen--quick { transition-duration: 180ms; }
+
 .boot-logo {
   width: 96px;
   height: 96px;
@@ -138,4 +128,42 @@ textarea {
 @keyframes pulse {
   from { transform: scale(0.98); opacity: 0.82; }
   to { transform: scale(1.02); opacity: 1; }
+}
+
+/* ── App marks (js/utils/icons.js) ─────────────────────────────────────────
+   Each mark draws in currentColor = --hue, with one --spark detail. Dark mode
+   uses the 400 tones, light mode the 600 tones, so marks hold their contrast
+   on both glasses. Neutral parts (grid lines, empty tiles) use --neutral. */
+.app-mark { --neutral: #94a3b8; color: var(--hue, #818cf8); flex: none; }
+.app-mark--finder { --hue: #818cf8; --spark: #c7d2fe; }
+.app-mark--codex { --hue: #818cf8; --spark: #c7d2fe; }
+.app-mark--settings { --hue: #94a3b8; --spark: #e2e8f0; }
+.app-mark--calculator { --hue: #34d399; --spark: #a7f3d0; }
+.app-mark--minesweeper { --hue: #f87171; --spark: #fecaca; }
+.app-mark--game2048 { --hue: #a78bfa; --spark: #ddd6fe; }
+.app-mark--wordl { --hue: #4ade80; --spark: #bbf7d0; }
+.app-mark--novarun { --hue: #22d3ee; --spark: #a5f3fc; }
+.app-mark--scores { --hue: #fbbf24; --spark: #fde68a; }
+
+html.theme-light .app-mark { --neutral: #64748b; }
+html.theme-light .app-mark--finder { --hue: #4f46e5; --spark: #818cf8; }
+html.theme-light .app-mark--codex { --hue: #4f46e5; --spark: #818cf8; }
+html.theme-light .app-mark--settings { --hue: #64748b; --spark: #94a3b8; }
+html.theme-light .app-mark--calculator { --hue: #059669; --spark: #34d399; }
+html.theme-light .app-mark--minesweeper { --hue: #dc2626; --spark: #f87171; }
+html.theme-light .app-mark--game2048 { --hue: #7c3aed; --spark: #a78bfa; }
+html.theme-light .app-mark--wordl { --hue: #16a34a; --spark: #4ade80; }
+html.theme-light .app-mark--novarun { --hue: #0891b2; --spark: #22d3ee; }
+html.theme-light .app-mark--scores { --hue: #d97706; --spark: #fbbf24; }
+@media (prefers-color-scheme: light) {
+  :root:not(.theme-dark) .app-mark { --neutral: #64748b; }
+  :root:not(.theme-dark) .app-mark--finder { --hue: #4f46e5; --spark: #818cf8; }
+  :root:not(.theme-dark) .app-mark--codex { --hue: #4f46e5; --spark: #818cf8; }
+  :root:not(.theme-dark) .app-mark--settings { --hue: #64748b; --spark: #94a3b8; }
+  :root:not(.theme-dark) .app-mark--calculator { --hue: #059669; --spark: #34d399; }
+  :root:not(.theme-dark) .app-mark--minesweeper { --hue: #dc2626; --spark: #f87171; }
+  :root:not(.theme-dark) .app-mark--game2048 { --hue: #7c3aed; --spark: #a78bfa; }
+  :root:not(.theme-dark) .app-mark--wordl { --hue: #16a34a; --spark: #4ade80; }
+  :root:not(.theme-dark) .app-mark--novarun { --hue: #0891b2; --spark: #22d3ee; }
+  :root:not(.theme-dark) .app-mark--scores { --hue: #d97706; --spark: #fbbf24; }
 }
