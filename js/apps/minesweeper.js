@@ -17,7 +17,9 @@ Apps.register({
                 .ms-cell:hover { background: var(--glass-hover); }
             }
             .ms-cell.revealed { background: var(--glass-active); border: 1px solid var(--surface-sunk); cursor: default; }
-            .ms-cell.mine { background: #EF4444; color: #fff;}
+            .ms-cell.mine { color: #EF4444; }
+            .ms-cell.mine.exploded { background: #EF4444; border-color: #EF4444; color: #fff; }
+            .ms-mine { width: 72%; height: 72%; }
             .ms-cell.flagged { color: #F59E0B; }
             .c-1 { color: #3B82F6; } .c-2 { color: #10B981; } .c-3 { color: #EF4444; }
             .c-4 { color: #8B5CF6; } .c-5 { color: #F59E0B; } .c-6 { color: #06B6D4; }
@@ -257,7 +259,9 @@ Apps.register({
                 div.classList.add('revealed');
                 if (cell.isMine) {
                     div.classList.add('mine');
-                    div.innerHTML = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="13" cy="14" r="7"></circle><path d="M9.15 9.15l-1.15 -1.15M9 4l1 2M13 4l-1 2M17 4l-1 2M18 8l2 -1M21 11l-2 1"></path></svg>';
+                    if (cell.exploded) div.classList.add('exploded');
+                    // The same mine as the app mark: a round body, eight spikes, a glint.
+                    div.innerHTML = '<svg class="ms-mine" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3M6 6l2.1 2.1M15.9 15.9l2.1 2.1M6 18l2.1 -2.1M15.9 8.1l2.1 -2.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="12" r="5.5" fill="currentColor"/><circle cx="10.2" cy="10.2" r="1.5" fill="#fff" opacity=".7"/></svg>';
                 } else if (cell.neighborMines > 0) {
                     div.textContent = cell.neighborMines;
                     div.classList.add('c-'+cell.neighborMines);
@@ -297,6 +301,7 @@ Apps.register({
             }
 
             if(board[r][c].isMine) {
+                board[r][c].exploded = true;
                 gameOver(false);
                 return;
             }

@@ -17,17 +17,23 @@ class Island {
             }
         });
 
+        // The button shows the stored state from the start; before, it always
+        // drew "sound on" even when a previous visit had left Nova muted.
         this.muteBtn = document.getElementById('btn-mute');
         if (this.muteBtn) {
-            this.muteBtn.onclick = () => {
-                const isMuted = AudioMng.toggleMute();
-                if (isMuted) {
-                    this.muteBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 8a5 5 0 0 1 .912 2.322M17.7 5a9 9 0 0 1 1.747 9.038M6 15h-2a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h2l4 -4v5M10 14v5l-4 -4M3 3l18 18"></path></svg>';
-                } else {
-                    this.muteBtn.innerHTML = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 8a5 5 0 0 1 0 8M17.7 5a9 9 0 0 1 0 14M6 15h-2a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h2l4 -4v14z"></path></svg>';
-                }
-            };
+            this.syncMute(AudioMng.muted);
+            this.muteBtn.onclick = () => this.syncMute(AudioMng.toggleMute());
         }
+    }
+
+    syncMute(isMuted) {
+        const on = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 8a5 5 0 0 1 0 8M17.7 5a9 9 0 0 1 0 14M6 15h-2a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h2l4 -4v14z"></path></svg>';
+        const off = '<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 8a5 5 0 0 1 .912 2.322M17.7 5a9 9 0 0 1 1.747 9.038M6 15h-2a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h2l4 -4v5M10 14v5l-4 -4M3 3l18 18"></path></svg>';
+        this.muteBtn.innerHTML = isMuted ? off : on;
+        const label = isMuted ? 'Sound off — click to turn on' : 'Sound on — click to mute';
+        this.muteBtn.setAttribute('aria-label', label);
+        this.muteBtn.title = label;
+        this.muteBtn.setAttribute('aria-pressed', isMuted ? 'true' : 'false');
     }
 
     setAppName(name) {
