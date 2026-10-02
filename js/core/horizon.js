@@ -57,14 +57,23 @@ class Horizon {
         return { inEnd: 2.5, descentEnd: 14, hoverEnd: 28, fallEnd: 34, darkEnd: 36.5, end: 39.5 };
     }
 
-    // log10 of how many home seconds pass per cockpit second.
-    logRate(t) {
+    // Where the craft is: x = log10(r − 1), r in units of rs. From r = 12 down
+    // to just outside the photon sphere and the horizon, then holding ever
+    // closer to it (r − 1 → 10⁻⁴⁴).
+    logR1(t) {
         const P = Horizon.P;
-        const ease = x => x * x * (3 - 2 * x);
-        if (t < P.inEnd) return 0;
-        if (t < P.descentEnd) return 6 * ease((t - P.inEnd) / (P.descentEnd - P.inEnd));
-        if (t < P.hoverEnd) return 6 + 16 * Math.pow((t - P.descentEnd) / (P.hoverEnd - P.descentEnd), 1.4);
-        return 22;
+        const ease = k => k * k * (3 - 2 * k);
+        if (t < P.inEnd) return Math.log10(11);
+        if (t < 11) return Math.log10(11) + (-1.6 - Math.log10(11)) * ease((t - P.inEnd) / (11 - P.inEnd));
+        if (t < P.hoverEnd) return -1.6 - 42.4 * Math.pow((t - 11) / (P.hoverEnd - 11), 1.5);
+        return -44;
+    }
+
+    // log10 of how many home seconds pass per cockpit second: for a static
+    // observer, dt_home/dτ = 1/√(1 − rs/r).
+    logRate(t) {
+        const x = this.logR1(t);
+        return -0.5 * (x - Math.log10(1 + Math.pow(10, x)));
     }
 
     // ── Start and finish ─────────────────────────────────────────────────────
@@ -89,7 +98,8 @@ class Horizon {
         this.collectDesktop();
         this.planZoom();
         this.makeStars();
-        this.discTex = null;
+        this.rays = new SchwarzschildView(this.hue);
+        this.snapshot = null;
         this.music = new HorizonScore();
         this.music.start();
 
@@ -231,121 +241,6 @@ class Horizon {
             nova: Math.random() < 0.2,
             novaT: -1
         }));
-        // Stars in the porthole sky, in unit-disc coordinates.
-        this.viewStars = Array.from({ length: 140 }, () => {
-            const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random());
-            return { x: Math.cos(a) * d, y: Math.sin(a) * d, m: 0.4 + Math.random() * 0.6 };
-        });
-    }
-
-    // A top-down accretion disc in this hole's colour, drawn once: a soft
-    // annulus, white-hot at the inner edge, and hundreds of thin filaments.
-    makeDiscTexture() {
-        const N = 1024, c = document.createElement('canvas');
-        c.width = c.height = N;
-        const g = c.getContext('2d'), m = N / 2;
-        const rin = N * 0.17, rout = N * 0.5;
-        const base = g.createRadialGradient(m, m, rin, m, m, rout);
-        base.addColorStop(0, `hsla(${this.hue}, 30%, 96%, 0.95)`);
-        base.addColorStop(0.08, `hsla(${this.hue}, 95%, 72%, 0.75)`);
-        base.addColorStop(0.45, `hsla(${this.hue}, 90%, 50%, 0.35)`);
-        base.addColorStop(1, `hsla(${this.hue}, 90%, 40%, 0)`);
-        g.fillStyle = base;
-        g.beginPath(); g.arc(m, m, rout, 0, Math.PI * 2); g.arc(m, m, rin, 0, Math.PI * 2, true); g.fill('evenodd');
-        g.globalCompositeOperation = 'lighter';
-        for (let i = 0; i < 1400; i++) {
-            const k = Math.pow(Math.random(), 1.7);            // denser toward the inside
-            const r = rin + (rout - rin) * k;
-            const a = Math.random() * Math.PI * 2, len = 0.15 + Math.random() * 1.6;
-            const hot = 1 - k;
-            g.strokeStyle = `hsla(${this.hue + (Math.random() - 0.5) * 18}, ${40 + 55 * k}%, ${55 + 40 * hot}%, ${0.04 + 0.22 * Math.random() * (0.4 + hot)})`;
-            g.lineWidth = 0.6 + Math.random() * 2.4;
-            g.beginPath(); g.arc(m, m, r, a, a + len); g.stroke();
-        }
-        g.strokeStyle = 'rgba(255,255,255,0.45)';           // innermost stable orbit
-        g.lineWidth = 3;
-        g.beginPath(); g.arc(m, m, rin + 2, 0, Math.PI * 2); g.stroke();
-        this.discTex = c;
-        this.layers = [document.createElement('canvas'), document.createElement('canvas')];
-    }
-
-    // Draws the disc as seen nearly edge-on, with the hole between its halves:
-    // the far half and its lensed image (an arc thrown over the top of the
-    // shadow, and a faint secondary arc under it) go behind the shadow, the
-    // near half in front. The approaching side is brighter (Doppler beaming).
-    drawDisc(ctx, W, H, cx, hy, sR, spin, fall, u) {
-        if (!this.discTex) this.makeDiscTexture();
-        const tex = this.discTex, T = tex.width;
-        const [back, front] = this.layers;
-        [back, front].forEach(l => { if (l.width !== W || l.height !== H) { l.width = W; l.height = H; } });
-        const b = back.getContext('2d'), f = front.getContext('2d');
-        b.setTransform(1, 0, 0, 1, 0, 0); b.clearRect(0, 0, W, H);
-        f.setTransform(1, 0, 0, 1, 0, 0); f.clearRect(0, 0, W, H);
-        const D = sR * 7.6;                                   // disc diameter: inner edge (0.34·D/2) ≈ 1.3× the shadow
-        const flat = 0.13;
-
-        const flatDisc = (g, half) => {
-            g.save();
-            g.beginPath();
-            if (half === 'far') g.rect(0, 0, W, hy); else g.rect(0, hy, W, H - hy);
-            g.clip();
-            g.translate(cx, hy); g.scale(1, flat); g.rotate(spin);
-            g.drawImage(tex, -D / 2, -D / 2, D, D);
-            g.restore();
-        };
-        // lensed images of the far side: almost circular arcs hugging the shadow
-        const lensed = (g, top, scale, alpha) => {
-            g.save();
-            g.beginPath();
-            if (top) g.rect(0, 0, W, hy); else g.rect(0, hy, W, H - hy);
-            g.clip();
-            g.globalAlpha = alpha;
-            g.translate(cx, hy); g.scale(1, top ? 0.92 : 0.82); g.rotate(-spin);
-            const L = sR * scale;
-            g.drawImage(tex, -L / 2, -L / 2, L, L);
-            g.restore();
-        };
-        b.globalCompositeOperation = 'lighter';
-        lensed(b, true, 3.3, 0.85);
-        lensed(b, false, 2.6, 0.35);
-        flatDisc(b, 'far');
-        f.globalCompositeOperation = 'lighter';
-        flatDisc(f, 'near');
-
-        // Doppler beaming and, in the fall, a deep red shift
-        [b, f].forEach(g => {
-            g.globalCompositeOperation = 'destination-in';
-            const beam = g.createLinearGradient(cx - D / 2, 0, cx + D / 2, 0);
-            beam.addColorStop(0, 'rgba(0,0,0,1)'); beam.addColorStop(0.5, 'rgba(0,0,0,0.75)'); beam.addColorStop(1, 'rgba(0,0,0,0.3)');
-            g.fillStyle = beam; g.fillRect(0, 0, W, H);
-            if (fall > 0) {
-                g.globalCompositeOperation = 'source-atop';
-                g.fillStyle = `rgba(150, 20, 8, ${0.75 * fall})`;
-                g.fillRect(0, 0, W, H);
-            }
-            g.globalCompositeOperation = 'source-over';
-        });
-
-        const dim = 1 - 0.8 * fall;
-        const glow = (layer) => {
-            ctx.save();
-            ctx.globalCompositeOperation = 'lighter';
-            ctx.globalAlpha = 0.55 * dim;
-            ctx.filter = `blur(${Math.round(14 * u)}px)`;
-            ctx.drawImage(layer, 0, 0);
-            ctx.filter = 'none';
-            ctx.globalAlpha = dim;
-            ctx.drawImage(layer, 0, 0);
-            ctx.restore();
-        };
-        glow(back);
-        // the shadow and its photon ring
-        ctx.fillStyle = '#000';
-        ctx.beginPath(); ctx.arc(cx, hy, sR, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = `hsla(${this.hue}, 60%, 85%, ${0.55 * dim})`;
-        ctx.lineWidth = 1.3 * u;
-        ctx.beginPath(); ctx.arc(cx, hy, sR * 1.025, 0, Math.PI * 2); ctx.stroke();
-        glow(front);
     }
 
     // ── Loop ─────────────────────────────────────────────────────────────────
@@ -480,56 +375,31 @@ class Horizon {
         const shake = (fall * 6 + this.s(t, P.hoverEnd - 4, P.hoverEnd) * 1.5) * u;
         ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
 
-        // ── Through the canopy ──
-        // Two things share the view. Above: the rest of the universe, squeezed
-        // into a shrinking disc, blueshifted while we hold, reddened in the
-        // fall. Below: the hole itself — its shadow grows until it fills the
-        // canopy, wrapped in an accretion disc in this hole's own colour, its
-        // far side lensed up over the top of the shadow.
-        const skyH = H * 0.64, cx = W / 2;
-        const mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
-        let col = mix([226, 232, 248], [150, 196, 255], hover);
-        col = mix(col, [255, 92, 48], fall);
-        const glow = (0.15 + 0.85 * hover) * (1 - 0.85 * fall);
-
-        // the hole and its disc
-        const grow = Math.pow(this.s(t, 0, P.hoverEnd), 1.6) + fall * 2.2;
-        const hy = skyH * (0.92 - 0.12 * grow);
-        const sR = W * (0.07 + 0.3 * grow);                 // shadow radius
-        this.drawDisc(ctx, W, H, cx, hy, sR, t * 0.35, fall, u);
-
-        // In the fall the shadow takes the whole view.
-        if (fall > 0) {
-            ctx.fillStyle = `rgba(0,0,0,${this.s(fall, 0.55, 1)})`;
-            ctx.fillRect(0, 0, W, skyH + 30 * u);
-        }
-
-        // the universe overhead, drawn last: it stays visible to the end,
-        // reddening and shrinking while the shadow swallows the rest
-        const uy = skyH * (0.34 - 0.16 * hover);
-        const UR = Math.min(W * 0.5, skyH * 0.62) * (1.05 - 0.85 * Math.pow(hover, 1.2)) * (1 - 0.92 * fall);
-        if (UR > 0.5) {
+        // ── Through the canopy: the ray-traced view ──
+        const skyH = H * 0.64;
+        const lw = 400, lh = Math.round(lw * (skyH + 20 * u) / W);
+        if (!h.falling) {
+            const x = this.logR1(t), lr = this.logRate(t);
+            const rho = 0.376 * Math.pow(0.1 / 0.376, this.s(t, 11, P.hoverEnd));
+            const img = this.rays.render(lw, lh, { logR1: x, gObs: Math.pow(10, Math.min(lr, 30)), rho }, t);
+            ctx.imageSmoothingEnabled = true;
+            ctx.drawImage(img, 0, 0, W, skyH + 20 * u);
+            if (t > P.hoverEnd - 0.2) {               // keep the last sight for the fall
+                if (!this.snapshot) { this.snapshot = document.createElement('canvas'); }
+                this.snapshot.width = lw; this.snapshot.height = lh;
+                this.snapshot.getContext('2d').drawImage(img, 0, 0);
+            }
+        } else if (this.snapshot) {
+            // Free fall: the cone of outside light widens a little (aberration
+            // for a falling observer), reddens and dims, and then it is gone.
+            const sc = 1 + 0.9 * fall;
+            const dw = W * sc, dh = (skyH + 20 * u) * sc;
             ctx.save();
-            ctx.translate(cx, uy);
-            ctx.scale(1 - 0.55 * fall, 1 + 1.6 * fall);
-            const g = ctx.createRadialGradient(0, 0, 0, 0, 0, UR);
-            g.addColorStop(0, `rgba(${col},${0.08 + 0.45 * glow})`);
-            g.addColorStop(0.8, `rgba(${col},${0.04 + 0.2 * glow})`);
-            g.addColorStop(1, `rgba(${col},0)`);
-            ctx.fillStyle = g;
-            ctx.beginPath(); ctx.arc(0, 0, UR, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = `rgb(${col})`;
-            this.viewStars.forEach(st => {
-                ctx.globalAlpha = Math.min(1, st.m * (0.5 + glow));
-                const size = (1 + glow * 1.4) * u;
-                ctx.fillRect(st.x * UR - size / 2, st.y * UR - size / 2, size, size);
-            });
-            ctx.globalAlpha = 1;
-            ctx.strokeStyle = `rgba(${col},${0.25 + 0.5 * glow})`;
-            ctx.lineWidth = (1 + 1.6 * glow) * u;
-            ctx.shadowColor = `rgba(${col},0.9)`; ctx.shadowBlur = 14 * glow * u;
-            ctx.beginPath(); ctx.arc(0, 0, UR * 1.03, 0, Math.PI * 2); ctx.stroke();
-            ctx.shadowBlur = 0;
+            ctx.globalAlpha = Math.max(0, 1 - fall * 1.15);
+            ctx.drawImage(this.snapshot, (W - dw) / 2, (skyH - dh) / 2, dw, dh);
+            ctx.globalCompositeOperation = 'multiply';
+            ctx.fillStyle = `rgb(255, ${Math.round(255 - 205 * fall)}, ${Math.round(255 - 230 * fall)})`;
+            ctx.fillRect(0, 0, W, skyH + 20 * u);
             ctx.restore();
         }
 
@@ -605,7 +475,7 @@ class Horizon {
         const spec = ctx.createLinearGradient(bx, 0, bx + bw, 0);
         spec.addColorStop(0, '#6b8cff'); spec.addColorStop(0.5, '#e8ecf8'); spec.addColorStop(1, '#ff4a2a');
         ctx.fillStyle = spec; ctx.fillRect(bx, by, bw, bh);
-        const shift = 0.5 - 0.42 * hover + 0.9 * fall;
+        const shift = h.falling ? 0.5 + 0.5 * fall : 0.5 - 0.5 * Math.min(1, h.lr / 4);
         ctx.fillStyle = '#fff'; ctx.fillRect(bx + bw * Math.min(1, shift) - 1.5 * u, by - 4 * u, 3 * u, bh + 8 * u);
         ctx.fillStyle = dimText; ctx.font = mono(9);
         ctx.fillText('BLUE', bx, by + bh + 13 * u);
@@ -640,15 +510,16 @@ class Horizon {
             this.el.rate.textContent = 'signal lost';
             this.el.cockpit.classList.add('is-falling');
         }
-        // r/r_s creeps toward 1 while holding, then crosses it.
         const hold = this.s(t, P.inEnd, P.hoverEnd);
         const inside = falling && t > P.hoverEnd + 2;
+        const x = this.logR1(t);
+        const radius = x > -3 ? `r = ${(1 + Math.pow(10, x)).toFixed(5)} rs` : `r = (1 + 10${this.sup(Math.round(x))}) rs`;
         const thrust = falling ? Math.max(0, 0.45 - (t - P.hoverEnd) * 0.5) * (Math.random() < 0.3 ? 0 : 1) : 0.5 + 0.48 * hold;
         this.hud = {
             lr: falling ? 22 : lr,
             thrust,
             falling,
-            radius: inside ? 'inside the horizon' : `r = ${(1 + Math.pow(10, -6 * hold) * 0.5).toFixed(8)} rs`,
+            radius: inside ? 'inside the horizon' : radius,
             status: falling ? 'engine failure · free fall' : t < P.inEnd ? 'descending' : 'holding position'
         };
     }
@@ -723,6 +594,217 @@ class Horizon {
             if (this.el.flash) this.el.flash.classList.add('is-fading');
             this.restoreCamera();
         }, 420);
+    }
+}
+
+// ── The view, ray-traced ────────────────────────────────────────────────────
+// Light is followed through Schwarzschild spacetime (units: rs = 1). Each
+// photon moves in a plane; its path obeys the Binet equation
+//   d²u/dφ² = −u + (3/2)u²,   u = 1/r,
+// started from a static observer at r_obs with impact parameter
+//   b = r sinα / √(1 − 1/r),  α = angle between the ray and the hole.
+// Paths are tabulated once per observer radius; each pixel then looks up where
+// its photon crosses the plane of the accretion disc (first, second, third
+// image), or whether it falls in (black) or escapes to the stars.
+//
+// The disc (3 ≤ r ≤ 10, the inner edge at the last stable orbit) glows in the
+// hole's own hue. Its light is shifted by g = √(1−1/r_e)/√(1−1/r_o) · δ, with
+// δ the Doppler factor of Keplerian orbits (v = √(1/(2(r−1))) in the local
+// static frame), and dims as g⁴. The approaching side is brighter and bluer.
+//
+// Nearer than the photon sphere (r < 1.5) the shadow covers more than half the
+// sky; at r → 1 everything outside — stars and disc alike — is squeezed into a
+// cone straight up of half-angle ≈ b_c·√(r−1), blueshifted by 1/√(1−1/r). The
+// camera turns from the hole to that cone and zooms to keep it in sight.
+class SchwarzschildView {
+    constructor(hue) {
+        this.hue = hue;
+        this.bc = 3 * Math.sqrt(3) / 2;       // critical impact parameter
+        this.rin = 3; this.rout = 10;
+        this.beta = 7 * Math.PI / 180;        // observer a little above the disc plane
+        this.n = [Math.sin(this.beta), Math.cos(this.beta), 0];
+        this.NA = 640; this.H = 0.02; this.MAXPHI = 12;
+        this.S = Math.ceil(this.MAXPHI / this.H) + 2;
+        this.rows = new Float32Array(this.NA * this.S);
+        this.ws = new Float32Array(this.NA * this.S);
+        this.end = new Float32Array(this.NA);
+        this.esc = new Float32Array(this.NA);
+        this.bs = new Float32Array(this.NA);
+        this.tableKey = null;
+        this.canvas = document.createElement('canvas');
+        this.base = this.hsl(hue, 0.9, 0.56);
+    }
+
+    hsl(h, s, l) {
+        h /= 360;
+        const f = n => {
+            const k = (n + h * 12) % 12;
+            return l - s * Math.min(l, 1 - l) * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+        };
+        return [f(0) * 255, f(8) * 255, f(4) * 255];
+    }
+
+    // Tabulate photon paths for the given observer and list of ray angles α.
+    build(rObs, alphaOf, key) {
+        if (this.tableKey === key) return;
+        this.tableKey = key;
+        const { NA, H, S, rows, ws, end, esc, bs } = this;
+        const sq = Math.sqrt(Math.max(1e-30, 1 - 1 / rObs));
+        const u0 = 1 / rObs;
+        for (let i = 0; i < NA; i++) {
+            const a = alphaOf(i);
+            const b = rObs * Math.sin(a) / sq;
+            bs[i] = b;
+            const off = i * S;
+            end[i] = 0; esc[i] = NaN;
+            if (b < 1e-6) {                          // straight down or straight up
+                if (a < Math.PI / 2) { end[i] = 0; } else { esc[i] = 0; end[i] = 0; }
+                rows[off] = rObs; continue;
+            }
+            let u = u0;
+            let w = Math.sqrt(Math.max(0, 1 / (b * b) - u * u * (1 - u))) * (a < Math.PI / 2 ? 1 : -1);
+            let phi = 0, k = 0;
+            rows[off] = 1 / u; ws[off] = w;
+            const acc = x => -x + 1.5 * x * x;
+            while (true) {
+                // RK4 on (u, w)
+                const k1u = w, k1w = acc(u);
+                const k2u = w + 0.5 * H * k1w, k2w = acc(u + 0.5 * H * k1u);
+                const k3u = w + 0.5 * H * k2w, k3w = acc(u + 0.5 * H * k2u);
+                const k4u = w + H * k3w, k4w = acc(u + H * k3u);
+                u += H / 6 * (k1u + 2 * k2u + 2 * k3u + k4u);
+                w += H / 6 * (k1w + 2 * k2w + 2 * k3w + k4w);
+                phi += H; k++;
+                if (u >= 1) { end[i] = phi; rows[off + k] = 1; break; }             // through the horizon
+                rows[off + k] = 1 / u; ws[off + k] = w;
+                if (u < 1 / 60 && w < 0) {                                          // away to the stars
+                    end[i] = phi; esc[i] = phi + Math.asin(Math.min(1, b * u)); break;
+                }
+                if (k >= S - 2) { end[i] = phi; break; }                            // circling the photon sphere
+            }
+        }
+    }
+
+    // Draws the canopy view into this.canvas (w × h) for the given state.
+    render(w, h, st, time) {
+        const c = this.canvas;
+        if (c.width !== w || c.height !== h) { c.width = w; c.height = h; this.img = null; }
+        const ctx = c.getContext('2d');
+        if (!this.img) this.img = ctx.createImageData(w, h);
+        const data = this.img.data;
+
+        const x = st.logR1;                       // log10(r − 1)
+        const rObs = 1 + Math.pow(10, x);
+        const zenith = x < -1.6;                  // the outside is a narrow cone overhead
+        const NA = this.NA, PI = Math.PI;
+        let fovHalf, ac, rho = 0;
+
+        if (!zenith) {
+            this.build(rObs, i => i / (NA - 1) * PI, 'g' + x.toFixed(3));
+            const sa = this.bc * Math.sqrt(1 - 1 / rObs) / rObs;
+            const ash = rObs > 1.5 ? Math.asin(Math.min(1, sa)) : PI - Math.asin(Math.min(1, sa));
+            ac = Math.max(0, Math.min(PI, (ash - 0.5) * 1.55));     // tilt up as the shadow grows
+            fovHalf = 62 * PI / 180;
+        } else {
+            // In the limit r → 1 the image inside the cone depends only on
+            // q = δ/δc, so one table, made just above the horizon, serves all.
+            const rt = 1 + 1e-6;
+            const dct = Math.asin(this.bc * Math.sqrt(1 - 1 / rt) / rt);
+            this.build(rt, i => PI - (i / (NA - 1)) * 1.25 * dct, 'z');
+            ac = PI;
+            rho = st.rho;
+        }
+        const ca = Math.cos(ac), sa = Math.sin(ac);
+        const C = [-ca, sa, 0], U = [sa, ca, 0], R = [0, 0, 1];
+        const n = this.n, S = this.S, H = this.H;
+        const { rows, ws, end, esc, bs } = this;
+        const gObs = st.gObs;                     // blueshift of everything outside, 1/√(1−1/r)
+        const base = this.base, rin = this.rin, rout = this.rout;
+        const skyTint = Math.min(1, Math.log10(gObs) / 4);
+        const glowObs = Math.min(3, 1 + Math.log10(gObs) * 0.35);
+        const aspect = h / w;
+
+        let p = 0;
+        for (let py = 0; py < h; py++) {
+            const ny = -((py + 0.5) / h * 2 - 1) * aspect;
+            for (let px = 0; px < w; px++, p += 4) {
+                const nx = (px + 0.5) / w * 2 - 1;
+                const rr = Math.hypot(nx, ny);
+                let row, e2x, e2y, e2z;
+                // direction of the tangential part of the ray (perpendicular to the radial axis)
+                const tx = R[0] * nx + U[0] * ny, ty = R[1] * nx + U[1] * ny, tz = R[2] * nx + U[2] * ny;
+                if (!zenith) {
+                    const th = rr * fovHalf;
+                    if (th > PI) { data[p + 3] = 255; data[p] = data[p + 1] = data[p + 2] = 0; continue; }
+                    const s = rr > 1e-9 ? Math.sin(th) / rr : 0, co = Math.cos(th);
+                    const dx = C[0] * co + tx * s, dy = C[1] * co + ty * s, dz = C[2] * co + tz * s;
+                    const cosA = Math.max(-1, Math.min(1, -dx));
+                    const a = Math.acos(cosA);
+                    row = Math.min(NA - 1, Math.round(a / PI * (NA - 1)));
+                    const m = Math.hypot(dy, dz) || 1;
+                    e2x = 0; e2y = dy / m; e2z = dz / m;
+                } else {
+                    const q = rr / rho;
+                    if (q > 1.25) { data[p] = data[p + 1] = data[p + 2] = 0; data[p + 3] = 255; continue; }
+                    row = Math.min(NA - 1, Math.round(q / 1.25 * (NA - 1)));
+                    const m = Math.hypot(ty, tz) || 1;
+                    e2x = 0; e2y = ty / m; e2z = tz / m;
+                }
+                const off = row * S, pe = end[row];
+                // crossings of the disc plane: cosφ(n·e1) + sinφ(n·e2) = 0
+                const A = n[0], B = n[1] * e2y + n[2] * e2z;
+                let phi = Math.atan2(-A, B);
+                while (phi <= 1e-3) phi += PI;
+                let rC = 0, gC = 0, bC = 0, hit = false;
+                for (let k = 0; k < 3 && phi < pe; k++, phi += PI) {
+                    const fi = phi / H, i0 = Math.floor(fi), fr = fi - i0;
+                    const r = rows[off + i0] * (1 - fr) + rows[off + i0 + 1] * fr;
+                    if (r < rin || r > rout) continue;
+                    // emitter position and orbital velocity
+                    const cph = Math.cos(phi), sph = Math.sin(phi);
+                    const Px = cph, Py = sph * e2y, Pz = sph * e2z;
+                    let vx = n[1] * Pz - n[2] * Py, vy = n[2] * Px - n[0] * Pz, vz = n[0] * Py - n[1] * Px;
+                    const vm = Math.hypot(vx, vy, vz) || 1; vx /= vm; vy /= vm; vz /= vm;
+                    // photon direction at emission, toward us: −dP/dφ
+                    const wv = ws[off + i0], rp = -r * r * wv;
+                    let kx = -(rp * cph - r * sph), ky = -(rp * sph + r * cph) * e2y, kz = -(rp * sph + r * cph) * e2z;
+                    const km = Math.hypot(kx, ky, kz) || 1; kx /= km; ky /= km; kz /= km;
+                    const v = Math.sqrt(0.5 / (r - 1));
+                    const gam = 1 / Math.sqrt(1 - v * v);
+                    const dop = 1 / (gam * (1 - v * (vx * kx + vy * ky + vz * kz)));
+                    const g = Math.sqrt(1 - 1 / r) * dop * gObs;
+                    // emissivity: thin-disc-like profile, with streaks that orbit
+                    const az = Math.atan2(Pz, Px * Math.cos(this.beta) - Py * Math.sin(this.beta));
+                    const om = time * 2.2 * Math.pow(r / 3, -1.5);
+                    const streak = 0.62 + 0.24 * Math.sin(az * 6 + 7 * Math.log(r) - om) + 0.14 * Math.sin(az * 17 - 11 * r - om * 1.7);
+                    const em = Math.pow(rin / r, 3) * (1 - Math.sqrt(rin / r) * 0.92) * 9 * streak;
+                    const I = em * Math.min(1e3, Math.pow(Math.min(g, 6), 4)) / (1 + k * 0.6);
+                    const L = 1 - Math.exp(-I * 1.6);
+                    const lg = Math.log2(Math.max(1e-3, g));
+                    let cr = base[0], cg = base[1], cb = base[2];
+                    if (lg > 0) { const m2 = Math.min(0.8, lg / 2.6); cr += (238 - cr) * m2; cg += (242 - cg) * m2; cb += (255 - cb) * m2; }
+                    else { const m2 = Math.min(1, -lg / 1.8); cr += (255 - cr) * m2; cg += (50 - cg) * m2; cb += (24 - cb) * m2; }
+                    rC = cr * L; gC = cg * L; bC = cb * L; hit = true;
+                    break;
+                }
+                if (!hit && !isNaN(esc[row])) {
+                    // escaped: the star it came from
+                    const pf = esc[row], c2 = Math.cos(pf), s2 = Math.sin(pf);
+                    const Sx = c2, Sy = s2 * e2y, Sz = s2 * e2z;
+                    const lat = Math.asin(Math.max(-1, Math.min(1, Sx))), lon = Math.atan2(Sz, Sy);
+                    const ci = Math.floor((lat + 1.6) / 0.0055), cj = Math.floor((lon + PI) * Math.cos(lat) / 0.0055);
+                    let hsh = Math.sin(ci * 127.1 + cj * 311.7) * 43758.5453; hsh -= Math.floor(hsh);
+                    let star = hsh < 0.006 ? (0.3 + 0.7 * (hsh / 0.006)) : 0;
+                    const band = 0.09 * Math.exp(-Math.pow(Sx * 0.3 + Sy * 0.5 + Sz * 0.81, 2) / 0.03);
+                    const lum = Math.min(1, (star + band + 0.015) * glowObs);
+                    const cr = 230 - 70 * skyTint, cg = 236 - 40 * skyTint, cb = 250;
+                    rC = cr * lum; gC = cg * lum; bC = cb * lum;
+                }
+                data[p] = rC; data[p + 1] = gC; data[p + 2] = bC; data[p + 3] = 255;
+            }
+        }
+        ctx.putImageData(this.img, 0, 0);
+        return c;
     }
 }
 
