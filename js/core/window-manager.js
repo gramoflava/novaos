@@ -738,6 +738,7 @@ class WindowManagerClass {
         bh.className = 'nova-blackhole-container';
 
         const hue = Math.floor(Math.random() * 360);
+        bh.dataset.hue = hue; // the disc's colour, reused by the End of times view
         const gradId = 'discGrad-' + id;
 
         bh.innerHTML = `

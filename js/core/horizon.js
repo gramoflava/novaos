@@ -68,10 +68,15 @@ class Horizon {
     }
 
     // ── Start and finish ─────────────────────────────────────────────────────
-    play(onDone) {
+    // opts.hue: the colour of the hole being entered (hue-rotation of the
+    // standard orange disc, as in WindowManager). play() alone works too.
+    play(opts, onDone) {
+        if (typeof opts === 'function') { onDone = opts; opts = {}; }
+        opts = opts || {};
         if (this.running) return;
         this.running = true;
         this.onDone = onDone || null;
+        this.hue = ((opts.hue || 0) + 24) % 360;  // base disc orange ≈ 24°
         this.t = 0;
         this.homeSeconds = 0;
         this.startDate = new Date();
@@ -82,7 +87,9 @@ class Horizon {
 
         this.buildDom();
         this.collectDesktop();
+        this.planZoom();
         this.makeStars();
+        this.discTex = null;
         this.music = new HorizonScore();
         this.music.start();
 
@@ -231,6 +238,116 @@ class Horizon {
         });
     }
 
+    // A top-down accretion disc in this hole's colour, drawn once: a soft
+    // annulus, white-hot at the inner edge, and hundreds of thin filaments.
+    makeDiscTexture() {
+        const N = 1024, c = document.createElement('canvas');
+        c.width = c.height = N;
+        const g = c.getContext('2d'), m = N / 2;
+        const rin = N * 0.17, rout = N * 0.5;
+        const base = g.createRadialGradient(m, m, rin, m, m, rout);
+        base.addColorStop(0, `hsla(${this.hue}, 30%, 96%, 0.95)`);
+        base.addColorStop(0.08, `hsla(${this.hue}, 95%, 72%, 0.75)`);
+        base.addColorStop(0.45, `hsla(${this.hue}, 90%, 50%, 0.35)`);
+        base.addColorStop(1, `hsla(${this.hue}, 90%, 40%, 0)`);
+        g.fillStyle = base;
+        g.beginPath(); g.arc(m, m, rout, 0, Math.PI * 2); g.arc(m, m, rin, 0, Math.PI * 2, true); g.fill('evenodd');
+        g.globalCompositeOperation = 'lighter';
+        for (let i = 0; i < 1400; i++) {
+            const k = Math.pow(Math.random(), 1.7);            // denser toward the inside
+            const r = rin + (rout - rin) * k;
+            const a = Math.random() * Math.PI * 2, len = 0.15 + Math.random() * 1.6;
+            const hot = 1 - k;
+            g.strokeStyle = `hsla(${this.hue + (Math.random() - 0.5) * 18}, ${40 + 55 * k}%, ${55 + 40 * hot}%, ${0.04 + 0.22 * Math.random() * (0.4 + hot)})`;
+            g.lineWidth = 0.6 + Math.random() * 2.4;
+            g.beginPath(); g.arc(m, m, r, a, a + len); g.stroke();
+        }
+        g.strokeStyle = 'rgba(255,255,255,0.45)';           // innermost stable orbit
+        g.lineWidth = 3;
+        g.beginPath(); g.arc(m, m, rin + 2, 0, Math.PI * 2); g.stroke();
+        this.discTex = c;
+        this.layers = [document.createElement('canvas'), document.createElement('canvas')];
+    }
+
+    // Draws the disc as seen nearly edge-on, with the hole between its halves:
+    // the far half and its lensed image (an arc thrown over the top of the
+    // shadow, and a faint secondary arc under it) go behind the shadow, the
+    // near half in front. The approaching side is brighter (Doppler beaming).
+    drawDisc(ctx, W, H, cx, hy, sR, spin, fall, u) {
+        if (!this.discTex) this.makeDiscTexture();
+        const tex = this.discTex, T = tex.width;
+        const [back, front] = this.layers;
+        [back, front].forEach(l => { if (l.width !== W || l.height !== H) { l.width = W; l.height = H; } });
+        const b = back.getContext('2d'), f = front.getContext('2d');
+        b.setTransform(1, 0, 0, 1, 0, 0); b.clearRect(0, 0, W, H);
+        f.setTransform(1, 0, 0, 1, 0, 0); f.clearRect(0, 0, W, H);
+        const D = sR * 7.6;                                   // disc diameter: inner edge (0.34·D/2) ≈ 1.3× the shadow
+        const flat = 0.13;
+
+        const flatDisc = (g, half) => {
+            g.save();
+            g.beginPath();
+            if (half === 'far') g.rect(0, 0, W, hy); else g.rect(0, hy, W, H - hy);
+            g.clip();
+            g.translate(cx, hy); g.scale(1, flat); g.rotate(spin);
+            g.drawImage(tex, -D / 2, -D / 2, D, D);
+            g.restore();
+        };
+        // lensed images of the far side: almost circular arcs hugging the shadow
+        const lensed = (g, top, scale, alpha) => {
+            g.save();
+            g.beginPath();
+            if (top) g.rect(0, 0, W, hy); else g.rect(0, hy, W, H - hy);
+            g.clip();
+            g.globalAlpha = alpha;
+            g.translate(cx, hy); g.scale(1, top ? 0.92 : 0.82); g.rotate(-spin);
+            const L = sR * scale;
+            g.drawImage(tex, -L / 2, -L / 2, L, L);
+            g.restore();
+        };
+        b.globalCompositeOperation = 'lighter';
+        lensed(b, true, 3.3, 0.85);
+        lensed(b, false, 2.6, 0.35);
+        flatDisc(b, 'far');
+        f.globalCompositeOperation = 'lighter';
+        flatDisc(f, 'near');
+
+        // Doppler beaming and, in the fall, a deep red shift
+        [b, f].forEach(g => {
+            g.globalCompositeOperation = 'destination-in';
+            const beam = g.createLinearGradient(cx - D / 2, 0, cx + D / 2, 0);
+            beam.addColorStop(0, 'rgba(0,0,0,1)'); beam.addColorStop(0.5, 'rgba(0,0,0,0.75)'); beam.addColorStop(1, 'rgba(0,0,0,0.3)');
+            g.fillStyle = beam; g.fillRect(0, 0, W, H);
+            if (fall > 0) {
+                g.globalCompositeOperation = 'source-atop';
+                g.fillStyle = `rgba(150, 20, 8, ${0.75 * fall})`;
+                g.fillRect(0, 0, W, H);
+            }
+            g.globalCompositeOperation = 'source-over';
+        });
+
+        const dim = 1 - 0.8 * fall;
+        const glow = (layer) => {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.globalAlpha = 0.55 * dim;
+            ctx.filter = `blur(${Math.round(14 * u)}px)`;
+            ctx.drawImage(layer, 0, 0);
+            ctx.filter = 'none';
+            ctx.globalAlpha = dim;
+            ctx.drawImage(layer, 0, 0);
+            ctx.restore();
+        };
+        glow(back);
+        // the shadow and its photon ring
+        ctx.fillStyle = '#000';
+        ctx.beginPath(); ctx.arc(cx, hy, sR, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = `hsla(${this.hue}, 60%, 85%, ${0.55 * dim})`;
+        ctx.lineWidth = 1.3 * u;
+        ctx.beginPath(); ctx.arc(cx, hy, sR * 1.025, 0, Math.PI * 2); ctx.stroke();
+        glow(front);
+    }
+
     // ── Loop ─────────────────────────────────────────────────────────────────
     frame(now) {
         const dt = Math.min(0.05, (now - this.last) / 1000);
@@ -244,11 +361,14 @@ class Horizon {
         const ly = Math.log10(Math.max(years, 1e-9));
 
         this.music.update(t, this.logRate(t));
-        this.updateHome(t, ly, dt);
-        if (this.view.offsetWidth * this.dpr !== this.view.width || this.view.offsetHeight * this.dpr !== this.view.height) this.resize();
-        this.drawSky(t, ly, dt);
-        this.updateCockpit(t, years, ly);
-        this.drawView(t);
+        if (!this.flashed) {
+            this.zoomOut(t);
+            this.updateHome(t, ly, dt);
+            if (this.view.offsetWidth * this.dpr !== this.view.width || this.view.offsetHeight * this.dpr !== this.view.height) this.resize();
+            this.drawSky(t, ly, dt);
+            this.updateCockpit(t, years, ly);
+            this.drawView(t);
+        }
 
         if (t >= P.darkEnd && !this.flashed) this.flash();
         if (t >= P.end) { this.finish(); return; }
@@ -360,36 +480,55 @@ class Horizon {
         const shake = (fall * 6 + this.s(t, P.hoverEnd - 4, P.hoverEnd) * 1.5) * u;
         ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
 
-        // ── Sky through the canopy ──
-        const skyH = H * 0.64, cx = W / 2, cy = skyH * 0.5;
-        const base = Math.min(W * 0.36, skyH * 0.46);
-        const R = base * (1.05 - 0.86 * Math.pow(hover, 1.3)) * (1 - 0.92 * fall);
+        // ── Through the canopy ──
+        // Two things share the view. Above: the rest of the universe, squeezed
+        // into a shrinking disc, blueshifted while we hold, reddened in the
+        // fall. Below: the hole itself — its shadow grows until it fills the
+        // canopy, wrapped in an accretion disc in this hole's own colour, its
+        // far side lensed up over the top of the shadow.
+        const skyH = H * 0.64, cx = W / 2;
         const mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
         let col = mix([226, 232, 248], [150, 196, 255], hover);
         col = mix(col, [255, 92, 48], fall);
         const glow = (0.15 + 0.85 * hover) * (1 - 0.85 * fall);
-        if (R > 0.5) {
+
+        // the hole and its disc
+        const grow = Math.pow(this.s(t, 0, P.hoverEnd), 1.6) + fall * 2.2;
+        const hy = skyH * (0.92 - 0.12 * grow);
+        const sR = W * (0.07 + 0.3 * grow);                 // shadow radius
+        this.drawDisc(ctx, W, H, cx, hy, sR, t * 0.35, fall, u);
+
+        // In the fall the shadow takes the whole view.
+        if (fall > 0) {
+            ctx.fillStyle = `rgba(0,0,0,${this.s(fall, 0.55, 1)})`;
+            ctx.fillRect(0, 0, W, skyH + 30 * u);
+        }
+
+        // the universe overhead, drawn last: it stays visible to the end,
+        // reddening and shrinking while the shadow swallows the rest
+        const uy = skyH * (0.34 - 0.16 * hover);
+        const UR = Math.min(W * 0.5, skyH * 0.62) * (1.05 - 0.85 * Math.pow(hover, 1.2)) * (1 - 0.92 * fall);
+        if (UR > 0.5) {
             ctx.save();
-            ctx.translate(cx, cy);
-            ctx.scale(1 - 0.55 * fall, 1 + 1.6 * fall);  // tidal stretch
-            const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
-            g.addColorStop(0, `rgba(${col},${0.10 + 0.5 * glow})`);
-            g.addColorStop(0.8, `rgba(${col},${0.05 + 0.25 * glow})`);
+            ctx.translate(cx, uy);
+            ctx.scale(1 - 0.55 * fall, 1 + 1.6 * fall);
+            const g = ctx.createRadialGradient(0, 0, 0, 0, 0, UR);
+            g.addColorStop(0, `rgba(${col},${0.08 + 0.45 * glow})`);
+            g.addColorStop(0.8, `rgba(${col},${0.04 + 0.2 * glow})`);
             g.addColorStop(1, `rgba(${col},0)`);
             ctx.fillStyle = g;
-            ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(0, 0, UR, 0, Math.PI * 2); ctx.fill();
             ctx.fillStyle = `rgb(${col})`;
             this.viewStars.forEach(st => {
                 ctx.globalAlpha = Math.min(1, st.m * (0.5 + glow));
                 const size = (1 + glow * 1.4) * u;
-                ctx.fillRect(st.x * R - size / 2, st.y * R - size / 2, size, size);
+                ctx.fillRect(st.x * UR - size / 2, st.y * UR - size / 2, size, size);
             });
             ctx.globalAlpha = 1;
-            ctx.strokeStyle = `rgba(${col},${0.35 + 0.5 * glow})`;
-            ctx.lineWidth = (1.2 + 2 * glow) * u;
-            ctx.shadowColor = `rgba(${col},0.9)`;
-            ctx.shadowBlur = 18 * glow * u;
-            ctx.beginPath(); ctx.arc(0, 0, R * 1.04, 0, Math.PI * 2); ctx.stroke();
+            ctx.strokeStyle = `rgba(${col},${0.25 + 0.5 * glow})`;
+            ctx.lineWidth = (1 + 1.6 * glow) * u;
+            ctx.shadowColor = `rgba(${col},0.9)`; ctx.shadowBlur = 14 * glow * u;
+            ctx.beginPath(); ctx.arc(0, 0, UR * 1.03, 0, Math.PI * 2); ctx.stroke();
             ctx.shadowBlur = 0;
             ctx.restore();
         }
@@ -531,6 +670,45 @@ class Horizon {
         return String(n).split('').map(c => map[c] || c).join('');
     }
 
+    // Pull the camera back so windows that were off screen come into view and
+    // age in front of the player. Nothing to show: the camera stays put.
+    planZoom() {
+        const WM = window.WindowManager;
+        this.cam = WM ? { x: WM.cameraX, y: WM.cameraY, z: WM.cameraZ } : null;
+        this.camTo = null;
+        if (!WM || WM.isMobile() || !this.windows.length) return;
+        const Z = WM.cameraZ, W = innerWidth, H = innerHeight;
+        let x0 = -WM.cameraX / Z, y0 = -WM.cameraY / Z, x1 = x0 + W / Z, y1 = y0 + H / Z;
+        const vx0 = x0, vy0 = y0, vx1 = x1, vy1 = y1;
+        this.windows.forEach(w => {
+            const d = w.el.dataset;
+            const a = parseFloat(d.x), b = parseFloat(d.y), c = a + parseFloat(d.w), e = b + parseFloat(d.h);
+            x0 = Math.min(x0, a); y0 = Math.min(y0, b); x1 = Math.max(x1, c); y1 = Math.max(y1, e);
+        });
+        if (x0 >= vx0 && y0 >= vy0 && x1 <= vx1 && y1 <= vy1) return; // all in view already
+        const pad = 80;
+        const z = Math.max(0.2, Math.min(Z, W / (x1 - x0 + pad * 2 / Z), H / (y1 - y0 + pad * 2 / Z)));
+        const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+        this.camTo = { x: W / 2 - mx * z, y: H / 2 - my * z, z };
+    }
+
+    zoomOut(t) {
+        if (!this.camTo) return;
+        const k = this.s(t, 1.5, 11);
+        const WM = window.WindowManager, a = this.cam, b = this.camTo;
+        WM.cameraZ = a.z + (b.z - a.z) * k;
+        WM.cameraX = a.x + (b.x - a.x) * k;
+        WM.cameraY = a.y + (b.y - a.y) * k;
+        WM.applyCameraTransform();
+    }
+
+    restoreCamera() {
+        const WM = window.WindowManager;
+        if (!WM || !this.cam) return;
+        WM.cameraX = this.cam.x; WM.cameraY = this.cam.y; WM.cameraZ = this.cam.z;
+        WM.applyCameraTransform();
+    }
+
     // White flash; under it the desktop is put back, then the light fades.
     flash() {
         this.flashed = true;
@@ -543,7 +721,7 @@ class Horizon {
                 if (n) n.remove();
             });
             if (this.el.flash) this.el.flash.classList.add('is-fading');
-            this.drawSky = this.drawView = this.updateHome = this.updateCockpit = () => {};
+            this.restoreCamera();
         }, 420);
     }
 }
@@ -634,18 +812,26 @@ class HorizonScore {
         });
     }
 
-    tick(at, strength) {
+    // A clock's tick-tock: two short wooden knocks, alternating pitch and side.
+    // As the home clock races the knocks climb in pitch; in the fall they
+    // stretch apart and sink — the clock seen through a redshift.
+    tick(at, strength, pitch) {
         const ctx = this.ctx;
-        const n = ctx.createBufferSource();
-        const len = Math.floor(ctx.sampleRate * 0.03);
-        const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-        const d = buf.getChannelData(0);
-        for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 6);
-        n.buffer = buf;
-        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = 2400; bp.Q.value = 6;
-        const g = ctx.createGain(); g.gain.value = 0.18 * strength;
-        n.connect(bp); bp.connect(g); g.connect(this.out);
-        n.start(at);
+        this.tock = !this.tock;
+        const f = (this.tock ? 1320 : 990) * pitch;
+        const o = ctx.createOscillator();
+        o.type = 'triangle';
+        o.frequency.setValueAtTime(f * 1.6, at);
+        o.frequency.exponentialRampToValueAtTime(f, at + 0.012);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.exponentialRampToValueAtTime(0.22 * strength, at + 0.002);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + 0.07);
+        const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+        o.connect(g);
+        if (pan) { pan.pan.value = this.tock ? -0.35 : 0.35; g.connect(pan); pan.connect(this.out); pan.connect(this.reverb); }
+        else { g.connect(this.out); g.connect(this.reverb); }
+        o.start(at); o.stop(at + 0.09);
     }
 
     // Called every frame with scene time and log10(home rate).
@@ -663,12 +849,19 @@ class HorizonScore {
             }
             this.nextChord++;
         }
-        // The tick follows the home clock: once a second at first, a blur at the end.
+        // The tick follows the home clock: about once a second at first, a
+        // blur at the end of the hold; in the fall it slows, sinks and stops.
         if (t < 28) {
-            const interval = Math.max(0.055, 0.95 / (1 + logRate * 0.55));
+            const interval = Math.max(0.05, 0.9 / (1 + logRate * 0.6));
             while (this.nextTick < t + 0.25 && this.nextTick < 28) {
-                this.tick(this.t0 + this.nextTick, 0.5 + logRate / 30);
+                this.tick(this.t0 + this.nextTick, 0.55 + logRate / 40, 1 + logRate / 22);
                 this.nextTick += interval;
+            }
+        } else {
+            while (this.nextTick < t + 0.25 && this.nextTick < 33.5) {
+                const k = (this.nextTick - 28) / 5.5;            // 0→1 through the fall
+                this.tick(this.t0 + this.nextTick, 0.9 * (1 - k), 2 * Math.pow(0.12, k));
+                this.nextTick += 0.05 + 1.4 * k * k;
             }
         }
     }

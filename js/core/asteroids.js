@@ -220,7 +220,7 @@ class AsteroidsGame {
         const list = [];
         WindowManager.activeBlackHoles.forEach(bh => {
             if (bh.style.opacity === '0') return;
-            list.push({ x: parseFloat(bh.style.left), y: parseFloat(bh.style.top) });
+            list.push({ x: parseFloat(bh.style.left), y: parseFloat(bh.style.top), hue: parseFloat(bh.dataset.hue) || 0 });
         });
         return list;
     }
@@ -555,7 +555,7 @@ class AsteroidsGame {
 
     lostToHole(h) {
         if (window.NovaHorizon && NovaHorizon.roll()) {
-            this.enterHorizon();
+            this.enterHorizon(h);
             return;
         }
         if (!this.phantomsOn()) { this.crash('hole'); return; }
@@ -610,12 +610,12 @@ class AsteroidsGame {
 
     // The Horizon ends the game whatever lives are left. The game freezes
     // underneath, then shows "Game over" once the player wakes up.
-    enterHorizon() {
+    enterHorizon(hole) {
         this.state = 'over';
         this.keys.clear();
         if (this.canvas) this.canvas.classList.add('is-hidden');
         if (this.hud) this.hud.classList.add('is-hidden');
-        NovaHorizon.play(() => {
+        NovaHorizon.play({ hue: hole ? hole.hue : 0 }, () => {
             if (this.canvas) this.canvas.classList.remove('is-hidden');
             if (this.hud) this.hud.classList.remove('is-hidden');
             this.rocks = []; this.bullets = []; this.particles = []; this.trail = []; this.phantoms = [];
@@ -663,7 +663,7 @@ class AsteroidsGame {
     // Keep the ship inside the middle of the screen, leading slightly in the
     // direction of travel. The camera moves only when the ship leaves that box.
     followCamera(dt) {
-        if (!this.ship) return;
+        if (!this.ship || (window.NovaHorizon && NovaHorizon.running)) return;
         const Z = WindowManager.cameraZ;
         const s = this.ship;
         const sx = WindowManager.cameraX + (s.x + s.vx * 0.25) * Z;
