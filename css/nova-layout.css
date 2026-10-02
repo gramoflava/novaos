@@ -581,8 +581,15 @@
     font-weight: 500;
 }
 
-.settings-row .hint {
+.settings-row .hint,
+.settings-card--egg .hint {
     color: var(--text-secondary);
+}
+
+.settings-card--egg .hint { margin-top: var(--space-1); }
+
+@media (max-width: 640px) {
+    .settings-card--egg { display: none; }
 }
 
 .settings-version {

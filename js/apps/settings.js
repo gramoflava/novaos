@@ -24,6 +24,11 @@ Apps.register({
                     </div>
                 </div>
 
+                <div class="settings-card settings-card--egg">
+                    <div class="settings-label">Something is out there</div>
+                    <div class="hint">The oldest cheat code in gaming still works on this desktop.</div>
+                </div>
+
                 <div class="settings-version">
                     Nova OS v1.0<br>
                     Running on JS FileSystem
@@ -36,7 +41,7 @@ Apps.register({
             appId: 'settings',
             title: 'Settings',
             width: 480,
-            height: 380,
+            height: 460,
             content: html
         });
     }

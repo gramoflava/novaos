@@ -100,3 +100,80 @@
   from { transform: translate(-50%, -50%) scale(0.9) rotate(0deg); opacity: 0.6; }
   to { transform: translate(-50%, -50%) scale(1.1) rotate(25deg); opacity: 1; }
 }
+
+/* ── Nova Asteroids (js/core/asteroids.js) ───────────────────────────────── */
+.ast-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+
+.ast-hud {
+  position: fixed;
+  top: 76px;
+  left: 50%;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 6px 16px;
+  transform: translateX(-50%);
+  color: var(--text-secondary);
+  background: var(--glass);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-md), var(--glass-edge);
+  backdrop-filter: blur(var(--blur-bar)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--blur-bar)) saturate(150%);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.ast-hud__score {
+  min-width: 4ch;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ast-hud__lives { display: inline-flex; gap: 3px; }
+.ast-hud__lives svg { width: 14px; height: 14px; fill: var(--accent); }
+.ast-hud__help { color: var(--text-muted); }
+
+.ast-banner {
+  position: fixed;
+  top: 38%;
+  left: 50%;
+  z-index: 1001;
+  transform: translate(-50%, -50%);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 24px color-mix(in srgb, var(--bg) 80%, transparent);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ast-banner.is-shown { animation: ast-banner 1.6s var(--ease-out) both; }
+
+@keyframes ast-banner {
+  0%   { opacity: 0; transform: translate(-50%, -40%); }
+  15%  { opacity: 1; transform: translate(-50%, -50%); }
+  70%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -56%); }
+}
+
+/* While playing, the desktop is a playfield: no grab cursor for panning. */
+body.is-asteroids { cursor: default; }
+
+/* The game-over prompt sits on the desktop, not in a window. */
+body > .score-prompt-overlay { position: fixed; z-index: 3000; }
+.score-prompt-overlay .score-prompt-input { width: 100px; }

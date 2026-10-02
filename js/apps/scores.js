@@ -25,6 +25,7 @@ Apps.register({
                     <div class="scores-menu-item" data-game="columns-classic">Columns</div>
                     <div class="scores-menu-item" data-game="wordl-5">Wordl</div>
                     <div class="scores-menu-item" data-game="novarun-lunar">Nova Run</div>
+                    ${window.Scores && Scores.getTopScores('asteroids').length ? '<div class="scores-menu-item" data-game="asteroids">Asteroids</div>' : ''}
                 </div>
                 <div class="scores-content" id="scores-content-${winId}">
                     <!-- Scores injected here -->
@@ -50,7 +51,8 @@ Apps.register({
             'colorlines': 'Color Lines',
             'columns': 'Columns',
             'wordl': 'Wordl',
-            'novarun': 'Nova Run'
+            'novarun': 'Nova Run',
+            'asteroids': 'Asteroids'
         };
 
         const renderScores = (gameId) => {
