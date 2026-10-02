@@ -121,6 +121,9 @@ Apps.register({
     let animationFrame = 0;
     let starScroll = 0;
     let ridgeScroll = 0;
+    // The far ridge keeps its own counter. Deriving it from ridgeScroll (which
+    // wraps every tile) made it jump by half a tile at each wrap.
+    let farRidgeScroll = 0;
     let lunarGroundScroll = 0;
     let classicGroundScroll = 0;
     let cloudScroll = 0;
@@ -617,6 +620,7 @@ Apps.register({
       distanceRan += worldStep;
       starScroll = (starScroll + worldStep * 0.015) % WIDTH;
       ridgeScroll = (ridgeScroll + worldStep * 0.025) % RIDGE_TILE_WIDTH;
+      farRidgeScroll = (farRidgeScroll + worldStep * 0.025 * 0.52) % RIDGE_TILE_WIDTH;
       lunarGroundScroll = (lunarGroundScroll + worldStep * 0.34) % 54;
       classicGroundScroll = (classicGroundScroll + worldStep) % 34;
       cloudScroll = (cloudScroll + worldStep * 0.045) % (WIDTH + 160);
@@ -708,9 +712,8 @@ Apps.register({
         }
       };
 
-      const farRidgeScroll = (ridgeScroll * 0.52 + RIDGE_TILE_WIDTH * 0.37) % RIDGE_TILE_WIDTH;
       drawRidgeLayer(
-        farRidgeScroll,
+        (farRidgeScroll + RIDGE_TILE_WIDTH * 0.37) % RIDGE_TILE_WIDTH,
         0.78,
         palette.dark ? 'rgba(56, 189, 248, 0.11)' : 'rgba(30, 64, 175, 0.16)'
       );
