@@ -30,8 +30,8 @@
     <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="apple-touch-icon.png" sizes="180x180">
+    <script defer src="gramofdesign/tools.js"></script>
     <script defer src="gramofdesign/theme.js"></script>
-    <script defer src="gramofdesign/kofi.js"></script>
 </head>
 <body>
     <div id="nova-background" class="cosmos">
@@ -66,21 +66,10 @@
                     <span id="island-clock" class="island-clock">---</span>
                 </div>
                 <div class="island-right">
-                    <button class="island-btn" id="btn-support" type="button" data-kofi title="Support my work" aria-label="Support my work" aria-expanded="false">
-                        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14c.83 .642 2.077 1.017 3.5 1c1.423 .017 2.67 -.358 3.5 -1c.83 -.642 2.077 -1.017 3.5 -1c1.423 -.017 2.67 .358 3.5 1"></path><path d="M8 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2M12 3a2.4 2.4 0 0 0 -1 2a2.4 2.4 0 0 0 1 2"></path><path d="M3 10h14v5a6 6 0 0 1 -6 6H9a6 6 0 0 1 -6 -6v-5zM16.746 16.726a3 3 0 1 0 .252 -5.555"></path></svg>
-                    </button>
                     <button class="island-btn" id="btn-mute" aria-label="Audio Toggle">
                         <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 8a5 5 0 0 1 0 8M17.7 5a9 9 0 0 1 0 14M6 15h-2a1 1 0 0 1 -1 -1v-4a1 1 0 0 1 1 -1h2l4 -4v14z"></path></svg>
                     </button>
-                    <div class="segmented segmented--icon island-theme" role="group" aria-label="Color theme" data-theme-switch>
-                        <button class="segmented__btn" type="button" data-theme="light" aria-label="Light" title="Light" aria-pressed="false">
-                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M6.343 17.657l-1.414 1.414M6.343 6.343L4.929 4.929M17.657 6.343l1.414 -1.414M17.657 17.657l1.414 1.414M12 20v2M12 2v2M20 12h2M2 12h2"></path></svg>
-                        </button>
-                        <button class="segmented__btn" type="button" data-theme="auto" aria-label="Auto" title="Auto" aria-pressed="false"><span>A</span></button>
-                        <button class="segmented__btn" type="button" data-theme="dark" aria-label="Dark" title="Dark" aria-pressed="false">
-                            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3h.393a7.5 7.5 0 0 0 7.92 12.446A9 9 0 1 1 12 2.992z"></path></svg>
-                        </button>
-                    </div>
+                    <div class="site-tools island-tools" data-site-tools></div>
                 </div>
             </div>
         </div>

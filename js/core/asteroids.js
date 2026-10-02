@@ -212,11 +212,28 @@ class AsteroidsGame {
     nextWave() {
         this.wave++;
         this.waveSpeed = 1 + (this.wave - 1) * 0.12;
-        const count = 3 + this.wave;
+        // The wave fills the view: zoomed out, the same density needs more rocks.
+        this.waveArea = this.areaFactor();
+        const count = Math.round((3 + this.wave) * this.waveArea);
         for (let i = 0; i < count; i++) this.spawnRock(0);
         this.showBanner(`Wave ${this.wave}`);
         if (this.hud) this.hud.querySelector('.ast-hud__wave').textContent = `Wave ${this.wave}`;
-        this.waveSpeed = 1 + (this.wave - 1) * 0.12;
+    }
+
+    // Visible world area relative to a 1440×900 view at 100% zoom (never < 1).
+    areaFactor() {
+        const v = this.view();
+        return Math.max(1, (v.w * v.h) / (1440 * 900));
+    }
+
+    // Zooming out mid-wave tops the field up to the same density.
+    topUpForZoom() {
+        const f = this.areaFactor();
+        if (f > this.waveArea * 1.15) {
+            const extra = Math.round((3 + this.wave) * (f - this.waveArea));
+            for (let i = 0; i < extra; i++) this.spawnRock(0);
+            this.waveArea = f;
+        }
     }
 
     // A rock enters from just outside the view, heading roughly at the ship.
@@ -284,7 +301,7 @@ class AsteroidsGame {
         const holes = this.holes();
         const s = this.ship;
 
-        if ((this.colorTimer -= dt) <= 0) { this.readColors(); this.colorTimer = 0.5; }
+        if ((this.colorTimer -= dt) <= 0) { this.readColors(); this.topUpForZoom(); this.colorTimer = 0.5; }
 
         // Ship
         if (this.state === 'play') {
