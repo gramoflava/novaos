@@ -358,15 +358,14 @@ class Horizon {
         ctx.globalAlpha = 1;
     }
 
-    // Pilot's view: the canopy, the sky beyond it, and the dashboard below.
-    // Outside, the sky is a disc overhead ringed by light skimming the photon
-    // sphere; everything else is the shadow of the hole.
+    // Pilot's view. The whole window is the outside, ray-traced; the craft is
+    // only its white wireframe — the same lines as the ship in the game — and
+    // the few readouts sit small in the corners.
     drawView(t) {
         const P = Horizon.P;
         const ctx = this.view.getContext('2d');
         const W = this.view.width, H = this.view.height, u = W / 760;
-        const hover = this.s(t, P.inEnd, P.hoverEnd);   // 0→1 while holding position
-        const fall = this.s(t, P.hoverEnd, P.fallEnd);   // 0→1 in free fall
+        const fall = this.s(t, P.hoverEnd, P.fallEnd);
         const h = this.hud;
 
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -375,127 +374,100 @@ class Horizon {
         const shake = (fall * 6 + this.s(t, P.hoverEnd - 4, P.hoverEnd) * 1.5) * u;
         ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
 
-        // ── Through the canopy: the ray-traced view ──
-        const skyH = H * 0.64;
-        const lw = 400, lh = Math.round(lw * (skyH + 20 * u) / W);
+        // ── Outside ──
+        // Resolution follows the machine: aim for ~10 ms per frame.
+        this.lw = this.lw || 420;
+        const lw = Math.round(this.lw), lh = Math.round(lw * H / W);
         if (!h.falling) {
             const x = this.logR1(t), lr = this.logRate(t);
             const rho = 0.376 * Math.pow(0.1 / 0.376, this.s(t, 11, P.hoverEnd));
+            const t0 = performance.now();
             const img = this.rays.render(lw, lh, { logR1: x, gObs: Math.pow(10, Math.min(lr, 30)), rho }, t);
+            const ms = performance.now() - t0;
+            this.msAvg = this.msAvg ? this.msAvg * 0.9 + ms * 0.1 : ms;
+            if (this.msAvg > 13 && this.lw > 260) this.lw *= 0.94;
+            else if (this.msAvg < 7 && this.lw < Math.min(720, W)) this.lw *= 1.04;
             ctx.imageSmoothingEnabled = true;
-            ctx.drawImage(img, 0, 0, W, skyH + 20 * u);
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, W, H);
             if (t > P.hoverEnd - 0.2) {               // keep the last sight for the fall
-                if (!this.snapshot) { this.snapshot = document.createElement('canvas'); }
-                this.snapshot.width = lw; this.snapshot.height = lh;
+                if (!this.snapshot) this.snapshot = document.createElement('canvas');
+                this.snapshot.width = img.width; this.snapshot.height = img.height;
                 this.snapshot.getContext('2d').drawImage(img, 0, 0);
             }
         } else if (this.snapshot) {
             // Free fall: the cone of outside light widens a little (aberration
             // for a falling observer), reddens and dims, and then it is gone.
-            const sc = 1 + 0.9 * fall;
-            const dw = W * sc, dh = (skyH + 20 * u) * sc;
+            const sc = 1 + 0.9 * fall, dw = W * sc, dh = H * sc;
             ctx.save();
             ctx.globalAlpha = Math.max(0, 1 - fall * 1.15);
-            ctx.drawImage(this.snapshot, (W - dw) / 2, (skyH - dh) / 2, dw, dh);
+            ctx.drawImage(this.snapshot, (W - dw) / 2, (H - dh) / 2, dw, dh);
             ctx.globalCompositeOperation = 'multiply';
             ctx.fillStyle = `rgb(255, ${Math.round(255 - 205 * fall)}, ${Math.round(255 - 230 * fall)})`;
-            ctx.fillRect(0, 0, W, skyH + 20 * u);
+            ctx.fillRect(0, 0, W, H);
             ctx.restore();
         }
 
-        // ── Canopy frame: top bow, two pillars, a faint glare ──
-        const frame = '#0c0e15', edge = 'rgba(150,160,190,0.22)';
-        ctx.fillStyle = frame;
-        ctx.beginPath();                                   // left pillar
-        ctx.moveTo(0, 0); ctx.lineTo(W * 0.13, 0); ctx.lineTo(W * 0.04, skyH + 20 * u); ctx.lineTo(0, skyH + 20 * u);
-        ctx.closePath(); ctx.fill();
-        ctx.beginPath();                                   // right pillar
-        ctx.moveTo(W, 0); ctx.lineTo(W * 0.87, 0); ctx.lineTo(W * 0.96, skyH + 20 * u); ctx.lineTo(W, skyH + 20 * u);
-        ctx.closePath(); ctx.fill();
-        ctx.fillRect(0, 0, W, 10 * u);                     // top bow
-        ctx.strokeStyle = edge; ctx.lineWidth = 1.5 * u;
-        ctx.beginPath(); ctx.moveTo(W * 0.13, 10 * u); ctx.lineTo(W * 0.04, skyH + 20 * u); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(W * 0.87, 10 * u); ctx.lineTo(W * 0.96, skyH + 20 * u); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(W * 0.13, 10 * u); ctx.lineTo(W * 0.87, 10 * u); ctx.stroke();
-        const glare = ctx.createLinearGradient(W * 0.2, 0, W * 0.45, skyH);
-        glare.addColorStop(0, 'rgba(255,255,255,0.035)'); glare.addColorStop(0.5, 'rgba(255,255,255,0)');
-        ctx.fillStyle = glare; ctx.fillRect(W * 0.1, 10 * u, W * 0.8, skyH);
-
-        // ── Dashboard ──
-        const top = skyH - 6 * u;
-        ctx.fillStyle = '#10131b';
+        // ── The craft: white lines only ──
+        // Seen from the seat: two leading edges sweeping in from the lower
+        // corners toward the nose, the notch of the tail behind, a thin canopy
+        // bow overhead.
+        const line = a => `rgba(235, 240, 255, ${a})`;
+        ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        ctx.lineWidth = 1.4 * u;
+        ctx.strokeStyle = line(0.55);
         ctx.beginPath();
-        ctx.moveTo(0, top + 40 * u);
-        ctx.quadraticCurveTo(W / 2, top - 24 * u, W, top + 40 * u);
-        ctx.lineTo(W, H); ctx.lineTo(0, H); ctx.closePath(); ctx.fill();
-        ctx.strokeStyle = 'rgba(170,180,210,0.18)'; ctx.lineWidth = 1.5 * u;
-        ctx.beginPath(); ctx.moveTo(0, top + 40 * u); ctx.quadraticCurveTo(W / 2, top - 24 * u, W, top + 40 * u); ctx.stroke();
+        ctx.moveTo(-10 * u, H * 0.9); ctx.lineTo(W * 0.2, H * 0.62); ctx.lineTo(W * 0.32, H * 0.5);
+        ctx.moveTo(W + 10 * u, H * 0.9); ctx.lineTo(W * 0.8, H * 0.62); ctx.lineTo(W * 0.68, H * 0.5);
+        ctx.stroke();
+        ctx.strokeStyle = line(0.35);
+        ctx.beginPath();                                   // tail notch, low in the view
+        ctx.moveTo(W * 0.06, H + 4 * u); ctx.lineTo(W * 0.5, H * 0.86); ctx.lineTo(W * 0.94, H + 4 * u);
+        ctx.stroke();
+        ctx.strokeStyle = line(0.22);
+        ctx.beginPath();                                   // canopy bow
+        ctx.moveTo(-10 * u, H * 0.18); ctx.quadraticCurveTo(W / 2, -H * 0.05, W + 10 * u, H * 0.18);
+        ctx.stroke();
 
+        // ── Readouts, small, in the corners ──
         const mono = s => `${Math.round(s * u)}px "JetBrains Mono", ui-monospace, monospace`;
-        const dimText = 'rgba(170,180,205,0.75)';
-        const panelY = top + 34 * u, panelH = H - panelY - 14 * u;
+        const warn = '#ff6a4a', calm = 'rgba(225, 232, 250, 0.82)', dim = 'rgba(200, 210, 235, 0.5)';
+        ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 6 * u;
+        const pad = 16 * u, by = H - pad;
 
-        // Dial helper: value 0..1 across a 240° sweep
-        const dial = (x, y, r, v, label, valueText, warn) => {
-            ctx.fillStyle = '#0a0c12'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-            ctx.strokeStyle = 'rgba(170,180,210,0.25)'; ctx.lineWidth = 1.2 * u; ctx.stroke();
-            for (let i = 0; i <= 12; i++) {
-                const a = (-210 + i * 20) * Math.PI / 180;
-                const r1 = r * (i % 3 === 0 ? 0.72 : 0.8);
-                ctx.strokeStyle = i >= 10 ? 'rgba(255,100,70,0.6)' : 'rgba(190,200,225,0.45)';
-                ctx.beginPath(); ctx.moveTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1);
-                ctx.lineTo(x + Math.cos(a) * r * 0.88, y + Math.sin(a) * r * 0.88); ctx.stroke();
-            }
-            const a = (-210 + Math.max(0, Math.min(1, v)) * 240) * Math.PI / 180;
-            ctx.strokeStyle = warn ? '#ff5a3c' : '#9fb6ff'; ctx.lineWidth = 2 * u;
-            ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.cos(a) * r * 0.78, y + Math.sin(a) * r * 0.78); ctx.stroke();
-            ctx.fillStyle = '#c9d2ea'; ctx.beginPath(); ctx.arc(x, y, 2.5 * u, 0, Math.PI * 2); ctx.fill();
-            ctx.textAlign = 'center';
-            ctx.fillStyle = dimText; ctx.font = mono(9); ctx.fillText(label, x, y + r * 0.5);
-            ctx.fillStyle = warn ? '#ff6a4a' : '#e6ecff'; ctx.font = mono(11); ctx.fillText(valueText, x, y + r + 14 * u);
+        // bottom left: where we are, and what the craft is doing
+        ctx.textAlign = 'left';
+        ctx.fillStyle = dim; ctx.font = mono(9);
+        ctx.fillText('DISTANCE', pad, by - 30 * u);
+        ctx.fillStyle = h.falling ? warn : calm; ctx.font = mono(12);
+        ctx.fillText(h.radius, pad, by - 14 * u);
+        ctx.fillStyle = h.falling ? warn : dim; ctx.font = mono(9);
+        ctx.fillText(h.status.toUpperCase(), pad, by);
+
+        // bottom right: thrust and the light's shift, as two thin bars
+        ctx.textAlign = 'right';
+        const bw = 120 * u, bx = W - pad - bw;
+        const bar = (y, label, v, colour) => {
+            ctx.fillStyle = dim; ctx.font = mono(9);
+            ctx.fillText(label, W - pad, y - 6 * u);
+            ctx.fillStyle = 'rgba(235,240,255,0.15)'; ctx.fillRect(bx, y, bw, 2 * u);
+            ctx.fillStyle = colour; ctx.fillRect(bx, y, bw * Math.max(0, Math.min(1, v)), 2 * u);
         };
-
-        const dialR = Math.min(panelH * 0.38, 52 * u);
-        const dy = panelY + panelH * 0.46;
-        dial(W * 0.2, dy, dialR, h.lr / 22, 'HOME CLOCK', h.falling ? '— — —' : `×10${this.sup(Math.floor(h.lr))}`, h.falling);
-        dial(W * 0.8, dy, dialR, h.thrust, 'THRUST', `${Math.round(h.thrust * 100)} %`, h.falling);
-
-        // Centre screen: radius, spectrum shift, status
-        const sw = W * 0.34, sh = panelH * 0.78, sx0 = W / 2 - sw / 2, sy0 = panelY + panelH * 0.06;
-        ctx.fillStyle = '#060810';
-        ctx.beginPath(); ctx.roundRect ? ctx.roundRect(sx0, sy0, sw, sh, 6 * u) : ctx.rect(sx0, sy0, sw, sh); ctx.fill();
-        ctx.strokeStyle = 'rgba(170,180,210,0.2)'; ctx.lineWidth = 1 * u; ctx.stroke();
-        ctx.textAlign = 'left';
-        ctx.fillStyle = dimText; ctx.font = mono(9);
-        ctx.fillText('DISTANCE', sx0 + 12 * u, sy0 + 18 * u);
-        ctx.fillStyle = h.falling ? '#ff6a4a' : '#e6ecff'; ctx.font = mono(13);
-        ctx.fillText(h.radius, sx0 + 12 * u, sy0 + 36 * u);
-        // spectrum bar: where the outside light sits, blue ← → red
-        const bx = sx0 + 12 * u, by = sy0 + 50 * u, bw = sw - 24 * u, bh = 6 * u;
-        const spec = ctx.createLinearGradient(bx, 0, bx + bw, 0);
-        spec.addColorStop(0, '#6b8cff'); spec.addColorStop(0.5, '#e8ecf8'); spec.addColorStop(1, '#ff4a2a');
-        ctx.fillStyle = spec; ctx.fillRect(bx, by, bw, bh);
+        bar(by - 26 * u, `THRUST ${Math.round(h.thrust * 100)}%`, h.thrust, h.falling ? warn : calm);
         const shift = h.falling ? 0.5 + 0.5 * fall : 0.5 - 0.5 * Math.min(1, h.lr / 4);
-        ctx.fillStyle = '#fff'; ctx.fillRect(bx + bw * Math.min(1, shift) - 1.5 * u, by - 4 * u, 3 * u, bh + 8 * u);
-        ctx.fillStyle = dimText; ctx.font = mono(9);
-        ctx.fillText('BLUE', bx, by + bh + 13 * u);
-        ctx.textAlign = 'right'; ctx.fillText('RED', bx + bw, by + bh + 13 * u);
-        ctx.textAlign = 'left';
-        ctx.fillStyle = h.falling ? '#ff6a4a' : '#9fb6ff'; ctx.font = mono(10);
-        ctx.fillText(h.status.toUpperCase(), sx0 + 12 * u, sy0 + sh - 12 * u);
+        ctx.fillStyle = dim; ctx.font = mono(9);
+        ctx.fillText(shift < 0.48 ? 'LIGHT · BLUESHIFTED' : shift > 0.52 ? 'LIGHT · REDSHIFTED' : 'LIGHT', W - pad, by - 6 * u);
+        const sg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+        sg.addColorStop(0, '#6b8cff'); sg.addColorStop(0.5, '#e8ecf8'); sg.addColorStop(1, '#ff4a2a');
+        ctx.globalAlpha = 0.6; ctx.fillStyle = sg; ctx.fillRect(bx, by, bw, 2 * u); ctx.globalAlpha = 1;
+        ctx.fillStyle = '#fff'; ctx.fillRect(bx + bw * shift - 1 * u, by - 3 * u, 2 * u, 8 * u);
 
-        // Indicator lights; the caution light blinks in free fall
-        const lights = [['PWR', '#5ee08a', true], ['NAV', '#5ee08a', !h.falling], ['ENG', h.falling ? '#ff5a3c' : '#5ee08a', true],
-                        ['CAUTION', '#ff5a3c', h.falling && Math.floor(t * 4) % 2 === 0]];
-        lights.forEach(([name, c, on], i) => {
-            const lx = W * 0.06 + i * 30 * u, ly = H - 22 * u;
-            ctx.fillStyle = on ? c : 'rgba(120,130,150,0.25)';
-            if (on) { ctx.shadowColor = c; ctx.shadowBlur = 8 * u; }
-            ctx.beginPath(); ctx.arc(lx, ly, 3.2 * u, 0, Math.PI * 2); ctx.fill();
-            ctx.shadowBlur = 0;
-        });
-        ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(170,180,205,0.45)'; ctx.font = mono(9);
-        ctx.fillText('SC-1 · SINGLE SEAT', W * 0.96, H - 18 * u);
+        // a single caution light, top left under the title, only when needed
+        if (h.falling && Math.floor(t * 4) % 2 === 0) {
+            ctx.fillStyle = warn; ctx.shadowColor = warn; ctx.shadowBlur = 10 * u;
+            ctx.beginPath(); ctx.arc(pad + 3 * u, 44 * u, 3 * u, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.shadowBlur = 0;
         ctx.textAlign = 'left';
     }
 
@@ -686,12 +658,24 @@ class SchwarzschildView {
     }
 
     // Draws the canopy view into this.canvas (w × h) for the given state.
+    // Draws the view into this.canvas (w × h). Antialiasing is temporal: each
+    // frame is sampled at a slightly different sub-pixel offset and blended
+    // into a running average, so edges and stars settle smooth at no extra
+    // cost per frame. The disc's edges and the stars are soft by construction.
     render(w, h, st, time) {
         const c = this.canvas;
-        if (c.width !== w || c.height !== h) { c.width = w; c.height = h; this.img = null; }
+        if (c.width !== w || c.height !== h) {
+            c.width = w; c.height = h; this.img = null;
+            this.acc = new Float32Array(w * h * 3); this.fresh = true;
+        }
         const ctx = c.getContext('2d');
         if (!this.img) this.img = ctx.createImageData(w, h);
-        const data = this.img.data;
+        const data = this.img.data, acc = this.acc;
+        this.frameNo = (this.frameNo || 0) + 1;
+        const halton = (i, b) => { let f = 1, r = 0; while (i > 0) { f /= b; r += f * (i % b); i = Math.floor(i / b); } return r; };
+        const jx = halton(this.frameNo % 16 + 1, 2) - 0.5, jy = halton(this.frameNo % 16 + 1, 3) - 0.5;
+        const keep = this.fresh ? 0 : 0.62;     // share of the running average kept each frame
+        this.fresh = false;
 
         const x = st.logR1;                       // log10(r − 1)
         const rObs = 1 + Math.pow(10, x);
@@ -717,90 +701,110 @@ class SchwarzschildView {
         const ca = Math.cos(ac), sa = Math.sin(ac);
         const C = [-ca, sa, 0], U = [sa, ca, 0], R = [0, 0, 1];
         const n = this.n, S = this.S, H = this.H;
-        const { rows, ws, end, esc, bs } = this;
+        const { rows, ws, end, esc } = this;
         const gObs = st.gObs;                     // blueshift of everything outside, 1/√(1−1/r)
         const base = this.base, rin = this.rin, rout = this.rout;
         const skyTint = Math.min(1, Math.log10(gObs) / 4);
         const glowObs = Math.min(3, 1 + Math.log10(gObs) * 0.35);
         const aspect = h / w;
+        const cb0 = Math.cos(this.beta), sb0 = Math.sin(this.beta);
+        const smooth = (a, b, v) => { const k = Math.max(0, Math.min(1, (v - a) / (b - a))); return k * k * (3 - 2 * k); };
+        const CELL = 0.0055;
 
-        let p = 0;
+        // r along a row at angle φ, or −1 past the row's end
+        const rAt = (row, phi) => {
+            if (phi >= end[row]) return -1;
+            const fi = phi / H, i0 = Math.floor(fi), fr = fi - i0, off = row * S;
+            return rows[off + i0] * (1 - fr) + rows[off + i0 + 1] * fr;
+        };
+
+        let p = 0, q3 = 0;
         for (let py = 0; py < h; py++) {
-            const ny = -((py + 0.5) / h * 2 - 1) * aspect;
-            for (let px = 0; px < w; px++, p += 4) {
-                const nx = (px + 0.5) / w * 2 - 1;
+            const ny = -((py + 0.5 + jy) / h * 2 - 1) * aspect;
+            for (let px = 0; px < w; px++, p += 4, q3 += 3) {
+                const nx = (px + 0.5 + jx) / w * 2 - 1;
                 const rr = Math.hypot(nx, ny);
-                let row, e2x, e2y, e2z;
-                // direction of the tangential part of the ray (perpendicular to the radial axis)
+                let fa, e2y, e2z, outside = false;
                 const tx = R[0] * nx + U[0] * ny, ty = R[1] * nx + U[1] * ny, tz = R[2] * nx + U[2] * ny;
                 if (!zenith) {
                     const th = rr * fovHalf;
-                    if (th > PI) { data[p + 3] = 255; data[p] = data[p + 1] = data[p + 2] = 0; continue; }
+                    if (th > PI) outside = true;
                     const s = rr > 1e-9 ? Math.sin(th) / rr : 0, co = Math.cos(th);
                     const dx = C[0] * co + tx * s, dy = C[1] * co + ty * s, dz = C[2] * co + tz * s;
-                    const cosA = Math.max(-1, Math.min(1, -dx));
-                    const a = Math.acos(cosA);
-                    row = Math.min(NA - 1, Math.round(a / PI * (NA - 1)));
+                    fa = Math.acos(Math.max(-1, Math.min(1, -dx))) / PI * (NA - 1);
                     const m = Math.hypot(dy, dz) || 1;
-                    e2x = 0; e2y = dy / m; e2z = dz / m;
+                    e2y = dy / m; e2z = dz / m;
                 } else {
-                    const q = rr / rho;
-                    if (q > 1.25) { data[p] = data[p + 1] = data[p + 2] = 0; data[p + 3] = 255; continue; }
-                    row = Math.min(NA - 1, Math.round(q / 1.25 * (NA - 1)));
+                    const qv = rr / rho;
+                    if (qv > 1.25) outside = true;
+                    fa = qv / 1.25 * (NA - 1);
                     const m = Math.hypot(ty, tz) || 1;
-                    e2x = 0; e2y = ty / m; e2z = tz / m;
+                    e2y = ty / m; e2z = tz / m;
                 }
-                const off = row * S, pe = end[row];
-                // crossings of the disc plane: cosφ(n·e1) + sinφ(n·e2) = 0
-                const A = n[0], B = n[1] * e2y + n[2] * e2z;
-                let phi = Math.atan2(-A, B);
-                while (phi <= 1e-3) phi += PI;
-                let rC = 0, gC = 0, bC = 0, hit = false;
-                for (let k = 0; k < 3 && phi < pe; k++, phi += PI) {
-                    const fi = phi / H, i0 = Math.floor(fi), fr = fi - i0;
-                    const r = rows[off + i0] * (1 - fr) + rows[off + i0 + 1] * fr;
-                    if (r < rin || r > rout) continue;
-                    // emitter position and orbital velocity
-                    const cph = Math.cos(phi), sph = Math.sin(phi);
-                    const Px = cph, Py = sph * e2y, Pz = sph * e2z;
-                    let vx = n[1] * Pz - n[2] * Py, vy = n[2] * Px - n[0] * Pz, vz = n[0] * Py - n[1] * Px;
-                    const vm = Math.hypot(vx, vy, vz) || 1; vx /= vm; vy /= vm; vz /= vm;
-                    // photon direction at emission, toward us: −dP/dφ
-                    const wv = ws[off + i0], rp = -r * r * wv;
-                    let kx = -(rp * cph - r * sph), ky = -(rp * sph + r * cph) * e2y, kz = -(rp * sph + r * cph) * e2z;
-                    const km = Math.hypot(kx, ky, kz) || 1; kx /= km; ky /= km; kz /= km;
-                    const v = Math.sqrt(0.5 / (r - 1));
-                    const gam = 1 / Math.sqrt(1 - v * v);
-                    const dop = 1 / (gam * (1 - v * (vx * kx + vy * ky + vz * kz)));
-                    const g = Math.sqrt(1 - 1 / r) * dop * gObs;
-                    // emissivity: thin-disc-like profile, with streaks that orbit
-                    const az = Math.atan2(Pz, Px * Math.cos(this.beta) - Py * Math.sin(this.beta));
-                    const om = time * 2.2 * Math.pow(r / 3, -1.5);
-                    const streak = 0.62 + 0.24 * Math.sin(az * 6 + 7 * Math.log(r) - om) + 0.14 * Math.sin(az * 17 - 11 * r - om * 1.7);
-                    const em = Math.pow(rin / r, 3) * (1 - Math.sqrt(rin / r) * 0.92) * 9 * streak;
-                    const I = em * Math.min(1e3, Math.pow(Math.min(g, 6), 4)) / (1 + k * 0.6);
-                    const L = 1 - Math.exp(-I * 1.6);
-                    const lg = Math.log2(Math.max(1e-3, g));
-                    let cr = base[0], cg = base[1], cb = base[2];
-                    if (lg > 0) { const m2 = Math.min(0.8, lg / 2.6); cr += (238 - cr) * m2; cg += (242 - cg) * m2; cb += (255 - cb) * m2; }
-                    else { const m2 = Math.min(1, -lg / 1.8); cr += (255 - cr) * m2; cg += (50 - cg) * m2; cb += (24 - cb) * m2; }
-                    rC = cr * L; gC = cg * L; bC = cb * L; hit = true;
-                    break;
+                let rC = 0, gC = 0, bC = 0;
+                if (!outside) {
+                    const r0 = Math.min(NA - 1, Math.floor(fa)), r1 = Math.min(NA - 1, r0 + 1), wr = fa - r0;
+                    const row = wr < 0.5 ? r0 : r1;
+                    // crossings of the disc plane: cosφ(n·e1) + sinφ(n·e2) = 0
+                    const A = n[0], B = n[1] * e2y + n[2] * e2z;
+                    let phi = Math.atan2(-A, B);
+                    while (phi <= 1e-3) phi += PI;
+                    let remain = 1;
+                    for (let k = 0; k < 3 && remain > 0.01; k++, phi += PI) {
+                        const ra = rAt(r0, phi), rb = rAt(r1, phi);
+                        if (ra < 0 && rb < 0) break;
+                        const r = ra < 0 ? rb : rb < 0 ? ra : ra * (1 - wr) + rb * wr;
+                        const cover = smooth(rin, rin + 0.18, r) * (1 - smooth(rout - 1.6, rout, r)) * (ra < 0 || rb < 0 ? 0.5 : 1);
+                        if (cover <= 0) continue;
+                        const cph = Math.cos(phi), sph = Math.sin(phi);
+                        const Px = cph, Py = sph * e2y, Pz = sph * e2z;
+                        let vx = n[1] * Pz - n[2] * Py, vy = n[2] * Px - n[0] * Pz, vz = n[0] * Py - n[1] * Px;
+                        const vm = Math.hypot(vx, vy, vz) || 1; vx /= vm; vy /= vm; vz /= vm;
+                        const fi = Math.min(S - 2, Math.floor(phi / H));
+                        const wv = ws[row * S + fi], rp = -r * r * wv;
+                        let kx = -(rp * cph - r * sph), ky = -(rp * sph + r * cph) * e2y, kz = -(rp * sph + r * cph) * e2z;
+                        const km = Math.hypot(kx, ky, kz) || 1; kx /= km; ky /= km; kz /= km;
+                        const v = Math.sqrt(0.5 / (r - 1));
+                        const gam = 1 / Math.sqrt(1 - v * v);
+                        const dop = 1 / (gam * (1 - v * (vx * kx + vy * ky + vz * kz)));
+                        const g = Math.sqrt(1 - 1 / r) * dop * gObs;
+                        const az = Math.atan2(Pz, Px * cb0 - Py * sb0);
+                        const om = time * 2.2 * Math.pow(r / 3, -1.5);
+                        const streak = 0.62 + 0.24 * Math.sin(az * 6 + 7 * Math.log(r) - om) + 0.14 * Math.sin(az * 17 - 11 * r - om * 1.7);
+                        const em = Math.pow(rin / r, 3) * (1 - Math.sqrt(rin / r) * 0.92) * 9 * streak;
+                        const I = em * Math.min(1e3, Math.pow(Math.min(g, 6), 4)) / (1 + k * 0.6);
+                        const L = 1 - Math.exp(-I * 1.6);
+                        const lg = Math.log2(Math.max(1e-3, g));
+                        let cr = base[0], cg = base[1], cbl = base[2];
+                        if (lg > 0) { const m2 = Math.min(0.8, lg / 2.6); cr += (238 - cr) * m2; cg += (242 - cg) * m2; cbl += (255 - cbl) * m2; }
+                        else { const m2 = Math.min(1, -lg / 1.8); cr += (255 - cr) * m2; cg += (50 - cg) * m2; cbl += (24 - cbl) * m2; }
+                        const a = cover * remain;
+                        rC += cr * L * a; gC += cg * L * a; bC += cbl * L * a;
+                        remain *= 1 - cover;
+                    }
+                    if (remain > 0.01 && !isNaN(esc[row])) {
+                        // escaped: the sky it came from — soft round stars, a faint band
+                        const pf = esc[row], c2 = Math.cos(pf), s2 = Math.sin(pf);
+                        const Sx = c2, Sy = s2 * e2y, Sz = s2 * e2z;
+                        const lat = Math.asin(Math.max(-1, Math.min(1, Sx))), lon = Math.atan2(Sz, Sy);
+                        const u = (lat + 1.6) / CELL, vv = (lon + PI) * Math.cos(lat) / CELL;
+                        const ci = Math.floor(u), cj = Math.floor(vv);
+                        let hsh = Math.sin(ci * 127.1 + cj * 311.7) * 43758.5453; hsh -= Math.floor(hsh);
+                        let star = 0;
+                        if (hsh < 0.02) {
+                            let h2 = Math.sin(ci * 269.5 + cj * 183.3) * 43758.5453; h2 -= Math.floor(h2);
+                            const du = u - ci - (0.25 + 0.5 * hsh / 0.02), dv = vv - cj - (0.25 + 0.5 * h2);
+                            star = (0.3 + 0.7 * h2) * Math.exp(-(du * du + dv * dv) / 0.035);
+                        }
+                        const band = 0.09 * Math.exp(-Math.pow(Sx * 0.3 + Sy * 0.5 + Sz * 0.81, 2) / 0.03);
+                        const lum = Math.min(1, (star + band + 0.015) * glowObs) * remain;
+                        rC += (230 - 70 * skyTint) * lum; gC += (236 - 40 * skyTint) * lum; bC += 250 * lum;
+                    }
                 }
-                if (!hit && !isNaN(esc[row])) {
-                    // escaped: the star it came from
-                    const pf = esc[row], c2 = Math.cos(pf), s2 = Math.sin(pf);
-                    const Sx = c2, Sy = s2 * e2y, Sz = s2 * e2z;
-                    const lat = Math.asin(Math.max(-1, Math.min(1, Sx))), lon = Math.atan2(Sz, Sy);
-                    const ci = Math.floor((lat + 1.6) / 0.0055), cj = Math.floor((lon + PI) * Math.cos(lat) / 0.0055);
-                    let hsh = Math.sin(ci * 127.1 + cj * 311.7) * 43758.5453; hsh -= Math.floor(hsh);
-                    let star = hsh < 0.006 ? (0.3 + 0.7 * (hsh / 0.006)) : 0;
-                    const band = 0.09 * Math.exp(-Math.pow(Sx * 0.3 + Sy * 0.5 + Sz * 0.81, 2) / 0.03);
-                    const lum = Math.min(1, (star + band + 0.015) * glowObs);
-                    const cr = 230 - 70 * skyTint, cg = 236 - 40 * skyTint, cb = 250;
-                    rC = cr * lum; gC = cg * lum; bC = cb * lum;
-                }
-                data[p] = rC; data[p + 1] = gC; data[p + 2] = bC; data[p + 3] = 255;
+                acc[q3] = acc[q3] * keep + rC * (1 - keep);
+                acc[q3 + 1] = acc[q3 + 1] * keep + gC * (1 - keep);
+                acc[q3 + 2] = acc[q3 + 2] * keep + bC * (1 - keep);
+                data[p] = acc[q3]; data[p + 1] = acc[q3 + 1]; data[p + 2] = acc[q3 + 2]; data[p + 3] = 255;
             }
         }
         ctx.putImageData(this.img, 0, 0);
