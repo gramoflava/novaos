@@ -15,11 +15,9 @@
     pointer-events: auto;
     display: flex;
     flex-direction: column;
-    background: var(--glass);
-    backdrop-filter: blur(var(--blur-panel)) saturate(180%);
-    -webkit-backdrop-filter: blur(var(--blur-panel)) saturate(180%);
     border: 1px solid var(--line);
     border-radius: var(--window-radius);
+    isolation: isolate;
     box-shadow: var(--shadow-md), var(--glass-edge);
     overflow: hidden;
     will-change: transform, width, height, top, left;
@@ -27,6 +25,23 @@
     opacity: 0;
     transform: scale(0.95);
     animation: windowOpen 0.4s var(--ease-spring) forwards;
+}
+
+/* The glass lives on a pseudo-element clipped to the rounded shape. With the
+   backdrop filter on the window itself, browsers sometimes drew the blurred
+   backdrop as a square while the shadow changed (on focus and blur), leaving
+   dark corners outside the rounded edge. */
+.nova-window::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--glass);
+    backdrop-filter: blur(var(--blur-panel)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--blur-panel)) saturate(180%);
+    clip-path: inset(0 round var(--window-radius));
+    pointer-events: none;
 }
 
 @keyframes windowOpen {
