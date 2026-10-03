@@ -34,7 +34,7 @@ class HorizonGPU {
             if (!gl.getProgramParameter(this.program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(this.program));
             gl.useProgram(this.program);
             this.uniforms = {};
-            for (const name of ['size', 'path', 'ends', 'count', 'stepPhi', 'camera', 'rho', 'zenith', 'time', 'base', 'logG', 'fall']) {
+            for (const name of ['size', 'path', 'ends', 'count', 'stepPhi', 'camera', 'rho', 'zenith', 'time', 'base', 'logG', 'fall', 'discTime', 'smear', 'starsAlive', 'discAlive']) {
                 this.uniforms[name] = gl.getUniformLocation(this.program, name);
             }
             for (let i = 0; i < 2; i++) {
@@ -97,10 +97,14 @@ class HorizonGPU {
         gl.uniform2f(u.camera, Math.cos(camera.ac), Math.sin(camera.ac));
         gl.uniform1f(u.rho, st.rho); gl.uniform1i(u.zenith, camera.zenith ? 1 : 0);
         gl.uniform1f(u.time, time); gl.uniform3fv(u.base, v.base.map(c => c / 255));
-        // For the narrow, outward source cone, an inward local boost changes
-        // frequency by gamma*(1-v) = 1/boost. Work in logs near the horizon.
-        gl.uniform1f(u.logG, Math.log10(st.gObs) - Math.log10(v.constructor.fallBoost(st.fall || 0)));
+        // log10 of the shift of light from far away, as the pilot measures it
+        // (see Horizon.fallState for the free fall). Logs keep 10²² in range.
+        gl.uniform1f(u.logG, st.logG !== undefined ? st.logG : Math.log10(st.gObs));
         gl.uniform1f(u.fall, st.fall || 0);
+        gl.uniform1f(u.discTime, st.discTime !== undefined ? st.discTime : time);
+        gl.uniform1f(u.smear, Math.min(1e30, st.smear || 0));
+        gl.uniform1f(u.starsAlive, st.starsAlive !== undefined ? st.starsAlive : 1);
+        gl.uniform1f(u.discAlive, st.discAlive !== undefined ? st.discAlive : 1);
         const measure = this.timer && !this.pending;
         if (measure) { this.pending = gl.createQuery(); gl.beginQuery(this.timer.TIME_ELAPSED_EXT, this.pending); }
         gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -127,7 +131,7 @@ class HorizonGPU {
         uniform vec2 size, camera;
         uniform sampler2D path, ends;
         uniform int count, zenith;
-        uniform float stepPhi, rho, time, logG, fall;
+        uniform float stepPhi, rho, time, logG, fall, discTime, smear, starsAlive, discAlive;
         uniform vec3 base;
         out vec4 colour;
         const float PI = 3.14159265359;
@@ -179,10 +183,13 @@ class HorizonGPU {
             vec2 angular = vec2(lat + 1.6, (lon + PI) * cos(lat));
             float star = starLayer(angular, 0.018, 0.10, false)
                        + starLayer(angular, 0.25, 0.50, true);
-            float band = 0.045 * exp(-pow(dot(direction, vec3(0.3, 0.5, 0.81)), 2.0) / 0.03);
-            vec3 tint = mix(vec3(0.90, 0.93, 0.98), vec3(0.63, 0.77, 0.98), min(1.0, logG / 4.0));
-            float exposure = 1.4 + 1.1 * min(1.0, logG / 5.0);
-            return tint * (0.008 + band + min(1.0, star * exposure));
+            float band = 0.045 * starsAlive * exp(-pow(dot(direction, vec3(0.3, 0.5, 0.81)), 2.0) / 0.03);
+            // blue-white when blueshifted, deep red and dimmer (I ∝ g⁴) when redshifted
+            vec3 tint = logG >= 0.0 ? mix(vec3(0.90, 0.93, 0.98), vec3(0.63, 0.77, 0.98), min(1.0, logG / 4.0))
+                                    : mix(vec3(0.90, 0.93, 0.98), vec3(1.0, 0.34, 0.20), min(1.0, -logG / 1.5));
+            float dim = logG < 0.0 ? pow(10.0, 4.0 * logG) : 1.0;
+            float exposure = 1.4 + 1.1 * clamp(logG / 5.0, 0.0, 1.0);
+            return tint * dim * (0.008 + band + min(1.0, star * exposure * starsAlive));
         }
 
         void main() {
@@ -231,29 +238,35 @@ class HorizonGPU {
                 float cp = cos(phi), sp = sin(phi);
                 vec3 position = vec3(cp, sp * e2);
                 vec3 orbit = normalize(cross(n, position));
-                float rp = -r * r * samplePath.y;
+                // local static frame: radial component is (dr/dφ)/√(1−1/r)
+                float rp = -r * r * samplePath.y / sqrt(1.0 - 1.0 / r);
                 vec3 photon = normalize(-vec3(rp * cp - r * sp, (rp * sp + r * cp) * e2));
                 float v = sqrt(0.5 / (r - 1.0));
                 float dop = sqrt(1.0 - v * v) / (1.0 - v * dot(orbit, photon));
                 float localG = sqrt(1.0 - 1.0 / r) * dop;
                 float az = atan(position.z, position.x * CB - position.y * SB);
-                float orbitalTime = time * 2.2 * pow(r / 3.0, -1.5);
+                // The gas orbits in home time; when it turns several radians
+                // per frame its structure averages into a smooth ring.
+                float kep = pow(r / 3.0, -1.5);
+                float orbitalTime = discTime * 2.2 * kep;
+                float sharp = 1.0 - smoothstep(0.6, 3.0, smear * kep);
                 // Differential rotation and radial filaments read as flowing
                 // gas. Band-limit the fine layer rather than blur the whole scene.
                 float phase = az * 17.0 - 11.0 * r - orbitalTime * 1.7;
                 float fine = 1.0 - smoothstep(0.6, 2.5, fwidth(phase));
                 float filament = az * 31.0 + 36.0 * log(r) - orbitalTime * 2.3;
                 float filamentAA = 1.0 - smoothstep(0.6, 2.5, fwidth(filament));
-                float flow = 0.58 + 0.23 * sin(az * 6.0 + 7.0 * log(r) - orbitalTime)
-                           + 0.13 * fine * sin(phase) + 0.06 * filamentAA * sin(filament);
-                float emission = pow(3.0 / r, 3.0) * (1.0 - sqrt(3.0 / r) * 0.92) * 9.0 * flow;
+                float flow = 0.58 + sharp * (0.23 * sin(az * 6.0 + 7.0 * log(r) - orbitalTime)
+                           + 0.13 * fine * sin(phase) + 0.06 * filamentAA * sin(filament));
+                float emission = pow(3.0 / r, 3.0) * (1.0 - sqrt(3.0 / r) * 0.92) * 9.0 * flow * discAlive;
                 // Exposure compensates only the common observer blueshift;
                 // gravitational/Doppler asymmetry and g^4 radiance stay intact.
-                float intensity = emission * pow(localG, 4.0) * min(2.0, 1.0 + logG * 0.12) / (1.0 + float(k) * 0.6);
+                float shiftDim = logG < 0.0 ? pow(10.0, 4.0 * logG) : min(2.0, 1.0 + logG * 0.12);
+                float intensity = emission * pow(localG, 4.0) * shiftDim / (1.0 + float(k) * 0.6);
                 float luminance = 1.0 - exp(-intensity * 4.0);
                 // Compressed false colour: huge spectral shifts exceed any
                 // display gamut, but still progress from warm to blue-white.
-                float lg = log2(max(0.001, localG)) + min(4.5, logG * 0.60);
+                float lg = log2(max(0.001, localG)) + clamp(logG * 0.60, -6.0, 4.5);
                 vec3 tint = lg > 0.0 ? mix(base, vec3(0.78, 0.88, 1.0), min(0.85, lg / 3.6))
                                     : mix(base, vec3(1.0, 0.20, 0.09), min(1.0, -lg / 1.8));
                 light += tint * luminance * cover * remain;
@@ -267,8 +280,9 @@ class HorizonGPU {
                 float coverage = m0.y < 0.0 ? weight : m1.y < 0.0 ? 1.0 - weight : 1.0;
                 light += sky(vec3(cos(pf), sin(pf) * e2)) * remain * coverage;
             }
-            // Artistic exposure fade after engine failure, separate from ray physics.
-            light *= 1.0 - smoothstep(0.40, 1.0, fall);
+            // The physics dims the view in the fall (g⁴); this only closes the
+            // last moments to black before the flash.
+            light *= 1.0 - smoothstep(0.90, 1.0, fall);
             colour = vec4(light, 1.0);
         }`;
     }

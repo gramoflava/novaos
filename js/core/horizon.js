@@ -11,9 +11,10 @@
 // outside sky shrinks into a bright, blueshifted disc overhead. So the home
 // clock races, and the desktop around the cockpit ages with it: windows yellow,
 // crack and crumble, stars burn out or go supernova, the cosmos stretches and
-// dims. Then the engine gives out. In the cinematic fall the outside cone
-// widens through local aberration and fades, the screen goes black, a flash —
-// and the desktop is back, as
+// dims. Then the engine gives out. Released from rest so near the horizon,
+// the pilot still sees home light blueshifted ~10²¹× as the horizon passes;
+// only inside does it slow, redden and dim toward the singularity (see
+// fallState). The screen goes black, a flash — and the desktop is back, as
 // if waking from a dream. The game is over whatever lives were left.
 //
 // The score is original, made in Web Audio: an organ-like chord progression in
@@ -83,6 +84,43 @@ class Horizon {
     logRate(t) {
         const x = this.logR1(t);
         return -0.5 * (x - Math.log10(1 + Math.pow(10, x)));
+    }
+
+    // Free fall after the engine fails. The craft is released from rest at the
+    // hold radius r₀ (energy per unit mass E = √(1 − rs/r₀) = 10^(−lr₀)), so
+    // light from far away, arriving from overhead, is measured shifted by
+    //   g = (E − √(E² − f)) / f,   f = 1 − rs/r.
+    // At release g = 1/E (the hold value); at the horizon g = 1/(2E), still
+    // ~10²¹; only inside, as f grows negative, does g fall as 1/√|f|, below 1
+    // (red) once r < rs/2 and toward 0 at the singularity. Inside, r follows
+    // the cycloid of a drop from the horizon: r = (1 + cos η)/2, with proper
+    // time ∝ η + sin η, spread evenly over the cinematic fall.
+    // k: fall progress 0→1. Returns { logG, r, x (log10(r−1) outside), inside }.
+    fallState(k) {
+        const lr0 = this.logRate(Horizon.P.hoverEnd);
+        const OUT = 0.04;                          // a sliver of screen time to reach the horizon
+        if (k <= OUT) {
+            const sv = Math.max(0, 1 - k / OUT);   // f/E², 1 at release → 0 at the horizon
+            const hh = sv < 1e-9 ? 0.5 : (1 - Math.sqrt(1 - sv)) / sv;
+            return { logG: lr0 + Math.log10(hh), r: 1, x: this.logR1(Horizon.P.hoverEnd) + Math.log10(Math.max(sv, 1e-30)), inside: false };
+        }
+        const target = Math.PI * Math.min(1, (k - OUT) / (1 - OUT));
+        let lo = 0, hi = Math.PI;                  // solve η + sin η = target
+        for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (m + Math.sin(m) < target) lo = m; else hi = m; }
+        const eta = (lo + hi) / 2;
+        const r = Math.max(1e-6, (1 + Math.cos(eta)) / 2);
+        const absF = 1 / r - 1;
+        const lq = Math.log10(Math.max(absF, 1e-300)) + 2 * lr0;   // q = |f|/E²
+        let logG;
+        if (lq > 8) logG = -0.5 * Math.log10(absF);
+        else { const q = Math.pow(10, lq); logG = lr0 + Math.log10((Math.sqrt(1 + q) - 1) / q); }
+        return { logG, r, inside: true };
+    }
+
+    // log10 of the shift of home light as the pilot sees it, now.
+    shiftNow(t) {
+        const P = Horizon.P;
+        return t < P.hoverEnd ? this.logRate(t) : this.fallState(this.s(t, P.hoverEnd, P.fallEnd)).logG;
     }
 
     // ── Start and finish ─────────────────────────────────────────────────────
@@ -280,10 +318,19 @@ class Horizon {
         const t = this.t;
 
         if (t < P.hoverEnd) this.homeSeconds += Math.pow(10, this.logRate(t)) * dt;
+        else if (t < P.fallEnd) {
+            // The clock keeps running at the measured shift — but over the fall's
+            // real proper time, which is tiny: πGM/c³ ≈ 1.5·10⁻⁴ s from the
+            // horizon in for 10 solar masses (and ~10⁻²⁶ s before it, from the
+            // hold radius). So the home date barely moves after release.
+            const fs = this.fallState(this.s(t, P.hoverEnd, P.fallEnd));
+            if (fs.inside) this.homeSeconds += Math.pow(10, fs.logG) * dt * 1.55e-4 / (P.fallEnd - P.hoverEnd);
+        }
         const years = this.homeSeconds / 3.15576e7;
         const ly = Math.log10(Math.max(years, 1e-9));
 
-        this.music.update(t, this.logRate(t));
+        this.ly = ly;
+        this.music.update(t, this.shiftNow(t));
         if (!this.flashed) {
             this.zoomOut(t);
             this.updateHome(t, ly, dt);
@@ -417,7 +464,20 @@ class Horizon {
             const x = this.logR1(t), lr = this.logRate(t);
             const rho = 0.376 * Math.pow(0.1 / 0.376, this.s(t, P.geomEnd, P.hoverEnd));
             const t0 = performance.now();
-            const img = this.rays.render(lw, lh, { logR1: x, gObs: Math.pow(10, Math.min(lr, 30)), rho, fall }, t);
+            const ly = this.ly !== undefined ? this.ly : -9;
+            const logG = Math.min(30, this.shiftNow(t));
+            const img = this.rays.render(lw, lh, {
+                logR1: x, logG, rho, fall,
+                // gas orbits in home time; past a few radians a frame it blurs
+                discTime: Math.min(this.homeSeconds, 1e4),
+                smear: 2.2 * Math.pow(10, Math.max(0, Math.min(30, h.falling ? logG : lr))) / 60,
+                // outside ages with the home clock: an accretion disc lasts
+                // ~10⁷–10⁹ yr; stars dim out over ~10¹¹–10¹⁵ yr (the longest-
+                // lived red dwarfs reach ~10¹³–10¹⁴), so a few remain to redden
+                // in the fall
+                discAlive: 1 - this.s(ly, 7, 9.5),
+                starsAlive: 1 - this.s(ly, 11, 15.5)
+            }, t);
             outside = img;
             const ms = performance.now() - t0;
             this.msAvg = this.msAvg ? this.msAvg * 0.9 + ms * 0.1 : ms;
@@ -460,9 +520,9 @@ class Horizon {
             ctx.fillStyle = colour; ctx.fillRect(bx, y, bw * Math.max(0, Math.min(1, v)), 2 * u);
         };
         bar(by - 26 * u, `THRUST ${Math.round(h.thrust * 100)}%`, h.thrust, h.falling ? warn : calm);
-        const shift = 0.5 - 0.5 * Math.min(1, h.lr / 22);
+        const shift = h.lr >= 0 ? 0.5 - 0.5 * Math.min(1, h.lr / 22) : 0.5 + 0.5 * Math.min(1, -h.lr / 1.5);
         ctx.fillStyle = dim; ctx.font = mono(10);
-        ctx.fillText(h.falling ? 'LIGHT · SHIFT FALLING' : shift < 0.48 ? 'LIGHT · BLUESHIFTED' : 'LIGHT', W - pad, by - 6 * u);
+        ctx.fillText(h.lr > 0.05 ? 'LIGHT · BLUESHIFTED' : h.lr < -0.05 ? 'LIGHT · REDSHIFTED' : 'LIGHT', W - pad, by - 6 * u);
         const sg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
         sg.addColorStop(0, '#6b8cff'); sg.addColorStop(0.5, '#e8ecf8'); sg.addColorStop(1, '#ff4a2a');
         ctx.globalAlpha = 0.6; ctx.fillStyle = sg; ctx.fillRect(bx, by, bw, 2 * u); ctx.globalAlpha = 1;
@@ -644,27 +704,30 @@ class Horizon {
         const P = Horizon.P;
         const falling = t >= P.hoverEnd;
         const lr = this.logRate(t);
-        if (!falling) {
-            this.el.clock.textContent = this.formatHome(years);
-            this.el.rate.textContent = lr < 0.3 ? 'running normally' : `running ×10${this.sup(Math.floor(lr))}`;
-        } else {
-            this.el.rate.textContent = 'signal lost';
-            this.el.cockpit.classList.add('is-falling');
-        }
+        const fs = falling ? this.fallState(this.s(t, P.hoverEnd, P.fallEnd)) : null;
+        const shift = falling ? fs.logG : lr;
+        // The home clock stays an honest readout in the fall too: light from
+        // home keeps arriving, shifted by g, so the clock is seen running ×g.
+        this.el.clock.textContent = this.formatHome(years);
+        this.el.rate.textContent = shift >= 1 ? `running ×10${this.sup(Math.floor(shift))}`
+            : shift > 0.13 ? `running ×${Math.pow(10, shift).toFixed(1)}`
+            : shift > -0.13 ? 'running normally' : `running ×${Math.pow(10, shift).toPrecision(2)}`;
+        if (falling) this.el.cockpit.classList.add('is-falling');
         const hold = this.s(t, P.inEnd, P.hoverEnd);
-        const inside = falling && t > P.hoverEnd + 2;
-        const x = this.logR1(t);
-        const radius = x > -3 ? `r = ${(1 + Math.pow(10, x)).toFixed(5)} rs` : `r = (1 + 10${this.sup(Math.round(x))}) rs`;
+        const inside = falling && fs.inside;
+        const x = falling && !inside ? fs.x : this.logR1(t);
+        const radius = inside ? `r = ${fs.r.toFixed(3)} rs · inside the horizon`
+            : x > -3 ? `r = ${(1 + Math.pow(10, x)).toFixed(5)} rs` : `r = (1 + 10${this.sup(Math.round(x))}) rs`;
         const strain = this.s(t, P.geomEnd + 3, P.hoverEnd);
         const dropout = !falling && ((t > 25.1 && t < 25.3) || (t > 32.7 && t < 33.05) || (t > 36.5 && t < 36.95));
         const thrust = falling ? Math.max(0, 0.45 - (t - P.hoverEnd) * 0.5) * (Math.sin(t * 37) > -0.3 ? 1 : 0) : (0.5 + 0.48 * hold) * (dropout ? 0.84 : 1);
         this.hud = {
-            lr: lr - Math.log10(SchwarzschildView.fallBoost(this.s(t, P.hoverEnd, P.fallEnd))),
+            lr: shift,
             thrust,
             falling,
             strain, dropout,
-            radius: inside ? 'inside the horizon' : radius,
-            status: falling ? 'engine failure · free fall' : dropout ? 'thrust instability' : strain > 0.7 ? 'holding · engine at limit' : t < P.geomEnd ? 'descending' : 'holding position'
+            radius,
+            status: falling ? (inside ? 'free fall · inside the horizon' : 'engine failure · free fall') : dropout ? 'thrust instability' : strain > 0.7 ? 'holding · engine at limit' : t < P.geomEnd ? 'descending' : 'holding position'
         };
     }
 
@@ -763,6 +826,8 @@ class Horizon {
 // cone straight up of half-angle ≈ b_c·√(r−1), blueshifted by 1/√(1−1/r). The
 // camera turns from the hole to that cone and zooms to keep it in sight.
 class SchwarzschildView {
+    // Camera geometry only: how strongly the fall's aberration spreads the
+    // overhead cone on screen. Frequencies come from Horizon.fallState().
     static fallBoost(k) {
         const velocity = 0.995 * k * k * (3 - 2 * k);
         return Math.sqrt((1 + velocity) / (1 - velocity));
@@ -860,6 +925,14 @@ class SchwarzschildView {
         return { zenith, ac };
     }
 
+    // Starlight colour: blue-white when blueshifted (tint > 0), toward deep
+    // red when redshifted (tint < 0). A compressed false colour, as for the disc.
+    skyColour(tint) {
+        if (tint >= 0) return [230 - 70 * tint, 236 - 40 * tint, 250];
+        const k = Math.min(1, -tint * 2.7);
+        return [230 + 25 * k, 236 - 150 * k, 250 - 200 * k];
+    }
+
     dispose() {
         if (this.gpu) this.gpu.dispose();
         this.gpu = null;
@@ -940,9 +1013,19 @@ class SchwarzschildView {
         const C = [-ca, sa, 0], U = [sa, ca, 0], R = [0, 0, 1];
         const n = this.n, S = this.S, H = this.H;
         const { rows, ws, end, esc } = this;
-        const gObs = st.gObs / boost;             // static gravitational shift × local infall Doppler factor
+        // logG: log10 of the shift of light arriving from far away (home), as
+        // measured by the pilot: 1/√(1−rs/r) while holding, then the free-fall
+        // value from Horizon.fallState(). The aberration boost above only bends
+        // directions (a cinematic camera); it no longer touches frequencies.
+        const logG = st.logG !== undefined ? st.logG : Math.log10(st.gObs);
+        const gObs = Math.pow(10, Math.min(30, logG));
+        const dimG = logG < 0 ? Math.pow(10, 4 * logG) : Math.min(2, 1 + logG * 0.12); // I ∝ g⁴ once it goes red
+        const starsAlive = st.starsAlive !== undefined ? st.starsAlive : 1;
+        const discAlive = st.discAlive !== undefined ? st.discAlive : 1;
+        const discTime = st.discTime !== undefined ? st.discTime : time;
+        const smear = st.smear || 0;
         const base = this.base, rin = this.rin, rout = this.rout;
-        const skyTint = Math.min(1, Math.log10(gObs) / 4);
+        const skyTint = Math.max(-1, Math.min(1, logG / 4));
         const aspect = h / w;
         const cb0 = Math.cos(this.beta), sb0 = Math.sin(this.beta);
         const smooth = (a, b, v) => { const k = Math.max(0, Math.min(1, (v - a) / (b - a))); return k * k * (3 - 2 * k); };
@@ -998,20 +1081,25 @@ class SchwarzschildView {
                         let vx = n[1] * Pz - n[2] * Py, vy = n[2] * Px - n[0] * Pz, vz = n[0] * Py - n[1] * Px;
                         const vm = Math.hypot(vx, vy, vz) || 1; vx /= vm; vy /= vm; vz /= vm;
                         const fi = Math.min(S - 2, Math.floor(phi / H));
-                        const wv = ws[row * S + fi], rp = -r * r * wv;
+                        // Photon direction in the local static frame: the radial
+                        // component is dr/dφ divided by √(1−1/r), not dr/dφ itself.
+                        const wv = ws[row * S + fi], rp = -r * r * wv / Math.sqrt(1 - 1 / r);
                         let kx = -(rp * cph - r * sph), ky = -(rp * sph + r * cph) * e2y, kz = -(rp * sph + r * cph) * e2z;
                         const km = Math.hypot(kx, ky, kz) || 1; kx /= km; ky /= km; kz /= km;
                         const v = Math.sqrt(0.5 / (r - 1));
                         const gam = 1 / Math.sqrt(1 - v * v);
                         const dop = 1 / (gam * (1 - v * (vx * kx + vy * ky + vz * kz)));
                         const az = Math.atan2(Pz, Px * cb0 - Py * sb0);
-                        const om = time * 2.2 * Math.pow(r / 3, -1.5);
-                        const streak = 0.58 + 0.23 * Math.sin(az * 6 + 7 * Math.log(r) - om) + 0.13 * Math.sin(az * 17 - 11 * r - om * 1.7) + 0.06 * Math.sin(az * 31 + 36 * Math.log(r) - om * 2.3);
-                        const em = Math.pow(rin / r, 3) * (1 - Math.sqrt(rin / r) * 0.92) * 9 * streak;
+                        // The gas orbits in home time. Once it turns more than a
+                        // few radians per frame its structure averages out.
+                        const kep = Math.pow(r / 3, -1.5), om = discTime * 2.2 * kep;
+                        const sharp = 1 - smooth(0.6, 3, smear * kep);
+                        const streak = 0.58 + sharp * (0.23 * Math.sin(az * 6 + 7 * Math.log(r) - om) + 0.13 * Math.sin(az * 17 - 11 * r - om * 1.7) + 0.06 * Math.sin(az * 31 + 36 * Math.log(r) - om * 2.3));
+                        const em = Math.pow(rin / r, 3) * (1 - Math.sqrt(rin / r) * 0.92) * 9 * streak * discAlive;
                         const localG = Math.sqrt(1 - 1 / r) * dop;
-                        const I = em * Math.pow(localG, 4) * Math.min(2, 1 + Math.log10(gObs) * 0.12) / (1 + k * 0.6);
+                        const I = em * Math.pow(localG, 4) * dimG / (1 + k * 0.6);
                         const L = 1 - Math.exp(-I * 4);
-                        const lg = Math.log2(Math.max(1e-3, localG)) + Math.min(4.5, Math.log10(gObs) * 0.60);
+                        const lg = Math.log2(Math.max(1e-3, localG)) + Math.max(-6, Math.min(4.5, logG * 0.60));
                         let cr = base[0], cg = base[1], cbl = base[2];
                         if (lg > 0) { const m2 = Math.min(0.85, lg / 3.6); cr += (199 - cr) * m2; cg += (224 - cg) * m2; cbl += (255 - cbl) * m2; }
                         else { const m2 = Math.min(1, -lg / 1.8); cr += (255 - cr) * m2; cg += (50 - cg) * m2; cbl += (24 - cbl) * m2; }
@@ -1026,20 +1114,22 @@ class SchwarzschildView {
                         const c2 = Math.cos(pf), s2 = Math.sin(pf);
                         const Sx = c2, Sy = s2 * e2y, Sz = s2 * e2z;
                         const lat = Math.asin(Math.max(-1, Math.min(1, Sx))), lon = Math.atan2(Sz, Sy);
-                        const band = 0.045 * Math.exp(-Math.pow(Sx * 0.3 + Sy * 0.5 + Sz * 0.81, 2) / 0.03);
-                        const lum = (band + 0.008) * remain * coverage;
-                        rC += (230 - 70 * skyTint) * lum; gC += (236 - 40 * skyTint) * lum; bC += 250 * lum;
+                        const band = 0.045 * starsAlive * Math.exp(-Math.pow(Sx * 0.3 + Sy * 0.5 + Sz * 0.81, 2) / 0.03);
+                        const lum = (band + 0.008) * remain * coverage * Math.min(1, dimG);
+                        const [sr, sg, sb] = this.skyColour(skyTint);
+                        rC += sr * lum; gC += sg * lum; bC += sb * lum;
                         const si = (py * w + px) * 3;
                         sky[si] = lat + 1.6; sky[si + 1] = (lon + PI) * Math.cos(lat);
                         sky[si + 2] = remain * coverage;
                     }
                 }
-                const fade = 1 - smooth(0.4, 1, falling);
+                const fade = 1 - smooth(0.9, 1, falling);   // only the very end; the physics dims the rest
                 data[p] = rC * fade; data[p + 1] = gC * fade; data[p + 2] = bC * fade; data[p + 3] = 255;
             }
         }
-        const exposure = 1.4 + 1.1 * Math.min(1, Math.log10(gObs) / 5);
-        const fade = 1 - smooth(0.4, 1, falling);
+        const exposure = (1.4 + 1.1 * Math.max(0, Math.min(1, logG / 5))) * Math.min(1, dimG) * starsAlive;
+        const fade = 1 - smooth(0.9, 1, falling);
+        const [skyR, skyGc, skyB] = this.skyColour(skyTint);
         const defaultFootprint = zenith ? 2 * PI / (rho * boost * w) : 2 * fovHalf / w;
         // Finite differences of the actual escaped rays provide the pixel's
         // angular footprint. Do this after mapping, so both CPU and GPU retain
@@ -1058,7 +1148,7 @@ class SchwarzschildView {
             let stars = 0;
             for (const layer of this.starLayers) stars += this.starLight(layer, sky[i], sky[i + 1], dx, dy);
             const light = Math.min(1, stars * exposure) * sky[i + 2] * fade, p = (py * w + px) * 4;
-            data[p] += (230 - 70 * skyTint) * light; data[p + 1] += (236 - 40 * skyTint) * light; data[p + 2] += 250 * light;
+            data[p] += skyR * light; data[p + 1] += skyGc * light; data[p + 2] += skyB * light;
         }
         ctx.putImageData(this.img, 0, 0);
         return c;
@@ -1202,10 +1292,14 @@ class HorizonScore {
                 this.nextTick += interval;
             }
         } else {
+            // In the fall the clock is heard as the light is shifted: still a
+            // blur until the horizon, then slowing toward a single tick a
+            // second, then lower and slower as the light goes red.
             while (this.nextTick < t + 0.25 && this.nextTick < F) {
-                const k = Math.max(0, Math.min(1, (this.nextTick - H) / (F - H))); // 0→1 through the fall
-                this.tick(this.t0 + this.nextTick, 0.9 * (1 - k), 2 * Math.pow(0.12, k));
-                this.nextTick += 0.05 + 1.4 * k * k;
+                const k = Math.max(0, Math.min(1, (this.nextTick - H) / (F - H)));
+                const g = Math.max(-1.2, Math.min(1.3, logRate));
+                this.tick(this.t0 + this.nextTick, 0.9 * (1 - 0.7 * k), Math.pow(2, g * 0.8));
+                this.nextTick += Math.max(0.05, 0.9 / Math.pow(10, g));
             }
         }
     }

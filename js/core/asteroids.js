@@ -16,7 +16,7 @@
 // the secret Phantoms mode is on for good: once the hole's pull beats the
 // engine there is no way back. At that moment the ship is lost and a new one
 // appears; where the old one was, a phantom stays — seen from outside, a falling ship never quite reaches
-// the horizon: it slows, stretches, reddens and fades over about half a minute.
+// the horizon: it slows, flattens along it, reddens and fades exponentially.
 // Either way, that moment may start End of times (js/core/horizon.js): the
 // chance is n/8 for the n-th fall, counted across games and visits, and the
 // count resets when it plays.
@@ -576,22 +576,28 @@ class AsteroidsGame {
     // is redshifted and dimmed until it is gone.
     drawPhantoms(px) {
         if (!this.phantoms.length) return;
-        const ctx = this.ctx, D = AsteroidsGame.PHANTOM;
+        const ctx = this.ctx;
         const rh = AsteroidsGame.T.holeRadius;
         const mix = (a, b, k) => a.map((v, i) => Math.round(v + (b[i] - v) * k));
+        // Seen from far away, a body falling in freezes at the horizon: its
+        // light is redshifted by g ∝ e^(−t/τ), its distance to the horizon
+        // shrinks as g² and its brightness as g⁴. The image flattens along the
+        // horizon rather than stretching toward it. τ is cinematic (40 s here;
+        // ~2·rs/c, a fraction of a millisecond, for a stellar black hole).
+        const TAU = 40;
         this.phantoms.forEach(ph => {
-            const k = ph.t / D;
-            const red = 1 - Math.exp(-ph.t / 5);
-            const dist = rh + (ph.d0 - rh) * Math.exp(-ph.t / 4);
+            const g = Math.exp(-ph.t / TAU);
+            const dist = rh + (ph.d0 - rh) * g * g;
             const x = ph.hx + Math.cos(ph.ang) * dist, y = ph.hy + Math.sin(ph.ang) * dist;
+            const red = Math.min(1, -Math.log2(g) / 1.2);          // false colour by log g, as in End of times
             let col = mix([165, 180, 252], [255, 64, 32], Math.min(1, red * 1.3));
             col = mix(col, [70, 8, 4], Math.max(0, red - 0.6) / 0.4);
-            const alpha = Math.pow(1 - k, 1.6) * (1 - 0.5 * red) * (1 - Math.min(1, (ph.gone || 0) / 0.8));
+            const alpha = Math.min(1, Math.pow(g, 4) * 1.15) * (1 - Math.min(1, (ph.gone || 0) / 0.8));
             if (alpha <= 0.01) return;
             ctx.save();
             ctx.translate(x, y);
             ctx.rotate(ph.ang);                       // radial axis
-            ctx.scale(1 + 2.6 * k + 0.6 * red, Math.max(0.15, 1 - 0.7 * k));
+            ctx.scale(Math.max(0.2, g), 1 + 1.6 * (1 - g));
             ctx.rotate(ph.a - ph.ang);
             ctx.beginPath();
             ctx.moveTo(15, 0); ctx.lineTo(-9, -9.5); ctx.lineTo(-5, 0); ctx.lineTo(-9, 9.5);
