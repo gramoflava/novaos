@@ -79,6 +79,10 @@ class Horizon {
         return -44;
     }
 
+    // The flight console's outline (fractions of the view): top edge just
+    // under the dash lip, wider toward the pilot.
+    static get CONSOLE() { return [[0.32, 0.705], [0.68, 0.705], [0.71, 0.96], [0.29, 0.96]]; }
+
     // log10 of how many home seconds pass per cockpit second: for a static
     // observer, dt_home/dτ = 1/√(1 − rs/r).
     logRate(t) {
@@ -294,14 +298,19 @@ class Horizon {
 
     makeStars() {
         const W = innerWidth, H = innerHeight;
-        // Stars at home: each dies at its own log10(years), one in five as a supernova.
-        this.stars = Array.from({ length: 170 }, () => ({
-            x: Math.random() * W, y: Math.random() * H,
-            r: Math.random() < 0.15 ? 1.6 : 0.9,
-            death: 8 + Math.random() * 6,
-            nova: Math.random() < 0.2,
-            novaT: -1
-        }));
+        // Stars at home, each dying at its own log10(years). Only massive stars
+        // explode, and they die young (~10⁷–10⁸·⁵ yr); sun-like and smaller
+        // ones just fade, the red dwarfs last (up to ~10¹⁴ yr).
+        this.stars = Array.from({ length: 170 }, () => {
+            const massive = Math.random() < 0.12;
+            return {
+                x: Math.random() * W, y: Math.random() * H,
+                r: massive ? 1.8 : Math.random() < 0.15 ? 1.4 : 0.9,
+                death: massive ? 7 + Math.random() * 1.5 : 9.5 + Math.random() * 4.5,
+                nova: massive,
+                novaT: -1
+            };
+        });
     }
 
     // ── Loop ─────────────────────────────────────────────────────────────────
@@ -407,8 +416,8 @@ class Horizon {
                 const k = st.novaT / 1.6;
                 const R = 6 + 75 * Math.sqrt(k);
                 const g = ctx.createRadialGradient(st.x, st.y, 0, st.x, st.y, R);
-                g.addColorStop(0, `rgba(255,255,255,${0.95 * (1 - k)})`);
-                g.addColorStop(0.3, `rgba(170,200,255,${0.6 * (1 - k)})`);
+                g.addColorStop(0, `rgba(255,255,255,${0.95 * (1 - k) * fade})`);
+                g.addColorStop(0.3, `rgba(170,200,255,${0.6 * (1 - k) * fade})`);
                 g.addColorStop(1, 'rgba(120,80,255,0)');
                 ctx.fillStyle = g;
                 ctx.beginPath(); ctx.arc(st.x, st.y, R, 0, Math.PI * 2); ctx.fill();
@@ -495,46 +504,51 @@ class Horizon {
         ctx.drawImage(this.cockpitFrame(W, H, u), 0, 0);
         this.drawInstruments(ctx, W, H, u, t, outside);
 
-        // ── Readouts, small, in the corners ──
-        const mono = s => `${Math.round(s * u)}px "JetBrains Mono", ui-monospace, monospace`;
-        const warn = '#ff937a', calm = 'rgba(235, 241, 255, 0.94)', dim = 'rgba(212, 224, 246, 0.76)';
-        ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 6 * u;
-        const pad = 16 * u, by = H - pad;
+        // ── Readouts, on the console ──
+        this.drawConsole(ctx, W, H, u, t, fall);
+    }
 
-        // bottom left: where we are, and what the craft is doing
+    // Distance and status on the left of the console; thrust and the shift of
+    // the light from home on the right; a caution light when the engine fails.
+    // The home clock stays in the top corner, as a head-up readout.
+    drawConsole(ctx, W, H, u, t, fall) {
+        const h = this.hud;
+        const mono = (sz, w = 400) => `${w} ${Math.round(sz * u)}px "JetBrains Mono", ui-monospace, monospace`;
+        const warn = '#ff937a', calm = 'rgba(235, 241, 255, 0.94)', dim = 'rgba(212, 224, 246, 0.62)';
+        const alarm = h.falling || h.strain > 0.7;
+        ctx.save();
+        // left column
+        // content block (~56u tall) centred in the console (y 0.705…0.96 of H)
+        const lx = W * 0.335, top = H * 0.8325 - 34 * u;
         ctx.textAlign = 'left';
-        ctx.fillStyle = dim; ctx.font = mono(10);
-        ctx.fillText('DISTANCE', pad, by - 30 * u);
-        ctx.fillStyle = h.falling ? warn : calm; ctx.font = mono(12);
-        ctx.fillText(h.radius, pad, by - 14 * u);
-        ctx.fillStyle = h.falling || h.strain > 0.7 ? warn : dim; ctx.font = mono(10);
-        ctx.fillText(h.status.toUpperCase(), pad, by);
-
-        // bottom right: thrust and the light's shift, as two thin bars
-        ctx.textAlign = 'right';
-        const bw = 120 * u, bx = W - pad - bw;
+        ctx.fillStyle = dim; ctx.font = mono(8.5);
+        ctx.fillText('DISTANCE', lx, top + 20 * u);
+        ctx.fillStyle = h.falling ? warn : calm; ctx.font = mono(11.5, 500);
+        ctx.fillText(h.radius, lx, top + 36 * u);
+        ctx.fillStyle = alarm ? warn : dim; ctx.font = mono(8.5);
+        ctx.fillText(h.status.toUpperCase(), lx, top + 52 * u);
+        // right column
+        const rx = W * 0.54, bw = W * 0.13;
         const bar = (y, label, v, colour) => {
-            ctx.fillStyle = dim; ctx.font = mono(10);
-            ctx.fillText(label, W - pad, y - 6 * u);
-            ctx.fillStyle = 'rgba(235,240,255,0.15)'; ctx.fillRect(bx, y, bw, 2 * u);
-            ctx.fillStyle = colour; ctx.fillRect(bx, y, bw * Math.max(0, Math.min(1, v)), 2 * u);
+            ctx.fillStyle = dim; ctx.font = mono(8.5);
+            ctx.fillText(label, rx, y - 5 * u);
+            ctx.fillStyle = 'rgba(235,240,255,0.15)'; ctx.fillRect(rx, y, bw, 2 * u);
+            ctx.fillStyle = colour; ctx.fillRect(rx, y, bw * Math.max(0, Math.min(1, v)), 2 * u);
         };
-        bar(by - 26 * u, `THRUST ${Math.round(h.thrust * 100)}%`, h.thrust, h.falling ? warn : calm);
+        bar(top + 24 * u, `THRUST ${Math.round(h.thrust * 100)}%`, h.thrust, h.falling ? warn : calm);
         const shift = h.lr >= 0 ? 0.5 - 0.5 * Math.min(1, h.lr / 22) : 0.5 + 0.5 * Math.min(1, -h.lr / 1.5);
-        ctx.fillStyle = dim; ctx.font = mono(10);
-        ctx.fillText(h.lr > 0.05 ? 'LIGHT · BLUESHIFTED' : h.lr < -0.05 ? 'LIGHT · REDSHIFTED' : 'LIGHT', W - pad, by - 6 * u);
-        const sg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+        ctx.fillStyle = dim; ctx.font = mono(8.5);
+        ctx.fillText(h.lr > 0.13 ? 'LIGHT · BLUE' : h.lr < -0.13 ? 'LIGHT · RED' : 'LIGHT', rx, top + 46 * u);
+        const sg = ctx.createLinearGradient(rx, 0, rx + bw, 0);
         sg.addColorStop(0, '#6b8cff'); sg.addColorStop(0.5, '#e8ecf8'); sg.addColorStop(1, '#ff4a2a');
-        ctx.globalAlpha = 0.6; ctx.fillStyle = sg; ctx.fillRect(bx, by, bw, 2 * u); ctx.globalAlpha = 1;
-        ctx.fillStyle = '#fff'; ctx.fillRect(bx + bw * shift - 1 * u, by - 3 * u, 2 * u, 8 * u);
-
-        // a single caution light, top left under the title, only when needed
+        ctx.globalAlpha = 0.7; ctx.fillStyle = sg; ctx.fillRect(rx, top + 51 * u, bw, 2 * u); ctx.globalAlpha = 1;
+        ctx.fillStyle = '#fff'; ctx.fillRect(rx + bw * shift - 1 * u, top + 48 * u, 2 * u, 8 * u);
+        // caution light, top right of the console, only in the fall
         if (h.falling && Math.floor(t * 4) % 2 === 0) {
             ctx.fillStyle = warn; ctx.shadowColor = warn; ctx.shadowBlur = 10 * u;
-            ctx.beginPath(); ctx.arc(pad + 3 * u, 44 * u, 3 * u, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(W * 0.665, H * 0.705 + 12 * u, 3 * u, 0, Math.PI * 2); ctx.fill();
         }
-        ctx.shadowBlur = 0;
-        ctx.textAlign = 'left';
+        ctx.restore();
     }
 
     // The cockpit as white lines, built once per size: overhead panel, a
@@ -585,8 +599,9 @@ class Horizon {
         poly([P(0.915, roofY(0.085)), P(0.885, roofY(0.115)), P(0.945, sillY(0.945)), P(0.975, sillY(0.975))], veil);
         // dash: lip from the sides to the bottom of the front pane, console below
         poly([P(0, 0.8), bl, br, P(1, 0.8), P(1, 1), P(0, 1)], veil);
-        const panel = [P(0.38, 0.725), P(0.62, 0.725), P(0.655, 0.905), P(0.345, 0.905)];
-        const panelGlass = g.createLinearGradient(0, H * 0.725, 0, H * 0.905);
+        // the flight console: the readouts live here, on a dark inset display
+        const panel = Horizon.CONSOLE.map(([x, y]) => P(x, y));
+        const panelGlass = g.createLinearGradient(0, H * 0.705, 0, H * 0.96);
         panelGlass.addColorStop(0, 'rgba(144,194,228,0.07)');
         panelGlass.addColorStop(1, 'rgba(8,14,24,0.6)');
         poly(panel, panelGlass);
@@ -612,8 +627,7 @@ class Horizon {
         edge([P(0.9, roofY(0.1)), P(0.96, sillY(0.96))], 0.6, 1.1);
         edge([P(0, 0.8), bl, br, P(1, 0.8)], 0.8, 1.2);                      // unbroken dash lip
         edge([...panel, panel[0]], 0.65, 0.9);                               // inset flight console
-        edge([P(0.395, 0.75), P(0.605, 0.75)], 0.32, 0.7);
-        edge([P(0.37, 0.878), P(0.63, 0.878)], 0.26, 0.7);
+        edge([P(0.5225, 0.725), P(0.5225, 0.935)], 0.22, 0.7);              // its two columns
         // overhead warning strip: four small empty panels
         for (let i = 0; i < 4; i++) {
             const x0 = 0.33 + i * 0.087;
@@ -670,22 +684,6 @@ class Horizon {
             ctx.fillStyle = h.falling || (warm > 0.65 && i > 1) ? `rgba(255,139,110,${0.24 * pulse})` : `rgba(163,215,255,${0.12 * pulse})`;
             ctx.fillRect(x + 5 * u, H * 0.095, W * 0.06 * level, 2 * u);
         }
-        // A small attitude indicator set into the dash, not a huge empty
-        // trapezoid extending past the window. Its bank follows the fall camera.
-        ctx.save(); ctx.translate(W * 0.5, H * 0.812);
-        const attitudeR = 14 * u;
-        ctx.strokeStyle = 'rgba(206,229,250,0.42)'; ctx.lineWidth = 0.8 * u;
-        ctx.beginPath(); ctx.arc(0, 0, attitudeR, 0, Math.PI * 2); ctx.stroke();
-        ctx.rotate(0.1 * Math.pow(this.s(t, Horizon.P.hoverEnd, Horizon.P.fallEnd), 2));
-        ctx.strokeStyle = h.falling ? 'rgba(255,147,122,0.75)' : 'rgba(214,236,255,0.68)';
-        ctx.beginPath(); ctx.moveTo(-10 * u, 0); ctx.lineTo(-3 * u, 0); ctx.lineTo(0, 3 * u);
-        ctx.lineTo(3 * u, 0); ctx.lineTo(10 * u, 0); ctx.stroke(); ctx.restore();
-        for (let i = 0; i < 5; i++) {
-            ctx.fillStyle = `rgba(${h.falling ? '255,147,122' : '172,217,246'},${h.dropout ? 0.10 : 0.22 + i * 0.045})`;
-            const length = (5 + i * 2) * u;
-            ctx.fillRect(W * 0.415 - length, H * 0.783 + i * 7 * u, length, u);
-            ctx.fillRect(W * 0.585, H * 0.783 + i * 7 * u, length * h.thrust, u);
-        }
         // A changing reflection, faint and clipped to the front pane. It lends
         // the frame glassiness without bloom/post-processing on the ray image.
         ctx.save();
@@ -712,11 +710,15 @@ class Horizon {
         this.el.rate.textContent = shift >= 1 ? `running ×10${this.sup(Math.floor(shift))}`
             : shift > 0.13 ? `running ×${Math.pow(10, shift).toFixed(1)}`
             : shift > -0.13 ? 'running normally' : `running ×${Math.pow(10, shift).toPrecision(2)}`;
-        if (falling) this.el.cockpit.classList.add('is-falling');
+        if (falling && !this.el.cockpit.classList.contains('is-falling')) {
+            this.el.cockpit.classList.add('is-falling');
+            const title = this.root.querySelector('.hz-title');
+            if (title) title.textContent = 'Single-seat craft · falling';
+        }
         const hold = this.s(t, P.inEnd, P.hoverEnd);
         const inside = falling && fs.inside;
         const x = falling && !inside ? fs.x : this.logR1(t);
-        const radius = inside ? `r = ${fs.r.toFixed(3)} rs · inside the horizon`
+        const radius = inside ? `r = ${fs.r.toFixed(3)} rs`
             : x > -3 ? `r = ${(1 + Math.pow(10, x)).toFixed(5)} rs` : `r = (1 + 10${this.sup(Math.round(x))}) rs`;
         const strain = this.s(t, P.geomEnd + 3, P.hoverEnd);
         const dropout = !falling && ((t > 25.1 && t < 25.3) || (t > 32.7 && t < 33.05) || (t > 36.5 && t < 36.95));
@@ -727,7 +729,7 @@ class Horizon {
             falling,
             strain, dropout,
             radius,
-            status: falling ? (inside ? 'free fall · inside the horizon' : 'engine failure · free fall') : dropout ? 'thrust instability' : strain > 0.7 ? 'holding · engine at limit' : t < P.geomEnd ? 'descending' : 'holding position'
+            status: falling ? (inside ? 'inside the horizon' : 'engine failure') : dropout ? 'thrust instability' : strain > 0.7 ? 'holding · engine at limit' : t < P.geomEnd ? 'descending' : 'holding position'
         };
     }
 

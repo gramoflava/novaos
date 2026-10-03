@@ -60,13 +60,21 @@ class AsteroidsGame {
     }
 
     // ── Starting and stopping ────────────────────────────────────────────────
+    // Letters by physical key, not by character: B A on a Russian layout
+    // types «и ф», and W A D «ц ф в». e.code is the same on every layout.
+    static keyOf(e) {
+        if (e.code && /^Key[A-Z]$/.test(e.code)) return e.code.slice(3).toLowerCase();
+        if (e.code === 'Space') return ' ';
+        return e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    }
+
     onCodeKey(e) {
         if (this.state !== 'off') return;
         if (e.target && e.target.closest && e.target.closest('input, textarea, select, [contenteditable="true"]')) {
             this.codePos = 0;
             return;
         }
-        const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+        const key = AsteroidsGame.keyOf(e);
         if (key === this.code[this.codePos]) {
             this.codePos++;
             if (this.codePos === this.code.length) {
@@ -154,14 +162,15 @@ class AsteroidsGame {
             this.stop();
             return;
         }
-        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' ', 'a', 'd', 'w', 'A', 'D', 'W'].includes(e.key)) {
+        const key = AsteroidsGame.keyOf(e);
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' ', 'a', 'd', 'w'].includes(key)) {
             e.preventDefault(); e.stopPropagation();
-            this.keys.add(e.key.length === 1 ? e.key.toLowerCase() : e.key);
+            this.keys.add(key);
         }
     }
 
     onKeyUp(e) {
-        const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+        const key = AsteroidsGame.keyOf(e);
         if (this.keys.has(key)) {
             e.preventDefault(); e.stopPropagation();
             this.keys.delete(key);
