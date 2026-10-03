@@ -91,14 +91,16 @@ class WindowManagerClass {
                     let edgeX = scX;
                     let edgeY = scY;
                     const slope = dy / dx;
-                    const maxDX = vW/2 - 20;
-                    const maxDY = vH/2 - 20;
+                    // Hug the screen edge, clear of the island and shelf outlines.
+                    const E = 7;
+                    const maxDX = vW/2 - E;
+                    const maxDY = vH/2 - E;
 
                     if (Math.abs(slope) < maxDY / maxDX) {
-                        edgeX = dx > 0 ? vW - 20 : 20;
+                        edgeX = dx > 0 ? vW - E : E;
                         edgeY = scY + (edgeX - scX) * slope;
                     } else {
-                        edgeY = dy > 0 ? vH - 20 : 20;
+                        edgeY = dy > 0 ? vH - E : E;
                         edgeX = scX + (edgeY - scY) / slope;
                     }
 

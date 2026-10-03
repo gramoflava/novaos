@@ -8,8 +8,8 @@ Apps.register({
         const winId = 'scoresapp-' + Date.now();
         const style = `
             .scores-container { display: flex; height: 100%; color: var(--text); }
-            .scores-sidebar { width: 120px; border-right: 1px solid var(--line); padding: 12px; }
-            .scores-menu-item { padding: 8px 12px; margin-bottom: 4px; border-radius: var(--radius-sm); cursor: pointer; transition: background 0.2s; font-size: 14px; }
+            .scores-sidebar { width: 150px; flex: none; border-right: 1px solid var(--line); padding: 12px; }
+            .scores-menu-item { white-space: nowrap; padding: 8px 12px; margin-bottom: 4px; border-radius: var(--radius-sm); cursor: pointer; transition: background 0.2s; font-size: 14px; }
             .scores-menu-item:hover { background: var(--surface-sunk); }
             .scores-menu-item.active { background: var(--accent); color: var(--text-on-accent); }
             .scores-content { flex: 1; padding: 24px; overflow-y: auto; }
@@ -38,8 +38,8 @@ Apps.register({
             id: winId,
             appId: 'scores',
             title: 'Scores',
-            width: 400,
-            height: 500,
+            width: 520,
+            height: 540,
             content: html
         });
 

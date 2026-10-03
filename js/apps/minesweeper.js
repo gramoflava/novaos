@@ -37,7 +37,7 @@ Apps.register({
                     <div class="game-toolbar__group">
                         <select id="ms-level-${winId}" class="game-select" aria-label="Difficulty">
                             <option value="easy">Beginner</option>
-                            <option value="medium">Intermed.</option>
+                            <option value="medium">${window.matchMedia('(max-width: 640px)').matches ? 'Medium' : 'Intermediate'}</option>
                             <option value="hard">Expert</option>
                         </select>
                         <button class="game-icon-btn game-icon-btn--restart" id="ms-restart-${winId}" type="button" title="Restart" aria-label="Restart"></button>

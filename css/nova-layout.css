@@ -25,7 +25,7 @@
 
 .nova-island {
     pointer-events: auto;
-    height: 40px;
+    height: 44px;
     background: var(--glass);
     backdrop-filter: blur(var(--blur-bar)) saturate(200%);
     -webkit-backdrop-filter: blur(var(--blur-bar)) saturate(200%);
@@ -33,7 +33,9 @@
     border-radius: var(--radius-xl);
     display: flex;
     align-items: center;
-    padding: 0 16px;
+    /* the site tools sit in the right end, 3px from the edge all round, so
+       the two pills end together */
+    padding: 0 3px 0 16px;
     gap: 20px;
     box-shadow: var(--shadow-lg), var(--glass-edge);
     transition: all var(--dur-base) var(--ease-smooth);
@@ -85,6 +87,7 @@
 
 .island-tools {
     margin-left: var(--space-1);
+    box-shadow: none;
 }
 
 .island-btn:hover {
@@ -421,9 +424,12 @@
     height: 18px;
     background: currentColor;
     content: "";
-    -webkit-mask: var(--game-action-icon) center / contain no-repeat;
-    mask: var(--game-action-icon) center / contain no-repeat;
+    -webkit-mask-position: center; mask-position: center;
+    -webkit-mask-size: contain; mask-size: contain;
+    -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
 }
+/* Each action names its icon directly: a url() passed through a custom
+   property is resolved differently between browsers, and the icons vanished. */
 
 .game-icon-btn:hover,
 .game-select:hover {
@@ -450,27 +456,16 @@
     box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
-.game-icon-btn--restart {
-    --game-action-icon: url("../gramofdesign/icons/refresh.svg");
-}
-
-.game-icon-btn--pause {
-    --game-action-icon: url("../gramofdesign/icons/pause.svg");
-}
-
 .game-icon-btn--pause[aria-pressed="true"] {
-    --game-action-icon: url("../gramofdesign/icons/play.svg");
     color: var(--accent);
     background: color-mix(in srgb, var(--accent) 12%, var(--surface-sunk));
 }
 
 .game-icon-btn--forfeit {
-    --game-action-icon: url("../gramofdesign/icons/flag.svg");
     color: var(--warn);
 }
 
 .game-icon-btn--flag {
-    --game-action-icon: url("../gramofdesign/icons/flag.svg");
     color: var(--warn);
 }
 
@@ -480,7 +475,6 @@
 }
 
 .game-icon-btn--reveal {
-    --game-action-icon: url("../gramofdesign/icons/eye.svg");
     color: var(--danger);
 }
 
@@ -742,3 +736,10 @@
     }
 
 }
+
+.game-icon-btn--restart::before { -webkit-mask-image: url("../gramofdesign/icons/refresh.svg"); mask-image: url("../gramofdesign/icons/refresh.svg"); }
+.game-icon-btn--pause::before { -webkit-mask-image: url("../gramofdesign/icons/pause.svg"); mask-image: url("../gramofdesign/icons/pause.svg"); }
+.game-icon-btn--pause[aria-pressed="true"]::before { -webkit-mask-image: url("../gramofdesign/icons/play.svg"); mask-image: url("../gramofdesign/icons/play.svg"); }
+.game-icon-btn--forfeit::before { -webkit-mask-image: url("../gramofdesign/icons/flag.svg"); mask-image: url("../gramofdesign/icons/flag.svg"); }
+.game-icon-btn--flag::before { -webkit-mask-image: url("../gramofdesign/icons/flag.svg"); mask-image: url("../gramofdesign/icons/flag.svg"); }
+.game-icon-btn--reveal::before { -webkit-mask-image: url("../gramofdesign/icons/eye.svg"); mask-image: url("../gramofdesign/icons/eye.svg"); }
