@@ -547,7 +547,7 @@ class AsteroidsGame {
         return Math.max(T.holeRadius, Math.sqrt(Math.max(0, T.holePull / T.thrust - 1600)));
     }
 
-    static get PHANTOM() { return 36; } // seconds a phantom lingers, about the Horizon's length
+    static get PHANTOM() { return 48; } // seconds a phantom lingers, about End of times' length
 
     phantomsOn() {
         return !!(window.NovaHorizon && NovaHorizon.phantomsUnlocked());

@@ -53,8 +53,12 @@ class Horizon {
     }
 
     // ── Timeline (seconds) ───────────────────────────────────────────────────
+    // The descent and the hold last 38.2 s — the golden ratio's 0.382, ×100.
+    // Everything before the fall is that one span, stretched evenly from the
+    // original 28 s cut (K); the fall, darkness and waking keep their length.
     static get P() {
-        return { inEnd: 2.5, descentEnd: 14, hoverEnd: 28, fallEnd: 34, darkEnd: 36.5, end: 39.5 };
+        const K = 38.2 / 28;
+        return { K, inEnd: 2.5 * K, geomEnd: 11 * K, hoverEnd: 38.2, fallEnd: 44.2, darkEnd: 46.7, end: 49.7 };
     }
 
     // Where the craft is: x = log10(r − 1), r in units of rs. From r = 12 down
@@ -64,8 +68,8 @@ class Horizon {
         const P = Horizon.P;
         const ease = k => k * k * (3 - 2 * k);
         if (t < P.inEnd) return Math.log10(11);
-        if (t < 11) return Math.log10(11) + (-1.6 - Math.log10(11)) * ease((t - P.inEnd) / (11 - P.inEnd));
-        if (t < P.hoverEnd) return -1.6 - 42.4 * Math.pow((t - 11) / (P.hoverEnd - 11), 1.5);
+        if (t < P.geomEnd) return Math.log10(11) + (-1.6 - Math.log10(11)) * ease((t - P.inEnd) / (P.geomEnd - P.inEnd));
+        if (t < P.hoverEnd) return -1.6 - 42.4 * Math.pow((t - P.geomEnd) / (P.hoverEnd - P.geomEnd), 1.5);
         return -44;
     }
 
@@ -380,7 +384,7 @@ class Horizon {
         const lw = Math.round(this.lw), lh = Math.round(lw * H / W);
         if (!h.falling) {
             const x = this.logR1(t), lr = this.logRate(t);
-            const rho = 0.376 * Math.pow(0.1 / 0.376, this.s(t, 11, P.hoverEnd));
+            const rho = 0.376 * Math.pow(0.1 / 0.376, this.s(t, P.geomEnd, P.hoverEnd));
             const t0 = performance.now();
             const img = this.rays.render(lw, lh, { logR1: x, gObs: Math.pow(10, Math.min(lr, 30)), rho }, t);
             const ms = performance.now() - t0;
@@ -594,7 +598,7 @@ class Horizon {
 
     zoomOut(t) {
         if (!this.camTo) return;
-        const k = this.s(t, 1.5, 11);
+        const k = this.s(t, 1.5 * Horizon.P.K, Horizon.P.geomEnd);
         const WM = window.WindowManager, a = this.cam, b = this.camTo;
         WM.cameraZ = a.z + (b.z - a.z) * k;
         WM.cameraX = a.x + (b.x - a.x) * k;
@@ -920,11 +924,12 @@ class HorizonScore {
         // [start s, length s, MIDI notes, level]
         const Am = [45, 52, 59, 60, 64], F = [41, 48, 52, 57, 59], C = [43, 48, 52, 55, 62], E = [40, 45, 47, 52, 57];
         const up = ch => ch.concat(ch.slice(2).map(n => n + 12));
+        const P = Horizon.P, K = P.K;
         this.score = [
             [0.4, 3.6, Am, 0.05], [3.4, 3.6, F, 0.055], [6.4, 3.6, C, 0.06], [9.4, 4.6, E, 0.065],
-            [13.6, 3.8, up(Am), 0.07], [17.0, 3.8, up(F), 0.075], [20.4, 3.8, up(C), 0.08], [23.8, 4.4, up(E).concat([69]), 0.09],
-            [27.8, 6.4, [33, 45, 52, 57, 60, 64, 71], 0.09]        // the fall
-        ];
+            [13.6, 3.8, up(Am), 0.07], [17.0, 3.8, up(F), 0.075], [20.4, 3.8, up(C), 0.08], [23.8, 4.4, up(E).concat([69]), 0.09]
+        ].map(([at, len, notes, lv]) => [at * K, len * K, notes, lv]);
+        this.score.push([P.hoverEnd - 0.2, 6.4, [33, 45, 52, 57, 60, 64, 71], 0.09]);   // the fall
     }
 
     mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
@@ -997,15 +1002,16 @@ class HorizonScore {
         // Never schedule into the past: after a skip or a hidden tab the
         // tick would otherwise try to catch up (and at absurd pitches).
         if (this.nextTick < t - 0.1) this.nextTick = t;
-        if (t < 28) {
+        const P = Horizon.P, H = P.hoverEnd, F = P.fallEnd - 0.5;
+        if (t < H) {
             const interval = Math.max(0.05, 0.9 / (1 + logRate * 0.6));
-            while (this.nextTick < t + 0.25 && this.nextTick < 28) {
+            while (this.nextTick < t + 0.25 && this.nextTick < H) {
                 this.tick(this.t0 + this.nextTick, 0.55 + logRate / 40, 1 + logRate / 22);
                 this.nextTick += interval;
             }
         } else {
-            while (this.nextTick < t + 0.25 && this.nextTick < 33.5) {
-                const k = Math.max(0, Math.min(1, (this.nextTick - 28) / 5.5)); // 0→1 through the fall
+            while (this.nextTick < t + 0.25 && this.nextTick < F) {
+                const k = Math.max(0, Math.min(1, (this.nextTick - H) / (F - H))); // 0→1 through the fall
                 this.tick(this.t0 + this.nextTick, 0.9 * (1 - k), 2 * Math.pow(0.12, k));
                 this.nextTick += 0.05 + 1.4 * k * k;
             }
