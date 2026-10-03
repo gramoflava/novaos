@@ -11,8 +11,9 @@
 // outside sky shrinks into a bright, blueshifted disc overhead. So the home
 // clock races, and the desktop around the cockpit ages with it: windows yellow,
 // crack and crumble, stars burn out or go supernova, the cosmos stretches and
-// dims. Then the engine gives out. In free fall the disc reddens, stretches
-// and goes out, the screen goes black, a flash — and the desktop is back, as
+// dims. Then the engine gives out. In the cinematic fall the outside cone
+// widens through local aberration and fades, the screen goes black, a flash —
+// and the desktop is back, as
 // if waking from a dream. The game is over whatever lives were left.
 //
 // The score is original, made in Web Audio: an organ-like chord progression in
@@ -39,6 +40,10 @@ class Horizon {
 
     phantomsUnlocked() {
         try { return localStorage.getItem('novaos_phantoms') === '1'; } catch (e) { return false; }
+    }
+
+    unlockPhantoms() {
+        try { localStorage.setItem('novaos_phantoms', '1'); } catch (e) { }
     }
 
     // Called on every fall into a black hole. True means: play it now.
@@ -96,19 +101,22 @@ class Horizon {
         this.saved = new Map();
         this.flashed = false;
         this.unlockedNow = !this.phantomsUnlocked();
-        try { localStorage.setItem('novaos_phantoms', '1'); } catch (e) { }
+        this.unlockPhantoms();
 
         this.buildDom();
         this.collectDesktop();
         this.planZoom();
         this.makeStars();
         this.rays = new SchwarzschildView(this.hue);
-        this.snapshot = null;
+        this.lw = 420;
+        this.msAvg = 0;
+        this.qualityAt = 0;
         this.music = new HorizonScore();
         this.music.start();
 
         window.addEventListener('keydown', this.onKey, true);
         this.last = performance.now();
+        this.nextDraw = this.last + 1000 / 60;
         this.raf = requestAnimationFrame(this.frame);
     }
 
@@ -126,6 +134,17 @@ class Horizon {
         cancelAnimationFrame(this.raf);
         window.removeEventListener('keydown', this.onKey, true);
         if (this.root) this.root.remove();
+        if (this.rays) this.rays.dispose();
+        this.rays = null;
+        this.frameCache = null;
+        // Detached canvases otherwise remain held by the singleton until the
+        // next visit, including the full-screen high-DPI star/dust layer.
+        for (const canvas of [this.sky, this.view]) {
+            if (canvas) { canvas.width = 1; canvas.height = 1; }
+        }
+        this.sky = this.view = this.el = null;
+        this.stars = this.dust = this.windows = this.chrome = null;
+        this.music = null;
         this.root = null;
         this.running = false;
         const done = this.onDone;
@@ -173,10 +192,10 @@ class Horizon {
     resize() {
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         this.dpr = dpr;
-        this.sky.width = innerWidth * dpr;
-        this.sky.height = innerHeight * dpr;
-        this.view.width = Math.max(1, this.view.offsetWidth * dpr);
-        this.view.height = Math.max(1, this.view.offsetHeight * dpr);
+        this.sky.width = Math.round(innerWidth * dpr);
+        this.sky.height = Math.round(innerHeight * dpr);
+        this.view.width = Math.max(1, Math.round(this.view.offsetWidth * dpr));
+        this.view.height = Math.max(1, Math.round(this.view.offsetHeight * dpr));
     }
 
     // Everything at home that ages: windows, the island, the shelf, the cosmos.
@@ -249,6 +268,11 @@ class Horizon {
 
     // ── Loop ─────────────────────────────────────────────────────────────────
     frame(now) {
+        // A 120/144 Hz display does not need twice as many photon images.
+        // Keep the cinematic scene at ~60 rendered frames without busy waiting.
+        if (now + 0.5 < this.nextDraw) { this.raf = requestAnimationFrame(this.frame); return; }
+        this.nextDraw += 1000 / 60;
+        if (this.nextDraw < now - 1000 / 60) this.nextDraw = now + 1000 / 60;
         const dt = Math.min(0.05, (now - this.last) / 1000);
         this.last = now;
         const P = Horizon.P;
@@ -263,7 +287,7 @@ class Horizon {
         if (!this.flashed) {
             this.zoomOut(t);
             this.updateHome(t, ly, dt);
-            if (this.view.offsetWidth * this.dpr !== this.view.width || this.view.offsetHeight * this.dpr !== this.view.height) this.resize();
+            if (Math.round(this.view.offsetWidth * this.dpr) !== this.view.width || Math.round(this.view.offsetHeight * this.dpr) !== this.view.height) this.resize();
             this.drawSky(t, ly, dt);
             this.updateCockpit(t, years, ly);
             this.drawView(t);
@@ -334,13 +358,16 @@ class Horizon {
             if (st.novaT >= 0 && st.novaT < 1.6) {
                 st.novaT += dt;
                 const k = st.novaT / 1.6;
-                const R = 6 + 60 * Math.sqrt(k);
+                const R = 6 + 75 * Math.sqrt(k);
                 const g = ctx.createRadialGradient(st.x, st.y, 0, st.x, st.y, R);
                 g.addColorStop(0, `rgba(255,255,255,${0.95 * (1 - k)})`);
                 g.addColorStop(0.3, `rgba(170,200,255,${0.6 * (1 - k)})`);
                 g.addColorStop(1, 'rgba(120,80,255,0)');
                 ctx.fillStyle = g;
                 ctx.beginPath(); ctx.arc(st.x, st.y, R, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = `rgba(205,225,255,${0.38 * Math.sin(k * Math.PI) * fade})`;
+                ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.arc(st.x, st.y, R * 0.72, 0, Math.PI * 2); ctx.stroke();
                 return;
             }
             if (st.novaT >= 1.6 || life <= 0) return;
@@ -375,74 +402,67 @@ class Horizon {
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, W, H);
-        const shake = (fall * 6 + this.s(t, P.hoverEnd - 4, P.hoverEnd) * 1.5) * u;
-        ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+        const sinceFall = Math.max(0, t - P.hoverEnd);
+        const shake = h.falling ? 4.5 * Math.exp(-sinceFall * 1.6) + 0.22 * (1 - fall) : 0.22 * this.s(t, P.hoverEnd - 5, P.hoverEnd);
+        // One damped craft shudder; the outside camera has its own angular drift.
+        ctx.translate(Math.sin(t * 73) * shake * u, Math.sin(t * 91 + 1) * shake * u * 0.7);
 
         // ── Outside ──
-        // Resolution follows the machine: aim for ~10 ms per frame.
-        this.lw = this.lw || 420;
-        const lw = Math.round(this.lw), lh = Math.round(lw * H / W);
-        if (!h.falling) {
+        // The GPU shades at display resolution (with a pixel-budget cap).
+        // The CPU fallback changes quality slowly, not every frame: this avoids
+        // repeatedly reallocating buffers and making detail visibly breathe.
+        let outside = null;
+        if (fall < 1) {
+            const lw = this.rays.gpu ? W : Math.round(this.lw), lh = Math.round(lw * H / W);
             const x = this.logR1(t), lr = this.logRate(t);
             const rho = 0.376 * Math.pow(0.1 / 0.376, this.s(t, P.geomEnd, P.hoverEnd));
             const t0 = performance.now();
-            const img = this.rays.render(lw, lh, { logR1: x, gObs: Math.pow(10, Math.min(lr, 30)), rho }, t);
+            const img = this.rays.render(lw, lh, { logR1: x, gObs: Math.pow(10, Math.min(lr, 30)), rho, fall }, t);
+            outside = img;
             const ms = performance.now() - t0;
             this.msAvg = this.msAvg ? this.msAvg * 0.9 + ms * 0.1 : ms;
-            if (this.msAvg > 13 && this.lw > 260) this.lw *= 0.94;
-            else if (this.msAvg < 7 && this.lw < Math.min(720, W)) this.lw *= 1.04;
+            if (!this.rays.gpu && t > this.qualityAt) {
+                if (this.msAvg > 13) this.lw = Math.max(280, this.lw - 40);
+                else if (this.msAvg < 7) this.lw = Math.min(800, W, this.lw + 40);
+                this.qualityAt = t + 0.75;
+            }
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(img, 0, 0, W, H);
-            if (t > P.hoverEnd - 0.2) {               // keep the last sight for the fall
-                if (!this.snapshot) this.snapshot = document.createElement('canvas');
-                this.snapshot.width = img.width; this.snapshot.height = img.height;
-                this.snapshot.getContext('2d').drawImage(img, 0, 0);
-            }
-        } else if (this.snapshot) {
-            // Free fall: the cone of outside light widens a little (aberration
-            // for a falling observer), reddens and dims, and then it is gone.
-            const sc = 1 + 0.9 * fall, dw = W * sc, dh = H * sc;
-            ctx.save();
-            ctx.globalAlpha = Math.max(0, 1 - fall * 1.15);
-            ctx.drawImage(this.snapshot, (W - dw) / 2, (H - dh) / 2, dw, dh);
-            ctx.globalCompositeOperation = 'multiply';
-            ctx.fillStyle = `rgb(255, ${Math.round(255 - 205 * fall)}, ${Math.round(255 - 230 * fall)})`;
-            ctx.fillRect(0, 0, W, H);
-            ctx.restore();
         }
 
         // ── The craft: a white wireframe cockpit ──
         ctx.drawImage(this.cockpitFrame(W, H, u), 0, 0);
+        this.drawInstruments(ctx, W, H, u, t, outside);
 
         // ── Readouts, small, in the corners ──
         const mono = s => `${Math.round(s * u)}px "JetBrains Mono", ui-monospace, monospace`;
-        const warn = '#ff6a4a', calm = 'rgba(225, 232, 250, 0.82)', dim = 'rgba(200, 210, 235, 0.5)';
+        const warn = '#ff937a', calm = 'rgba(235, 241, 255, 0.94)', dim = 'rgba(212, 224, 246, 0.76)';
         ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 6 * u;
         const pad = 16 * u, by = H - pad;
 
         // bottom left: where we are, and what the craft is doing
         ctx.textAlign = 'left';
-        ctx.fillStyle = dim; ctx.font = mono(9);
+        ctx.fillStyle = dim; ctx.font = mono(10);
         ctx.fillText('DISTANCE', pad, by - 30 * u);
         ctx.fillStyle = h.falling ? warn : calm; ctx.font = mono(12);
         ctx.fillText(h.radius, pad, by - 14 * u);
-        ctx.fillStyle = h.falling ? warn : dim; ctx.font = mono(9);
+        ctx.fillStyle = h.falling || h.strain > 0.7 ? warn : dim; ctx.font = mono(10);
         ctx.fillText(h.status.toUpperCase(), pad, by);
 
         // bottom right: thrust and the light's shift, as two thin bars
         ctx.textAlign = 'right';
         const bw = 120 * u, bx = W - pad - bw;
         const bar = (y, label, v, colour) => {
-            ctx.fillStyle = dim; ctx.font = mono(9);
+            ctx.fillStyle = dim; ctx.font = mono(10);
             ctx.fillText(label, W - pad, y - 6 * u);
             ctx.fillStyle = 'rgba(235,240,255,0.15)'; ctx.fillRect(bx, y, bw, 2 * u);
             ctx.fillStyle = colour; ctx.fillRect(bx, y, bw * Math.max(0, Math.min(1, v)), 2 * u);
         };
         bar(by - 26 * u, `THRUST ${Math.round(h.thrust * 100)}%`, h.thrust, h.falling ? warn : calm);
-        const shift = h.falling ? 0.5 + 0.5 * fall : 0.5 - 0.5 * Math.min(1, h.lr / 4);
-        ctx.fillStyle = dim; ctx.font = mono(9);
-        ctx.fillText(shift < 0.48 ? 'LIGHT · BLUESHIFTED' : shift > 0.52 ? 'LIGHT · REDSHIFTED' : 'LIGHT', W - pad, by - 6 * u);
+        const shift = 0.5 - 0.5 * Math.min(1, h.lr / 22);
+        ctx.fillStyle = dim; ctx.font = mono(10);
+        ctx.fillText(h.falling ? 'LIGHT · SHIFT FALLING' : shift < 0.48 ? 'LIGHT · BLUESHIFTED' : 'LIGHT', W - pad, by - 6 * u);
         const sg = ctx.createLinearGradient(bx, 0, bx + bw, 0);
         sg.addColorStop(0, '#6b8cff'); sg.addColorStop(0.5, '#e8ecf8'); sg.addColorStop(1, '#ff4a2a');
         ctx.globalAlpha = 0.6; ctx.fillStyle = sg; ctx.fillRect(bx, by, bw, 2 * u); ctx.globalAlpha = 1;
@@ -469,6 +489,10 @@ class Horizon {
         const g = c.getContext('2d');
         g.clearRect(0, 0, W, H);
         const P = (x, y) => [x * W, y * H];
+        // Every sill/strut foot lies on this same straight dash edge. Keeping
+        // the joins derived avoids a bend that isn't attached to any member.
+        const sillY = x => 0.8 - 0.14 * Math.min(x, 1 - x) / 0.385;
+        const roofY = x => 0.04 + (x + 0.02) / 0.275 * 0.12;
         // key points (fractions of the view)
         const tl = P(0.29, 0.17), tr = P(0.71, 0.17);      // front pane, top corners
         const bl = P(0.385, 0.66), br = P(0.615, 0.66);     // front pane, bottom corners
@@ -479,36 +503,57 @@ class Horizon {
             g.closePath(); g.fillStyle = fill; g.fill();
         };
         const pw = 0.035;                                   // pillar width, in W
+        // A restrained dichroic coating: broad, transparent reflections on the
+        // glass, and a narrow coloured bevel beside each white structural edge.
+        const glass = g.createLinearGradient(W * 0.24, H * 0.1, W * 0.78, H * 0.8);
+        glass.addColorStop(0, 'rgba(145,225,255,0.045)');
+        glass.addColorStop(0.37, 'rgba(230,245,255,0.008)');
+        glass.addColorStop(0.58, 'rgba(202,166,255,0.035)');
+        glass.addColorStop(1, 'rgba(151,235,230,0.015)');
+        poly([tl, tr, br, bl], glass);
+        poly([P(0, 0.04), tl, bl, P(0, 0.8)], glass);
+        poly([tr, P(1, 0.04), P(1, 0.8), br], glass);
         // overhead panel
         poly([P(-0.02, -0.02), P(1.02, -0.02), P(1.02, 0.04), tr, tl, P(-0.02, 0.04)], veil);
         // pillars (front pane edges), thick at the top, thinner at the dash
-        poly([tl, [tl[0] - pw * W, tl[1] - 0.01 * H], [bl[0] - pw * 0.5 * W, bl[1]], bl], veil);
-        poly([tr, [tr[0] + pw * W, tr[1] - 0.01 * H], [br[0] + pw * 0.5 * W, br[1]], br], veil);
+        poly([tl, P(0.255, 0.16), P(0.3675, sillY(0.3675)), bl], veil);
+        poly([tr, P(0.745, 0.16), P(0.6325, sillY(0.6325)), br], veil);
         // side-pane struts from the overhead corners down to the sills
         // (they run from the overhead edge down to the dash lip, so they meet
         // the rest of the frame instead of floating across it)
-        poly([P(0.085, 0.085), P(0.115, 0.098), P(0.055, 0.76), P(0.025, 0.775)], veil);
-        poly([P(0.915, 0.085), P(0.885, 0.098), P(0.945, 0.76), P(0.975, 0.775)], veil);
+        poly([P(0.085, roofY(0.085)), P(0.115, roofY(0.115)), P(0.055, sillY(0.055)), P(0.025, sillY(0.025))], veil);
+        poly([P(0.915, roofY(0.085)), P(0.885, roofY(0.115)), P(0.945, sillY(0.945)), P(0.975, sillY(0.975))], veil);
         // dash: lip from the sides to the bottom of the front pane, console below
-        poly([P(-0.02, 0.8), P(0.18, 0.7), bl, br, P(0.82, 0.7), P(1.02, 0.8), P(1.02, 1.02), P(-0.02, 1.02)], veil);
+        poly([P(0, 0.8), bl, br, P(1, 0.8), P(1, 1), P(0, 1)], veil);
+        const panel = [P(0.38, 0.725), P(0.62, 0.725), P(0.655, 0.905), P(0.345, 0.905)];
+        const panelGlass = g.createLinearGradient(0, H * 0.725, 0, H * 0.905);
+        panelGlass.addColorStop(0, 'rgba(144,194,228,0.07)');
+        panelGlass.addColorStop(1, 'rgba(8,14,24,0.6)');
+        poly(panel, panelGlass);
 
         // edges
         g.lineCap = 'round'; g.lineJoin = 'round';
         const edge = (pts, a, w) => {
             g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
             for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
+            const tint = g.createLinearGradient(0, 0, W, H);
+            tint.addColorStop(0, `rgba(123,219,255,${a * 0.45})`);
+            tint.addColorStop(0.48, `rgba(207,179,255,${a * 0.3})`);
+            tint.addColorStop(1, `rgba(144,241,221,${a * 0.4})`);
+            g.strokeStyle = tint; g.lineWidth = (w + 2) * u; g.stroke();
             g.strokeStyle = `rgba(235, 240, 255, ${a})`; g.lineWidth = w * u; g.stroke();
         };
         edge([tl, tr, br, bl, tl], 0.9, 1.3);                                  // front pane
-        edge([[tl[0] - pw * W, tl[1] - 0.01 * H], [bl[0] - pw * 0.5 * W, bl[1]]], 0.7, 1.1);
-        edge([[tr[0] + pw * W, tr[1] - 0.01 * H], [br[0] + pw * 0.5 * W, br[1]]], 0.7, 1.1);
+        edge([P(0.255, 0.16), P(0.3675, sillY(0.3675))], 0.7, 1.1);
+        edge([P(0.745, 0.16), P(0.6325, sillY(0.6325))], 0.7, 1.1);
         edge([P(-0.02, 0.04), [tl[0] - pw * W, tl[1] - 0.01 * H]], 0.7, 1.1);  // overhead
         edge([P(1.02, 0.04), [tr[0] + pw * W, tr[1] - 0.01 * H]], 0.7, 1.1);
-        edge([P(0.1, 0.091), P(0.04, 0.768)], 0.6, 1.1);                       // side struts
-        edge([P(0.9, 0.091), P(0.96, 0.768)], 0.6, 1.1);
-        edge([P(-0.02, 0.8), P(0.18, 0.7), bl], 0.8, 1.2);                     // dash lip
-        edge([br, P(0.82, 0.7), P(1.02, 0.8)], 0.8, 1.2);
-        edge([P(0.3, 1.02), P(0.36, 0.76), P(0.64, 0.76), P(0.7, 1.02)], 0.45, 1); // console
+        edge([P(0.1, roofY(0.1)), P(0.04, sillY(0.04))], 0.6, 1.1);           // side struts
+        edge([P(0.9, roofY(0.1)), P(0.96, sillY(0.96))], 0.6, 1.1);
+        edge([P(0, 0.8), bl, br, P(1, 0.8)], 0.8, 1.2);                      // unbroken dash lip
+        edge([...panel, panel[0]], 0.65, 0.9);                               // inset flight console
+        edge([P(0.395, 0.75), P(0.605, 0.75)], 0.32, 0.7);
+        edge([P(0.37, 0.878), P(0.63, 0.878)], 0.26, 0.7);
         // overhead warning strip: four small empty panels
         for (let i = 0; i < 4; i++) {
             const x0 = 0.33 + i * 0.087;
@@ -527,9 +572,72 @@ class Horizon {
         m.addColorStop(0.45, 'rgba(0,0,0,0.45)');
         m.addColorStop(1, 'rgba(0,0,0,1)');
         g.fillStyle = m; g.fillRect(0, 0, W, H);
+        // The console is a physical dark inset, not another window: exterior
+        // light should not show straight through its instrument display.
+        g.globalCompositeOperation = 'destination-over';
+        poly(panel, 'rgba(4, 8, 16, 0.78)');
         g.globalCompositeOperation = 'source-over';
         this.frameCache = c;
         return c;
+    }
+
+    drawInstruments(ctx, W, H, u, t, outside) {
+        const h = this.hud;
+        // Faint live ghost reflections in the oblique side panes. Reuse the
+        // already-shaded image: no second ray trace, framebuffer or bloom pass.
+        // The forward pane remains clear; the moving highlight is a coating,
+        // not a second bright black hole floating over the pilot's view.
+        if (outside) {
+            ctx.save(); ctx.beginPath();
+            ctx.moveTo(0, H * 0.06); ctx.lineTo(W * 0.255, H * 0.16);
+            ctx.lineTo(W * 0.3675, H * (0.8 - 0.14 * 0.3675 / 0.385)); ctx.lineTo(0, H * 0.8); ctx.closePath();
+            ctx.moveTo(W, H * 0.06); ctx.lineTo(W * 0.745, H * 0.16);
+            ctx.lineTo(W * 0.6325, H * (0.8 - 0.14 * 0.3675 / 0.385)); ctx.lineTo(W, H * 0.8); ctx.closePath();
+            ctx.clip();
+            ctx.globalAlpha = 0.035 + 0.012 * Math.sin(t * 0.37);
+            ctx.translate(W, 0); ctx.scale(-1, 1);
+            ctx.drawImage(outside, -W * 0.08 + W * 0.025 * Math.sin(t * 0.18), H * 0.025, W * 1.16, H * 0.94);
+            ctx.restore();
+        }
+        // The four existing overhead panels wake gradually as the engine
+        // works harder. A short, deterministic dropout is a warning, not noise
+        // on the home clock (which remains an honest physics readout).
+        const pulse = h.dropout ? 0.2 : 1;
+        const warm = h.strain;
+        for (let i = 0; i < 4; i++) {
+            const x = (0.33 + i * 0.087) * W;
+            const level = Math.max(0, Math.min(1, h.thrust * 1.2 - i * 0.17));
+            ctx.fillStyle = h.falling || (warm > 0.65 && i > 1) ? `rgba(255,139,110,${0.24 * pulse})` : `rgba(163,215,255,${0.12 * pulse})`;
+            ctx.fillRect(x + 5 * u, H * 0.095, W * 0.06 * level, 2 * u);
+        }
+        // A small attitude indicator set into the dash, not a huge empty
+        // trapezoid extending past the window. Its bank follows the fall camera.
+        ctx.save(); ctx.translate(W * 0.5, H * 0.812);
+        const attitudeR = 14 * u;
+        ctx.strokeStyle = 'rgba(206,229,250,0.42)'; ctx.lineWidth = 0.8 * u;
+        ctx.beginPath(); ctx.arc(0, 0, attitudeR, 0, Math.PI * 2); ctx.stroke();
+        ctx.rotate(0.1 * Math.pow(this.s(t, Horizon.P.hoverEnd, Horizon.P.fallEnd), 2));
+        ctx.strokeStyle = h.falling ? 'rgba(255,147,122,0.75)' : 'rgba(214,236,255,0.68)';
+        ctx.beginPath(); ctx.moveTo(-10 * u, 0); ctx.lineTo(-3 * u, 0); ctx.lineTo(0, 3 * u);
+        ctx.lineTo(3 * u, 0); ctx.lineTo(10 * u, 0); ctx.stroke(); ctx.restore();
+        for (let i = 0; i < 5; i++) {
+            ctx.fillStyle = `rgba(${h.falling ? '255,147,122' : '172,217,246'},${h.dropout ? 0.10 : 0.22 + i * 0.045})`;
+            const length = (5 + i * 2) * u;
+            ctx.fillRect(W * 0.415 - length, H * 0.783 + i * 7 * u, length, u);
+            ctx.fillRect(W * 0.585, H * 0.783 + i * 7 * u, length * h.thrust, u);
+        }
+        // A changing reflection, faint and clipped to the front pane. It lends
+        // the frame glassiness without bloom/post-processing on the ray image.
+        ctx.save();
+        ctx.beginPath(); ctx.moveTo(W * 0.29, H * 0.17); ctx.lineTo(W * 0.71, H * 0.17);
+        ctx.lineTo(W * 0.615, H * 0.66); ctx.lineTo(W * 0.385, H * 0.66); ctx.closePath(); ctx.clip();
+        const x = W * (0.36 + 0.035 * Math.sin(t * 0.22));
+        const sheen = ctx.createLinearGradient(x, 0, x + W * 0.16, H * 0.2);
+        sheen.addColorStop(0, 'rgba(190,230,255,0)');
+        const glint = Math.exp(-Math.pow((t - 29.5) / 2.3, 2)) * 0.018;
+        sheen.addColorStop(0.5, `rgba(${h.falling ? '255,189,159' : '196,220,255'},${(0.015 + warm * 0.016 + glint) * (1 - this.s(t, Horizon.P.hoverEnd, Horizon.P.fallEnd))})`);
+        sheen.addColorStop(1, 'rgba(219,198,255,0)');
+        ctx.fillStyle = sheen; ctx.fillRect(0, 0, W, H); ctx.restore();
     }
 
     updateCockpit(t, years, ly) {
@@ -547,13 +655,16 @@ class Horizon {
         const inside = falling && t > P.hoverEnd + 2;
         const x = this.logR1(t);
         const radius = x > -3 ? `r = ${(1 + Math.pow(10, x)).toFixed(5)} rs` : `r = (1 + 10${this.sup(Math.round(x))}) rs`;
-        const thrust = falling ? Math.max(0, 0.45 - (t - P.hoverEnd) * 0.5) * (Math.random() < 0.3 ? 0 : 1) : 0.5 + 0.48 * hold;
+        const strain = this.s(t, P.geomEnd + 3, P.hoverEnd);
+        const dropout = !falling && ((t > 25.1 && t < 25.3) || (t > 32.7 && t < 33.05) || (t > 36.5 && t < 36.95));
+        const thrust = falling ? Math.max(0, 0.45 - (t - P.hoverEnd) * 0.5) * (Math.sin(t * 37) > -0.3 ? 1 : 0) : (0.5 + 0.48 * hold) * (dropout ? 0.84 : 1);
         this.hud = {
-            lr: falling ? 22 : lr,
+            lr: lr - Math.log10(SchwarzschildView.fallBoost(this.s(t, P.hoverEnd, P.fallEnd))),
             thrust,
             falling,
+            strain, dropout,
             radius: inside ? 'inside the horizon' : radius,
-            status: falling ? 'engine failure · free fall' : t < P.inEnd ? 'descending' : 'holding position'
+            status: falling ? 'engine failure · free fall' : dropout ? 'thrust instability' : strain > 0.7 ? 'holding · engine at limit' : t < P.geomEnd ? 'descending' : 'holding position'
         };
     }
 
@@ -616,9 +727,11 @@ class Horizon {
     // White flash; under it the desktop is put back, then the light fades.
     flash() {
         this.flashed = true;
+        const root = this.root;
         this.el.flash.classList.add('is-on');
         this.music.wake();
         setTimeout(() => {
+            if (this.root !== root) return;
             this.restoreDesktop();
             ['.hz-sky', '.hz-shade', '.hz-cockpit', '.hz-black'].forEach(sel => {
                 const n = this.root && this.root.querySelector(sel);
@@ -650,13 +763,18 @@ class Horizon {
 // cone straight up of half-angle ≈ b_c·√(r−1), blueshifted by 1/√(1−1/r). The
 // camera turns from the hole to that cone and zooms to keep it in sight.
 class SchwarzschildView {
+    static fallBoost(k) {
+        const velocity = 0.995 * k * k * (3 - 2 * k);
+        return Math.sqrt((1 + velocity) / (1 - velocity));
+    }
+
     constructor(hue) {
         this.hue = hue;
         this.bc = 3 * Math.sqrt(3) / 2;       // critical impact parameter
         this.rin = 3; this.rout = 10;
         this.beta = 7 * Math.PI / 180;        // observer a little above the disc plane
         this.n = [Math.sin(this.beta), Math.cos(this.beta), 0];
-        this.NA = 640; this.H = 0.02; this.MAXPHI = 12;
+        this.NA = 1024; this.H = 0.02; this.MAXPHI = 12;
         this.S = Math.ceil(this.MAXPHI / this.H) + 2;
         this.rows = new Float32Array(this.NA * this.S);
         this.ws = new Float32Array(this.NA * this.S);
@@ -666,6 +784,8 @@ class SchwarzschildView {
         this.tableKey = null;
         this.canvas = document.createElement('canvas');
         this.base = this.hsl(hue, 0.9, 0.56);
+        try { this.gpu = new HorizonGPU(this); }
+        catch (e) { this.gpu = null; } // Safari without WebGL2 / disabled acceleration
     }
 
     hsl(h, s, l) {
@@ -718,38 +838,17 @@ class SchwarzschildView {
         }
     }
 
-    // Draws the canopy view into this.canvas (w × h) for the given state.
-    // Draws the view into this.canvas (w × h). Antialiasing is temporal: each
-    // frame is sampled at a slightly different sub-pixel offset and blended
-    // into a running average, so edges and stars settle smooth at no extra
-    // cost per frame. The disc's edges and the stars are soft by construction.
-    render(w, h, st, time) {
-        const c = this.canvas;
-        if (c.width !== w || c.height !== h) {
-            c.width = w; c.height = h; this.img = null;
-            this.acc = new Float32Array(w * h * 3); this.fresh = true;
-        }
-        const ctx = c.getContext('2d');
-        if (!this.img) this.img = ctx.createImageData(w, h);
-        const data = this.img.data, acc = this.acc;
-        this.frameNo = (this.frameNo || 0) + 1;
-        const halton = (i, b) => { let f = 1, r = 0; while (i > 0) { f /= b; r += f * (i % b); i = Math.floor(i / b); } return r; };
-        const jx = halton(this.frameNo % 16 + 1, 2) - 0.5, jy = halton(this.frameNo % 16 + 1, 3) - 0.5;
-        const keep = this.fresh ? 0 : 0.62;     // share of the running average kept each frame
-        this.fresh = false;
-
+    prepare(st) {
         const x = st.logR1;                       // log10(r − 1)
         const rObs = 1 + Math.pow(10, x);
         const zenith = x < -1.6;                  // the outside is a narrow cone overhead
         const NA = this.NA, PI = Math.PI;
-        let fovHalf, ac, rho = 0;
-
+        let ac;
         if (!zenith) {
             this.build(rObs, i => i / (NA - 1) * PI, 'g' + x.toFixed(3));
             const sa = this.bc * Math.sqrt(1 - 1 / rObs) / rObs;
             const ash = rObs > 1.5 ? Math.asin(Math.min(1, sa)) : PI - Math.asin(Math.min(1, sa));
             ac = Math.max(0, Math.min(PI, (ash - 0.5) * 1.55));     // tilt up as the shadow grows
-            fovHalf = 62 * PI / 180;
         } else {
             // In the limit r → 1 the image inside the cone depends only on
             // q = δ/δc, so one table, made just above the horizon, serves all.
@@ -757,20 +856,96 @@ class SchwarzschildView {
             const dct = Math.asin(this.bc * Math.sqrt(1 - 1 / rt) / rt);
             this.build(rt, i => PI - (i / (NA - 1)) * 1.25 * dct, 'z');
             ac = PI;
-            rho = st.rho;
         }
+        return { zenith, ac };
+    }
+
+    dispose() {
+        if (this.gpu) this.gpu.dispose();
+        this.gpu = null;
+        this.img = null;
+        this.skySamples = this.starLayers = null;
+    }
+
+    // CPU mirror of the GPU's two fixed angular star populations. Cache cells
+    // once, not nine procedural hashes per pixel on a low-powered device.
+    makeStarLayer(cell, density, bright) {
+        const nx = Math.ceil(3.2 / cell) + 3, ny = Math.ceil(2 * Math.PI / cell) + 3;
+        const points = new Float32Array(nx * ny * 3);
+        const hash = (x, y) => { const h = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return h - Math.floor(h); };
+        for (let x = 0; x < nx; x++) for (let y = 0; y < ny; y++) {
+            const a = x - 1, b = y - 1, seed = hash(a, b), i = (x * ny + y) * 3;
+            if (seed >= density) continue;
+            const seed2 = hash(a + 39.7, b + 39.7);
+            points[i] = a + 0.2 + 0.6 * seed / density;
+            points[i + 1] = b + 0.2 + 0.6 * seed2;
+            points[i + 2] = bright ? 160 + 880 * Math.pow(seed2, 8) : 0.5 + seed2;
+        }
+        const variance = Math.pow(0.00072 / cell, 2);
+        return { cell, nx, ny, points, variance, mean: 2 * Math.PI * variance * density * (bright ? 160 + 880 / 9 : 1) };
+    }
+
+    starLight(layer, a, b, dx, dy) {
+        const u = a / layer.cell, v = b / layer.cell;
+        const fx = Math.max(0.00027, dx) / layer.cell, fy = Math.max(0.00027, dy) / layer.cell;
+        let unresolved = Math.max(0, Math.min(1, (Math.max(fx, fy) - 0.65) / 0.85));
+        unresolved *= unresolved * (3 - 2 * unresolved);
+        if (unresolved >= 1) return layer.mean;
+        const vx = layer.variance + fx * fx / 12, vy = layer.variance + fy * fy / 12;
+        const energy = layer.variance / Math.sqrt(vx * vy);
+        const ix = Math.floor(u) + 1, iy = Math.floor(v) + 1;
+        let light = 0;
+        for (let x = ix - 1; x <= ix + 1; x++) for (let y = iy - 1; y <= iy + 1; y++) {
+            if (x < 0 || y < 0 || x >= layer.nx || y >= layer.ny) continue;
+            const i = (x * layer.ny + y) * 3, peak = layer.points[i + 2];
+            if (!peak) continue;
+            const du = u - layer.points[i], dv = v - layer.points[i + 1];
+            const exponent = -0.5 * (du * du / vx + dv * dv / vy);
+            if (exponent > -16) light += peak * energy * Math.exp(exponent);
+        }
+        return light * (1 - unresolved) + layer.mean * unresolved;
+    }
+
+    render(w, h, st, time) {
+        const camera = this.prepare(st);
+        if (this.gpu) {
+            const img = this.gpu.render(this, w, h, st, time, camera);
+            if (img) return img;
+            this.gpu.dispose(); this.gpu = null;
+            // A lost context must not turn a high-DPI request into a huge CPU job.
+            const ratio = h / w; w = Math.min(w, 420); h = Math.round(w * ratio);
+        }
+        const cpuScale = Math.min(1, 800 / w, Math.sqrt(500000 / (w * h)));
+        w = Math.max(1, Math.round(w * cpuScale)); h = Math.max(1, Math.round(h * cpuScale));
+        const c = this.canvas;
+        if (c.width !== w || c.height !== h) { c.width = w; c.height = h; this.img = null; }
+        const ctx = c.getContext('2d');
+        if (!this.img) {
+            this.img = ctx.createImageData(w, h);
+            this.skySamples = new Float32Array(w * h * 3);
+        }
+        const data = this.img.data;
+        const sky = this.skySamples;
+        sky.fill(0);
+        if (!this.starLayers) this.starLayers = [this.makeStarLayer(0.018, 0.1, false), this.makeStarLayer(0.25, 0.5, true)];
+        // Stable spatial samples: there is no history to ghost moving gas.
+        const jx = 0, jy = 0;
+        const { zenith, ac } = camera;
+        const NA = this.NA, PI = Math.PI, fovHalf = 62 * PI / 180;
+        const falling = st.fall || 0;
+        const boost = SchwarzschildView.fallBoost(falling);
+        const roll = 0.1 * falling * falling, rollC = Math.cos(roll), rollS = Math.sin(roll);
+        const rho = st.rho;
         const ca = Math.cos(ac), sa = Math.sin(ac);
         const C = [-ca, sa, 0], U = [sa, ca, 0], R = [0, 0, 1];
         const n = this.n, S = this.S, H = this.H;
         const { rows, ws, end, esc } = this;
-        const gObs = st.gObs;                     // blueshift of everything outside, 1/√(1−1/r)
+        const gObs = st.gObs / boost;             // static gravitational shift × local infall Doppler factor
         const base = this.base, rin = this.rin, rout = this.rout;
         const skyTint = Math.min(1, Math.log10(gObs) / 4);
-        const glowObs = Math.min(3, 1 + Math.log10(gObs) * 0.35);
         const aspect = h / w;
         const cb0 = Math.cos(this.beta), sb0 = Math.sin(this.beta);
         const smooth = (a, b, v) => { const k = Math.max(0, Math.min(1, (v - a) / (b - a))); return k * k * (3 - 2 * k); };
-        const CELL = 0.0055;
 
         // r along a row at angle φ, or −1 past the row's end
         const rAt = (row, phi) => {
@@ -779,11 +954,12 @@ class SchwarzschildView {
             return rows[off + i0] * (1 - fr) + rows[off + i0 + 1] * fr;
         };
 
-        let p = 0, q3 = 0;
+        let p = 0;
         for (let py = 0; py < h; py++) {
-            const ny = -((py + 0.5 + jy) / h * 2 - 1) * aspect;
-            for (let px = 0; px < w; px++, p += 4, q3 += 3) {
-                const nx = (px + 0.5 + jx) / w * 2 - 1;
+            const sy = -((py + 0.5 + jy) / h * 2 - 1) * aspect - 0.06 * falling * falling;
+            for (let px = 0; px < w; px++, p += 4) {
+                const sx = (px + 0.5 + jx) / w * 2 - 1 + 0.075 * Math.sin(falling * 1.8);
+                const nx = sx * rollC + sy * rollS, ny = -sx * rollS + sy * rollC;
                 const rr = Math.hypot(nx, ny);
                 let fa, e2y, e2z, outside = false;
                 const tx = R[0] * nx + U[0] * ny, ty = R[1] * nx + U[1] * ny, tz = R[2] * nx + U[2] * ny;
@@ -796,8 +972,8 @@ class SchwarzschildView {
                     const m = Math.hypot(dy, dz) || 1;
                     e2y = dy / m; e2z = dz / m;
                 } else {
-                    const qv = rr / rho;
-                    if (qv > 1.25) outside = true;
+                    const qv = 2 * Math.atan(Math.tan(rr * 0.54) / boost) / (rho * 1.08);
+                    if (qv > 1.25 || rr * 0.54 >= PI / 2) outside = true;
                     fa = qv / 1.25 * (NA - 1);
                     const m = Math.hypot(ty, tz) || 1;
                     e2y = ty / m; e2z = tz / m;
@@ -828,45 +1004,61 @@ class SchwarzschildView {
                         const v = Math.sqrt(0.5 / (r - 1));
                         const gam = 1 / Math.sqrt(1 - v * v);
                         const dop = 1 / (gam * (1 - v * (vx * kx + vy * ky + vz * kz)));
-                        const g = Math.sqrt(1 - 1 / r) * dop * gObs;
                         const az = Math.atan2(Pz, Px * cb0 - Py * sb0);
                         const om = time * 2.2 * Math.pow(r / 3, -1.5);
-                        const streak = 0.62 + 0.24 * Math.sin(az * 6 + 7 * Math.log(r) - om) + 0.14 * Math.sin(az * 17 - 11 * r - om * 1.7);
+                        const streak = 0.58 + 0.23 * Math.sin(az * 6 + 7 * Math.log(r) - om) + 0.13 * Math.sin(az * 17 - 11 * r - om * 1.7) + 0.06 * Math.sin(az * 31 + 36 * Math.log(r) - om * 2.3);
                         const em = Math.pow(rin / r, 3) * (1 - Math.sqrt(rin / r) * 0.92) * 9 * streak;
-                        const I = em * Math.min(1e3, Math.pow(Math.min(g, 6), 4)) / (1 + k * 0.6);
-                        const L = 1 - Math.exp(-I * 1.6);
-                        const lg = Math.log2(Math.max(1e-3, g));
+                        const localG = Math.sqrt(1 - 1 / r) * dop;
+                        const I = em * Math.pow(localG, 4) * Math.min(2, 1 + Math.log10(gObs) * 0.12) / (1 + k * 0.6);
+                        const L = 1 - Math.exp(-I * 4);
+                        const lg = Math.log2(Math.max(1e-3, localG)) + Math.min(4.5, Math.log10(gObs) * 0.60);
                         let cr = base[0], cg = base[1], cbl = base[2];
-                        if (lg > 0) { const m2 = Math.min(0.8, lg / 2.6); cr += (238 - cr) * m2; cg += (242 - cg) * m2; cbl += (255 - cbl) * m2; }
+                        if (lg > 0) { const m2 = Math.min(0.85, lg / 3.6); cr += (199 - cr) * m2; cg += (224 - cg) * m2; cbl += (255 - cbl) * m2; }
                         else { const m2 = Math.min(1, -lg / 1.8); cr += (255 - cr) * m2; cg += (50 - cg) * m2; cbl += (24 - cbl) * m2; }
                         const a = cover * remain;
                         rC += cr * L * a; gC += cg * L * a; bC += cbl * L * a;
                         remain *= 1 - cover;
                     }
-                    if (remain > 0.01 && !isNaN(esc[row])) {
-                        // escaped: the sky it came from — soft round stars, a faint band
-                        const pf = esc[row], c2 = Math.cos(pf), s2 = Math.sin(pf);
+                    if (remain > 0.01 && (Number.isFinite(esc[r0]) || Number.isFinite(esc[r1]))) {
+                        const e0 = esc[r0], e1 = esc[r1];
+                        const pf = !Number.isFinite(e0) ? e1 : !Number.isFinite(e1) ? e0 : e0 * (1 - wr) + e1 * wr;
+                        const coverage = !Number.isFinite(e0) ? wr : !Number.isFinite(e1) ? 1 - wr : 1;
+                        const c2 = Math.cos(pf), s2 = Math.sin(pf);
                         const Sx = c2, Sy = s2 * e2y, Sz = s2 * e2z;
                         const lat = Math.asin(Math.max(-1, Math.min(1, Sx))), lon = Math.atan2(Sz, Sy);
-                        const u = (lat + 1.6) / CELL, vv = (lon + PI) * Math.cos(lat) / CELL;
-                        const ci = Math.floor(u), cj = Math.floor(vv);
-                        let hsh = Math.sin(ci * 127.1 + cj * 311.7) * 43758.5453; hsh -= Math.floor(hsh);
-                        let star = 0;
-                        if (hsh < 0.02) {
-                            let h2 = Math.sin(ci * 269.5 + cj * 183.3) * 43758.5453; h2 -= Math.floor(h2);
-                            const du = u - ci - (0.25 + 0.5 * hsh / 0.02), dv = vv - cj - (0.25 + 0.5 * h2);
-                            star = (0.3 + 0.7 * h2) * Math.exp(-(du * du + dv * dv) / 0.035);
-                        }
-                        const band = 0.09 * Math.exp(-Math.pow(Sx * 0.3 + Sy * 0.5 + Sz * 0.81, 2) / 0.03);
-                        const lum = Math.min(1, (star + band + 0.015) * glowObs) * remain;
+                        const band = 0.045 * Math.exp(-Math.pow(Sx * 0.3 + Sy * 0.5 + Sz * 0.81, 2) / 0.03);
+                        const lum = (band + 0.008) * remain * coverage;
                         rC += (230 - 70 * skyTint) * lum; gC += (236 - 40 * skyTint) * lum; bC += 250 * lum;
+                        const si = (py * w + px) * 3;
+                        sky[si] = lat + 1.6; sky[si + 1] = (lon + PI) * Math.cos(lat);
+                        sky[si + 2] = remain * coverage;
                     }
                 }
-                acc[q3] = acc[q3] * keep + rC * (1 - keep);
-                acc[q3 + 1] = acc[q3 + 1] * keep + gC * (1 - keep);
-                acc[q3 + 2] = acc[q3 + 2] * keep + bC * (1 - keep);
-                data[p] = acc[q3]; data[p + 1] = acc[q3 + 1]; data[p + 2] = acc[q3 + 2]; data[p + 3] = 255;
+                const fade = 1 - smooth(0.4, 1, falling);
+                data[p] = rC * fade; data[p + 1] = gC * fade; data[p + 2] = bC * fade; data[p + 3] = 255;
             }
+        }
+        const exposure = 1.4 + 1.1 * Math.min(1, Math.log10(gObs) / 5);
+        const fade = 1 - smooth(0.4, 1, falling);
+        const defaultFootprint = zenith ? 2 * PI / (rho * boost * w) : 2 * fovHalf / w;
+        // Finite differences of the actual escaped rays provide the pixel's
+        // angular footprint. Do this after mapping, so both CPU and GPU retain
+        // subpixel light and suppress aliasing in the tightly compressed cone.
+        for (let py = 0; py < h; py++) for (let px = 0; px < w; px++) {
+            const i = (py * w + px) * 3;
+            if (sky[i + 2] <= 0) continue;
+            const right = px < w - 1 ? i + 3 : i - 3, up = py < h - 1 ? i + w * 3 : i - w * 3;
+            const validX = sky[right + 2] > 0, validY = sky[up + 2] > 0;
+            const dx = (validX ? Math.abs(sky[right] - sky[i]) : defaultFootprint) + (validY ? Math.abs(sky[up] - sky[i]) : defaultFootprint);
+            const circumference = 2 * PI * Math.cos(sky[i] - 1.6);
+            const lonX = validX ? Math.abs(sky[right + 1] - sky[i + 1]) : defaultFootprint;
+            const lonY = validY ? Math.abs(sky[up + 1] - sky[i + 1]) : defaultFootprint;
+            const dy = (validX ? Math.min(lonX, Math.abs(circumference - lonX)) : lonX)
+                + (validY ? Math.min(lonY, Math.abs(circumference - lonY)) : lonY);
+            let stars = 0;
+            for (const layer of this.starLayers) stars += this.starLight(layer, sky[i], sky[i + 1], dx, dy);
+            const light = Math.min(1, stars * exposure) * sky[i + 2] * fade, p = (py * w + px) * 4;
+            data[p] += (230 - 70 * skyTint) * light; data[p + 1] += (236 - 40 * skyTint) * light; data[p + 2] += 250 * light;
         }
         ctx.putImageData(this.img, 0, 0);
         return c;

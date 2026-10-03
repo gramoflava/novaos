@@ -218,11 +218,7 @@ body > .score-prompt-overlay { position: fixed; z-index: 3000; }
   box-shadow: 0 30px 120px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   animation: hz-in 1.6s var(--ease-out) both;
 }
-.hz-cockpit.is-falling { animation: hz-shake 0.12s linear infinite; }
 @keyframes hz-in { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: none; } }
-@keyframes hz-shake {
-  0% { translate: 0 0; } 25% { translate: 1.5px -1px; } 50% { translate: -1px 1.5px; } 75% { translate: 1px 1px; } 100% { translate: 0 0; }
-}
 
 .hz-head {
   position: absolute;
@@ -236,9 +232,9 @@ body > .score-prompt-overlay { position: fixed; z-index: 3000; }
   pointer-events: none;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
 }
-.hz-title { color: rgba(200, 210, 235, 0.5); font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: 0.06em; text-transform: uppercase; }
+.hz-title { max-width: 42%; color: rgba(212, 224, 246, 0.72); font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: 0.06em; text-transform: uppercase; }
 .hz-clock { display: grid; justify-items: end; gap: 2px; text-align: right; }
-.hz-clock__label { color: #8b93a8; font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: 0.08em; text-transform: uppercase; }
+.hz-clock__label { color: #b0bdd4; font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: 0.08em; text-transform: uppercase; }
 .hz-clock__value { color: #f2f5ff; font-family: var(--font-mono); font-size: var(--text-md); font-weight: 500; font-variant-numeric: tabular-nums; }
 .hz-clock__rate { color: #9fb6ff; font-family: var(--font-mono); font-size: var(--text-xs); }
 .hz-cockpit.is-falling .hz-clock__rate { color: #ff6a4a; }
