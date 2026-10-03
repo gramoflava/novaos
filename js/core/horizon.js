@@ -210,6 +210,7 @@ class Horizon {
                         <span class="hz-clock__label">Home time</span>
                         <b class="hz-clock__value"></b>
                         <small class="hz-clock__rate"></small>
+                        <small class="hz-clock__era"></small>
                     </div>
                 </header>
                 <canvas class="hz-view" aria-hidden="true"></canvas>
@@ -225,6 +226,7 @@ class Horizon {
             cockpit: root.querySelector('.hz-cockpit'),
             clock: root.querySelector('.hz-clock__value'),
             rate: root.querySelector('.hz-clock__rate'),
+            era: root.querySelector('.hz-clock__era'),
             black: root.querySelector('.hz-black'),
             flash: root.querySelector('.hz-flash')
         };
@@ -248,20 +250,26 @@ class Horizon {
             WindowManager.windows.forEach(w => {
                 if (!w.el || w.el.dataset.minimized === 'true') return;
                 this.save(w.el);
+                // The window's opening animation holds opacity and transform
+                // ('forwards') and would override the ageing below: switch it
+                // off for the scene. Restoring the style replays it on waking.
+                w.el.style.animation = 'none';
+                w.el.style.opacity = '1';
+                w.el.style.transform = 'none';
                 const crack = document.createElement('div');
                 crack.className = 'hz-crack';
                 crack.innerHTML = this.crackSvg();
                 w.el.appendChild(crack);
                 this.windows.push({
                     el: w.el, crack,
-                    // each crumbles at its own moment, in its own direction
-                    at: rnd(3.1, 4.4), dx: rnd(-1, 1), dy: rnd(-0.6, 1), rot: rnd(-25, 25), dusted: false
+                    // each ages a little out of step with the others
+                    off: rnd(-0.4, 0.4), dx: rnd(-1, 1), rot: rnd(-6, 6), lastDust: 0
                 });
             });
         }
         this.chrome = ['#nova-island-container', '#nova-shelf-container']
             .map(sel => document.querySelector(sel)).filter(Boolean)
-            .map((el, i) => { this.save(el); return { el, at: 4.6 + i * 0.5, dy: i ? 1 : -1, dusted: false }; });
+            .map((el, i) => { this.save(el); return { el, off: i * 0.3, dy: i ? 1 : -1, lastDust: 0 }; });
         this.cosmos = document.getElementById('nova-background');
         if (this.cosmos) this.save(this.cosmos);
         this.indicators = document.getElementById('window-indicators');
@@ -360,27 +368,53 @@ class Horizon {
         return k * k * (3 - 2 * k);
     }
 
+    // The desktop ages on the home clock, in stages anyone can name. ly is
+    // log10 of home years, so each stage takes about as long on screen as the
+    // clock needs to cross its span of years:
+    //   10⁻² – 10¹·⁵ yr   colours fade
+    //   10¹·⁵ – 10³ yr    glass cracks
+    //   10³ – 10⁵ yr      frames give way: windows sag and slowly drift
+    //   10⁵ – 10⁷ yr      windows turn to dust
+    //   10⁶ – 10⁷·⁵ yr    the island and the shelf follow
+    static era(ly) {
+        if (ly < -2) return '';
+        if (ly < 1.5) return 'colours fade';
+        if (ly < 3) return 'glass cracks';
+        if (ly < 5) return 'frames give way';
+        if (ly < 7) return 'windows turn to dust';
+        if (ly < 8.5) return 'massive stars explode';
+        if (ly < 9.5) return 'the disc runs dry';
+        if (ly < 13) return 'stars burn out';
+        return 'the last red dwarfs fade';
+    }
+
     updateHome(t, ly, dt) {
-        const age = this.s(ly, -2.3, 2);         // days to a century: colours fade
-        const crack = this.s(ly, 1, 3);          // decades to millennia: glass cracks
+        const age = this.s(ly, -2, 1.5);
+        const crack = this.s(ly, 1.5, 3);
         this.windows.forEach(w => {
-            const k = this.s(ly, w.at, w.at + 1.3);
-            w.el.style.filter = `sepia(${0.85 * age}) saturate(${1 - 0.6 * age}) brightness(${1 - 0.3 * age - 0.3 * k}) contrast(${1 - 0.2 * age})`;
-            w.crack.style.opacity = crack * (1 - k);
-            w.el.style.translate = `${w.dx * 260 * k}px ${w.dy * 220 * k}px`;
-            w.el.style.rotate = `${w.rot * k}deg`;
-            w.el.style.scale = `${1 - 0.35 * k}`;
-            w.el.style.opacity = `${1 - k}`;
-            if (k > 0.05 && !w.dusted) { w.dusted = true; this.addDust(w.el.getBoundingClientRect(), 70); }
+            const l = ly - w.off;
+            const sag = this.s(l, 3, 5);           // the frame gives way: a slow drift and settle
+            const dust = this.s(l, 5, 7);          // and then it falls apart
+            w.el.style.filter = `sepia(${0.85 * age}) saturate(${1 - 0.6 * age}) brightness(${1 - 0.3 * age - 0.25 * dust}) contrast(${1 - 0.2 * age}) blur(${(2.5 * dust).toFixed(2)}px)`;
+            w.crack.style.opacity = crack * (1 - dust);
+            w.el.style.translate = `${w.dx * 40 * sag}px ${70 * sag + 30 * dust}px`;
+            w.el.style.rotate = `${w.rot * sag}deg`;
+            w.el.style.scale = `${1 - 0.08 * dust}`;
+            w.el.style.opacity = `${1 - dust}`;
+            // dust is shed as the window crumbles, in step with it
+            const n = Math.round((dust - w.lastDust) * 160);
+            if (n > 0) { this.addDust(w.el.getBoundingClientRect(), n); w.lastDust = dust; }
         });
         this.chrome.forEach(c => {
-            const k = this.s(ly, c.at, c.at + 1.2);
-            c.el.style.filter = `sepia(${0.8 * age}) brightness(${1 - 0.3 * age})`;
-            c.el.style.translate = `0 ${c.dy * 90 * k}px`;
-            c.el.style.opacity = `${1 - k}`;
-            if (k > 0.05 && !c.dusted) { c.dusted = true; this.addDust(c.el.firstElementChild.getBoundingClientRect(), 40); }
+            const l = ly - c.off;
+            const sag = this.s(l, 4, 6), dust = this.s(l, 6, 7.5);
+            c.el.style.filter = `sepia(${0.8 * age}) brightness(${1 - 0.3 * age}) blur(${(2 * dust).toFixed(2)}px)`;
+            c.el.style.translate = `0 ${c.dy * (20 * sag + 20 * dust)}px`;
+            c.el.style.opacity = `${1 - dust}`;
+            const n = Math.round((dust - c.lastDust) * 90);
+            if (n > 0 && c.el.firstElementChild) { this.addDust(c.el.firstElementChild.getBoundingClientRect(), n); c.lastDust = dust; }
         });
-        if (this.indicators) this.indicators.style.opacity = `${1 - this.s(ly, 2, 4)}`;
+        if (this.indicators) this.indicators.style.opacity = `${1 - this.s(ly, 4, 6)}`;
         if (this.cosmos) {
             const d = this.s(ly, 6, 13);         // galaxies redden, stretch and fade
             this.cosmos.style.scale = `${1 + 0.4 * d} ${1 + 1.3 * d}`;
@@ -707,6 +741,8 @@ class Horizon {
         // The home clock stays an honest readout in the fall too: light from
         // home keeps arriving, shifted by g, so the clock is seen running ×g.
         this.el.clock.textContent = this.formatHome(years);
+        const era = Horizon.era(ly);
+        if (this.el.era.textContent !== era) this.el.era.textContent = era;
         this.el.rate.textContent = shift >= 1 ? `running ×10${this.sup(Math.floor(shift))}`
             : shift > 0.13 ? `running ×${Math.pow(10, shift).toFixed(1)}`
             : shift > -0.13 ? 'running normally' : `running ×${Math.pow(10, shift).toPrecision(2)}`;
