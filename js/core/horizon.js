@@ -481,8 +481,10 @@ class Horizon {
         poly([tl, [tl[0] - pw * W, tl[1] - 0.01 * H], [bl[0] - pw * 0.5 * W, bl[1]], bl], veil);
         poly([tr, [tr[0] + pw * W, tr[1] - 0.01 * H], [br[0] + pw * 0.5 * W, br[1]], br], veil);
         // side-pane struts from the overhead corners down to the sills
-        poly([P(-0.02, 0.06), P(0.12, 0.02), P(0.03, 0.62), P(-0.02, 0.64)], veil);
-        poly([P(1.02, 0.06), P(0.88, 0.02), P(0.97, 0.62), P(1.02, 0.64)], veil);
+        // (they run from the overhead edge down to the dash lip, so they meet
+        // the rest of the frame instead of floating across it)
+        poly([P(0.085, 0.085), P(0.115, 0.098), P(0.055, 0.76), P(0.025, 0.775)], veil);
+        poly([P(0.915, 0.085), P(0.885, 0.098), P(0.945, 0.76), P(0.975, 0.775)], veil);
         // dash: lip from the sides to the bottom of the front pane, console below
         poly([P(-0.02, 0.8), P(0.18, 0.7), bl, br, P(0.82, 0.7), P(1.02, 0.8), P(1.02, 1.02), P(-0.02, 1.02)], veil);
 
@@ -498,8 +500,8 @@ class Horizon {
         edge([[tr[0] + pw * W, tr[1] - 0.01 * H], [br[0] + pw * 0.5 * W, br[1]]], 0.7, 1.1);
         edge([P(-0.02, 0.04), [tl[0] - pw * W, tl[1] - 0.01 * H]], 0.7, 1.1);  // overhead
         edge([P(1.02, 0.04), [tr[0] + pw * W, tr[1] - 0.01 * H]], 0.7, 1.1);
-        edge([P(0.12, 0.02), P(0.03, 0.62)], 0.6, 1.1);                        // side struts
-        edge([P(0.88, 0.02), P(0.97, 0.62)], 0.6, 1.1);
+        edge([P(0.1, 0.091), P(0.04, 0.768)], 0.6, 1.1);                       // side struts
+        edge([P(0.9, 0.091), P(0.96, 0.768)], 0.6, 1.1);
         edge([P(-0.02, 0.8), P(0.18, 0.7), bl], 0.8, 1.2);                     // dash lip
         edge([br, P(0.82, 0.7), P(1.02, 0.8)], 0.8, 1.2);
         edge([P(0.3, 1.02), P(0.36, 0.76), P(0.64, 0.76), P(0.7, 1.02)], 0.45, 1); // console
