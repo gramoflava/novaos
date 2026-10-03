@@ -11,36 +11,64 @@ class AudioManager {
             this.muted = false;
         }
 
-        // Listen for boot or user interaction to init context properly
-        document.body.addEventListener('mousedown', () => this.init(), { once: true });
-        document.body.addEventListener('keydown', () => this.init(), { once: true });
+        // Browsers only let audio start from a user gesture, and may stop it
+        // later (sleep, a headphone switch, another app taking the device).
+        // So every gesture re-checks the context, not just the first one, and
+        // returning to the tab does too.
+        const wake = () => this.init();
+        ['pointerdown', 'keydown', 'touchstart'].forEach(ev =>
+            document.addEventListener(ev, wake, { capture: true, passive: true }));
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) this.check(); });
+    }
+
+    build() {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        this.context = new Ctx();
+        // Limiter: a stateless soft clipper. A compressor keeps internal state,
+        // and one bad sample could leave it (and so all sound) silent for good.
+        this.limiter = this.context.createWaveShaper();
+        const n = 2048, curve = new Float32Array(n);
+        for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; curve[i] = Math.tanh(x * 1.6) / Math.tanh(1.6); }
+        this.limiter.curve = curve;
+        this.limiter.oversample = '2x';
+        this.masterGain = this.context.createGain();
+        this.masterGain.gain.value = 0.7;
+        this.limiter.connect(this.masterGain);
+        this.masterGain.connect(this.context.destination);
+        this.lastTime = -1; this.lastWall = performance.now();
+    }
+
+    // Throw the context away and start a fresh one.
+    rebuild() {
+        const old = this.context;
+        this.context = this.limiter = this.masterGain = null;
+        try { if (old && old.state !== 'closed') old.close(); } catch (e) { }
+        this.build();
+    }
+
+    // A context that is closed, or "running" while its clock no longer moves
+    // (seen after audio device changes), is replaced.
+    check() {
+        const c = this.context;
+        if (!c) return;
+        if (c.state === 'closed') { this.rebuild(); return; }
+        const now = performance.now();
+        if (c.state === 'running') {
+            if (c.currentTime === this.lastTime && now - this.lastWall > 1500) { this.rebuild(); return; }
+            if (c.currentTime !== this.lastTime) { this.lastTime = c.currentTime; this.lastWall = now; }
+        }
     }
 
     init() {
         if (!this.context) {
-            try {
-                this.context = new (window.AudioContext || window.webkitAudioContext)();
-
-                // Create Limiter (Compressor with high ratio)
-                this.limiter = this.context.createDynamicsCompressor();
-                this.limiter.threshold.setValueAtTime(-12, this.context.currentTime);
-                this.limiter.knee.setValueAtTime(40, this.context.currentTime);
-                this.limiter.ratio.setValueAtTime(12, this.context.currentTime);
-                this.limiter.attack.setValueAtTime(0, this.context.currentTime);
-                this.limiter.release.setValueAtTime(0.25, this.context.currentTime);
-
-                // Master Gain
-                this.masterGain = this.context.createGain();
-                this.masterGain.gain.setValueAtTime(0.7, this.context.currentTime);
-
-                this.limiter.connect(this.masterGain);
-                this.masterGain.connect(this.context.destination);
-            } catch(e) {
-                console.warn('Web Audio API not supported', e);
-            }
+            try { this.build(); } catch (e) { console.warn('Web Audio API not supported', e); return; }
         }
-        if (this.context && this.context.state === 'suspended') {
-            this.context.resume();
+        this.check();
+        // 'suspended' after autoplay rules, 'interrupted' after Safari loses the device
+        if (this.context && this.context.state !== 'running' && this.context.state !== 'closed') {
+            const p = this.context.resume();
+            if (p && p.catch) p.catch(() => this.rebuild());
         }
     }
 

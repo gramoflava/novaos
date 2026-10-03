@@ -992,6 +992,9 @@ class HorizonScore {
         }
         // The tick follows the home clock: about once a second at first, a
         // blur at the end of the hold; in the fall it slows, sinks and stops.
+        // Never schedule into the past: after a skip or a hidden tab the
+        // tick would otherwise try to catch up (and at absurd pitches).
+        if (this.nextTick < t - 0.1) this.nextTick = t;
         if (t < 28) {
             const interval = Math.max(0.05, 0.9 / (1 + logRate * 0.6));
             while (this.nextTick < t + 0.25 && this.nextTick < 28) {
@@ -1000,7 +1003,7 @@ class HorizonScore {
             }
         } else {
             while (this.nextTick < t + 0.25 && this.nextTick < 33.5) {
-                const k = (this.nextTick - 28) / 5.5;            // 0→1 through the fall
+                const k = Math.max(0, Math.min(1, (this.nextTick - 28) / 5.5)); // 0→1 through the fall
                 this.tick(this.t0 + this.nextTick, 0.9 * (1 - k), 2 * Math.pow(0.12, k));
                 this.nextTick += 0.05 + 1.4 * k * k;
             }
@@ -1022,7 +1025,7 @@ class HorizonScore {
         const ctx = this.ctx, at = ctx.currentTime + 0.02;
         const g = ctx.createGain();
         g.gain.value = 1;
-        g.connect(AudioMng.limiter || ctx.destination);
+        g.connect(AudioMng.context === ctx && AudioMng.limiter ? AudioMng.limiter : ctx.destination);
         const verb = ctx.createConvolver(); verb.buffer = this.impulse(4);
         const wet = ctx.createGain(); wet.gain.value = 0.6;
         verb.connect(wet); wet.connect(g);
