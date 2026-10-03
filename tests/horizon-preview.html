@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Horizon rendering check</title>
+<link rel="stylesheet" href="../../gramofdesign/gramof.css">
+<link rel="stylesheet" href="../css/nova-effects.css">
+<style>
+  body { margin: 0; background: #182032; color: #eef4ff; font: 14px monospace; }
+  nav { position: fixed; inset: auto 8px 8px; z-index: 7000; display: flex; flex-wrap: wrap; gap: 8px; }
+  button, select { padding: 8px; font: inherit; }
+  output { flex-basis: 100%; background: #182032; padding: 4px; }
+</style>
+<nav>
+  <button id="play">Play full scene</button>
+  <button data-time="6">Approach</button><button data-time="12">Descent</button>
+  <button data-time="24">Hold</button><button data-time="37">Warning</button>
+  <button data-time="40">Free fall</button>
+  <select aria-label="Renderer"><option value="gpu">GPU</option><option value="cpu">CPU fallback</option></select>
+  <button id="check">Check rays & pixels</button>
+  <button id="lose">Lose GPU context</button>
+  <button id="stars">Check star visibility</button>
+  <output id="result">Choose a scene or run the checks.</output>
+</nav>
+<script src="../js/core/horizon-renderer.js"></script>
+<script src="../js/core/horizon.js"></script>
+<script>
+// Standalone visual/performance fixture; it never writes scores or changes the
+// desktop. Production still exposes the scene only through its easter egg.
+const result = document.getElementById('result');
+let scene;
+function start(t, live) {
+  if (scene) { scene.restoreDesktop(); scene.finish(); }
+  scene = new Horizon();
+  scene.unlockPhantoms = () => {}; // Preview must not unlock a secret on the real desktop.
+  scene.play({ hue: 0 });
+  if (document.querySelector('select').value === 'cpu') { scene.rays.dispose(); }
+  if (live) {
+    const current = scene;
+    const frames = [], started = performance.now();
+    let last = started, lastT = -1;
+    function sample(now) {
+      if (scene !== current) return;
+      const rendered = scene.t !== lastT;
+      if (rendered) { frames.push(now - last); last = now; lastT = scene.t; }
+      if (scene.running) {
+        if (rendered && frames.length % 30 === 0) {
+          const sorted = frames.slice(10).sort((a, b) => a - b), gpu = scene.rays.gpu;
+          result.textContent = `${gpu ? 'GPU' : 'CPU'} · t=${scene.t.toFixed(1)}s · ${(1000 * frames.length / (now - started)).toFixed(1)} fps · p95 ${sorted[Math.floor(sorted.length * .95)]?.toFixed(1)}ms · GPU ${gpu?.ms?.toFixed(2) || 'n/a'}ms · render ${gpu ? gpu.canvas.width + '×' + gpu.canvas.height : scene.rays.canvas.width + '×' + scene.rays.canvas.height}`;
+        }
+        requestAnimationFrame(sample);
+      } else result.textContent += ' · finished';
+    }
+    requestAnimationFrame(sample); return;
+  }
+  cancelAnimationFrame(scene.raf);
+  window.removeEventListener('keydown', scene.onKey, true);
+  scene.t = t; scene.homeSeconds = Math.pow(10, scene.logRate(t)) * 0.4;
+  scene.root.querySelector('.hz-cockpit').style.animation = 'none';
+  if (t >= Horizon.P.hoverEnd) scene.updateCockpit(Horizon.P.hoverEnd - 0.01, scene.homeSeconds / 3.15576e7, 0);
+  scene.updateCockpit(t, scene.homeSeconds / 3.15576e7, 0);
+  scene.drawView(t);
+  const r = scene.rays;
+  result.textContent = `${r.gpu ? 'GPU' : 'CPU'} · ${r.gpu ? r.gpu.canvas.width : r.canvas.width} × ${r.gpu ? r.gpu.canvas.height : r.canvas.height} · ${scene.msAvg.toFixed(2)} ms CPU submission`;
+}
+document.getElementById('play').onclick = () => start(0, true);
+document.getElementById('stars').onclick = () => {
+  start(37, false);
+  const view = scene.rays;
+  if (!view.gpu) { result.textContent = 'Star probe requires GPU'; return; }
+  // Exercise the production sky function, excluding gas and cockpit shading.
+  // Each disc contains the same whole celestial sphere at a different size.
+  class SkyProbe extends HorizonGPU {
+    static get fragment() {
+      const source = HorizonGPU.fragment;
+      return source.slice(0, source.indexOf('void main()')) + `
+      void main() {
+        vec2 p = (2.0 * gl_FragCoord.xy - size) / size.x;
+        float radius = length(p) / rho;
+        if (radius > 1.0) { colour = vec4(0.0, 0.0, 0.0, 1.0); return; }
+        vec2 angle = normalize(p + vec2(1e-12));
+        float theta = radius * PI;
+        colour = vec4(sky(vec3(cos(theta), sin(theta) * angle)), 1.0);
+      }`;
+    }
+  }
+  const probe = new SkyProbe(view), sizes = [32, 64, 128], metrics = [];
+  for (const radius of sizes) {
+    const image = probe.render(view, 256, 256, {rho:radius / 128, gObs:1}, 0, {ac:0, zenith:true});
+    const pixels = new Uint8Array(256 * 256 * 4);
+    probe.gl.readPixels(0, 0, 256, 256, probe.gl.RGBA, probe.gl.UNSIGNED_BYTE, pixels);
+    let bright = 0, peak = 0;
+    for (let i = 0; i < pixels.length; i += 4) {
+      const lum = (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+      if (lum > 55) bright++;
+      peak = Math.max(peak, lum);
+    }
+    const repeat = new Uint8Array(pixels.length);
+    probe.render(view, 256, 256, {rho:radius / 128, gObs:1}, 1, {ac:0, zenith:true});
+    probe.gl.readPixels(0, 0, 256, 256, probe.gl.RGBA, probe.gl.UNSIGNED_BYTE, repeat);
+    const stable = pixels.every((v, i) => v === repeat[i]);
+    metrics.push({radius, bright, peak, stable});
+  }
+  probe.dispose();
+  result.textContent = `${metrics[0].bright >= 3 && metrics.every(m => m.stable) ? 'PASS' : 'FAIL'} · star visibility · ${metrics.map(m => `r${m.radius}: ${m.bright} bright pixels, peak ${m.peak.toFixed(0)}, ${m.stable ? 'stable' : 'flicker'}`).join(' · ')}`;
+};
+document.querySelectorAll('[data-time]').forEach(b => b.onclick = () => start(Number(b.dataset.time), false));
+document.getElementById('lose').onclick = () => {
+  start(12, false);
+  if (!scene.rays.gpu) { result.textContent = 'No GPU context to lose'; return; }
+  const gl = scene.rays.gpu.gl;
+  scene.rays.gpu.canvas.addEventListener('webglcontextlost', () => {
+    scene.drawView(12);
+    result.textContent = `${!scene.rays.gpu && scene.rays.canvas.width <= 520 ? 'PASS' : 'FAIL'} · context lost → bounded CPU fallback ${scene.rays.canvas.width}×${scene.rays.canvas.height}`;
+  }, { once: true });
+  gl.getExtension('WEBGL_lose_context').loseContext();
+};
+document.getElementById('check').onclick = () => {
+  start(6, false);
+  const r = scene.rays, gpu = r.gpu;
+  const errors = [];
+  r.prepare({ logR1: Math.log10(11) });
+  if (r.esc[0] === r.esc[0] || r.esc[r.NA - 1] !== 0) errors.push('radial capture/escape');
+  const critical = Math.asin(r.bc * Math.sqrt(1 - 1 / 12) / 12);
+  const below = Math.floor((critical - 0.015) / Math.PI * (r.NA - 1));
+  const above = Math.ceil((critical + 0.015) / Math.PI * (r.NA - 1));
+  if (Number.isFinite(r.esc[below]) || !Number.isFinite(r.esc[above])) errors.push('critical impact parameter');
+  // First integral of the null-geodesic equation: w² + u²(1-u) = 1/b².
+  let invariantError = 0;
+  for (let row = 40; row < r.NA - 40; row += 41) {
+    const expected = 1 / (r.bs[row] * r.bs[row]);
+    const steps = Math.floor(r.end[row] / r.H) - 1;
+    for (let i = 0; i < steps; i += 13) {
+      const off = row * r.S + i, u = 1 / r.rows[off], w = r.ws[off];
+      invariantError = Math.max(invariantError, Math.abs(w * w + u * u * (1 - u) - expected) / expected);
+    }
+  }
+  if (invariantError > 0.001) errors.push('geodesic invariant');
+  const sizes = [[760, 600], [1520, 1200], [390, 600]];
+  let lit = 0, dark = 0;
+  const ms = [];
+  for (const t of [6, 12, 24, 37, 40, 43]) {
+    for (const [w, h] of sizes) {
+      const now = performance.now();
+      const image = r.render(w, h, { logR1: scene.logR1(t), logG: Math.min(30, scene.shiftNow(t)), rho: 0.376 * Math.pow(0.1 / 0.376, scene.s(t, Horizon.P.geomEnd, Horizon.P.hoverEnd)), fall: scene.s(t, Horizon.P.hoverEnd, Horizon.P.fallEnd) }, t);
+      ms.push(performance.now() - now);
+      const pixels = new Uint8Array(image.width * image.height * 4);
+      if (gpu) {
+        gpu.gl.readPixels(0, 0, image.width, image.height, gpu.gl.RGBA, gpu.gl.UNSIGNED_BYTE, pixels);
+        if (gpu.gl.getError() !== gpu.gl.NO_ERROR) errors.push('WebGL error');
+        if (image.width * image.height > 1002000) errors.push('pixel budget');
+      } else pixels.set(image.getContext('2d').getImageData(0, 0, image.width, image.height).data);
+      let frameLit = 0;
+      for (let i = 0; i < pixels.length; i += 4) { if (pixels[i] + pixels[i + 1] + pixels[i + 2] > 30) { lit++; frameLit++; } else dark++; }
+      if (t < 43 && !frameLit) errors.push(`empty view at ${t}s`);
+    }
+  }
+  if (!lit || !dark) errors.push('missing light/shadow');
+  const backend = gpu ? 'GPU' : 'CPU';
+  start(12, false);
+  result.textContent = `${errors.length ? 'FAIL: ' + errors.join(', ') : 'PASS'} · ${backend} · 18 frames / 3 sizes · mean submission ${(ms.reduce((a,b) => a+b) / ms.length).toFixed(2)} ms · capture/escape + photon boundary + pixel budget · ray invariant error ${invariantError.toExponential(2)}`;
+};
+</script>
+</html>
