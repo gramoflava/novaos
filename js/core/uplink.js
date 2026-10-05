@@ -64,13 +64,13 @@
         return { ...data, received: Date.now() };
     }
 
-    async function proof(challenge, initials, score, epoch) {
+    async function proof(challenge, initials, score, duration, epoch) {
         const encoder = new TextEncoder();
         const prefix = '0'.repeat(challenge.difficulty);
         const deadline = Date.now() + 15000;
         for (let nonce = 0; nonce < 1000000; nonce++) {
             if (!preference.enabled || generation !== epoch) throw new Error('Uplink disabled');
-            const digest = await crypto.subtle.digest('SHA-256', encoder.encode(`${challenge.ticket}:${initials}:${score}:${nonce}`));
+            const digest = await crypto.subtle.digest('SHA-256', encoder.encode(`${challenge.ticket}:${initials}:${score}:${duration}:${nonce}`));
             const hex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
             if (hex.startsWith(prefix)) return String(nonce);
             if (nonce % 128 === 0) {
@@ -114,14 +114,18 @@
     }
 
     // The returned reporter stays in the game's closure; the persisted leaderboard is never read here.
+    // A run's duration breaks ties between equal scores (the shorter run wins).
+    // Games with their own clock pass it; otherwise it is wall time since start.
     function startRun(game, targetWinId) {
         let reported = false;
+        const started = Date.now();
         const run = { game, challenge: null, epoch: generation };
         if (preference.enabled) run.challenge = ticket(game).catch(() => null);
-        return (score, isWin, onComplete) => {
+        return (score, isWin, onComplete, duration) => {
             if (reported) return;
             reported = true;
-            const receipt = Object.freeze({ game, score: Math.floor(score), run });
+            const measured = Number.isFinite(duration) ? duration : Date.now() - started;
+            const receipt = Object.freeze({ game, score: Math.floor(score), duration: Math.min(86400000, Math.max(0, Math.round(measured))), run });
             receipts.add(receipt);
             Scores.showScorePrompt(game, receipt.score, isWin, onComplete, targetWinId, receipt);
         };
@@ -157,11 +161,11 @@
             receipt.run.epoch = epoch;
         }
         const safeInitials = normalize(initials);
-        const nonce = await proof(challenge, safeInitials, receipt.score, epoch);
+        const nonce = await proof(challenge, safeInitials, receipt.score, receipt.duration, epoch);
         const wait = challenge.received + challenge.waitMs - Date.now();
         if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait));
         if (!preference.enabled || generation !== epoch) throw new Error('Uplink disabled');
-        return request('/v1/results', { ticket: challenge.ticket, nonce, initials: safeInitials, score: receipt.score });
+        return request('/v1/results', { ticket: challenge.ticket, nonce, initials: safeInitials, score: receipt.score, duration: receipt.duration });
     }
 
     async function publish(receipt, initials) {
@@ -207,7 +211,7 @@
     }
 
     function explorerReceipt() {
-        const receipt = Object.freeze({ game: 'explorers', score: 0, run: { game: 'explorers', epoch: generation, challenge: null } });
+        const receipt = Object.freeze({ game: 'explorers', score: 0, duration: 0, run: { game: 'explorers', epoch: generation, challenge: null } });
         receipts.add(receipt);
         return receipt;
     }

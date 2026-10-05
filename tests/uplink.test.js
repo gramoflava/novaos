@@ -65,7 +65,7 @@ test('new run is single-use and its immutable receipt cannot be forged', async (
     assert.equal(await b.uplink.publish({ ...receipt }, 'FAK'), 'local');
     assert.equal(await b.uplink.publish(receipt, '<b>'), 'sent');
     const post = b.requests.find(r => r.url.endsWith('/results'));
-    assert.deepEqual(Object.keys(JSON.parse(post.options.body)).sort(), ['initials', 'nonce', 'score', 'ticket']);
+    assert.deepEqual(Object.keys(JSON.parse(post.options.body)).sort(), ['duration', 'initials', 'nonce', 'score', 'ticket']);
     assert.equal(JSON.parse(post.options.body).initials, 'B');
     assert.equal(post.options.credentials, 'omit');
     assert.equal(post.options.referrerPolicy, 'no-referrer');

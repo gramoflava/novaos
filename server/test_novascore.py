@@ -1,5 +1,6 @@
 import hashlib
 import http.client
+import sqlite3
 import json
 import tempfile
 import threading
@@ -9,12 +10,12 @@ from pathlib import Path
 from novascore import APIError, Store, make_server
 
 
-def result(challenge, initials='ABC', score=100):
+def result(challenge, initials='ABC', score=100, duration=60000):
     ticket = challenge['ticket']
     nonce = 0
-    while not hashlib.sha256(f'{ticket}:{initials}:{score}:{nonce}'.encode()).hexdigest().startswith('0' * challenge['difficulty']):
+    while not hashlib.sha256(f'{ticket}:{initials}:{score}:{duration}:{nonce}'.encode()).hexdigest().startswith('0' * challenge['difficulty']):
         nonce += 1
-    return {'ticket': ticket, 'nonce': str(nonce), 'initials': initials, 'score': score}
+    return {'ticket': ticket, 'nonce': str(nonce), 'initials': initials, 'score': score, 'duration': duration}
 
 
 class StoreTests(unittest.TestCase):
@@ -28,14 +29,16 @@ class StoreTests(unittest.TestCase):
         self.store.close()
         self.directory.cleanup()
 
-    def submit(self, game, initials, score):
+    def submit(self, game, initials, score, duration=None):
         challenge = self.store.challenge(game)
         self.now += 2
-        return self.store.submit(result(challenge, initials, score))
+        if duration is None:
+            duration = score if game.startswith('minesweeper') else 60000
+        return self.store.submit(result(challenge, initials, score, duration))
 
     def test_fake_score_without_a_ticket_is_rejected(self):
         with self.assertRaises(APIError) as error:
-            self.store.submit({'ticket': '0' * 48, 'nonce': '0', 'initials': 'ABC', 'score': 9999})
+            self.store.submit({'ticket': '0' * 48, 'nonce': '0', 'initials': 'ABC', 'score': 9999, 'duration': 1000})
         self.assertEqual(error.exception.status, 410)
         self.assertEqual(self.store.leaderboard('game2048')['entries'], [])
 
@@ -58,7 +61,7 @@ class StoreTests(unittest.TestCase):
         self.now += 2
         tampered = {**data, 'score': 104}
         # Make an unequivocally invalid proof rather than rely on collision probability.
-        while hashlib.sha256(f"{data['ticket']}:ABC:104:{tampered['nonce']}".encode()).hexdigest().startswith('0'):
+        while hashlib.sha256(f"{data['ticket']}:ABC:104:60000:{tampered['nonce']}".encode()).hexdigest().startswith('0'):
             tampered['nonce'] = str(int(tampered['nonce']) + 1)
         with self.assertRaises(APIError) as wrong:
             self.store.submit(tampered)
@@ -69,9 +72,15 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(expired.exception.status, 410)
 
     def test_strict_score_limits_schema_and_initials(self):
-        for game, score in [('game2048', 101), ('minesweeper-easy', 10000), ('minesweeper-hard', 9998), ('wordl-4', 3001), ('asteroids', 31), ('explorers', 1)]:
+        for game, score, duration in [('game2048', 101, None), ('minesweeper-easy', 3600001, None), ('minesweeper-hard', 9000, 8000),
+                                      ('wordl-4', 2001, None), ('asteroids', 31, None), ('explorers', 1, None), ('game2048', 100, -1)]:
             with self.subTest(game=game, score=score), self.assertRaises(APIError):
-                self.submit(game, 'ABC', score)
+                self.submit(game, 'ABC', score, duration)
+        legacy = self.store.challenge('game2048')
+        self.now += 2
+        with self.assertRaises(APIError) as old_page:
+            self.store.submit({k: v for k, v in result(legacy).items() if k != 'duration'})
+        self.assertIn('Reload', old_page.exception.body['error'])
         challenge = self.store.challenge('game2048')
         self.now += 2
         for data in [result(challenge, '<b>', 100), {**result(challenge), 'profile': 'no'}, {**result(challenge), 'score': True}]:
@@ -88,9 +97,55 @@ class StoreTests(unittest.TestCase):
         self.submit('game2048', 'ABC', 200)
         self.submit('wordl-5', 'ABC', 500)
         self.store.close()
+        self.store = Store(self.path)  # reopening must not re-run the migration
+        self.assertEqual(self.store.leaderboard('wordl-5')['entries'][0]['score'], 500)
+        self.store.close()
         self.store = Store(self.path)
         self.assertEqual(self.store.leaderboard('game2048')['entries'][0]['score'], 200)
         self.assertEqual(self.store.leaderboard('wordl-5')['entries'][0]['score'], 500)
+
+    def test_minesweeper_lower_time_wins(self):
+        self.submit('minesweeper-easy', 'ABC', 30000)
+        self.submit('minesweeper-easy', 'ABC', 45000)
+        self.submit('minesweeper-easy', 'DEF', 12345)
+        entries = self.store.leaderboard('minesweeper-easy')['entries']
+        self.assertEqual([(e['initials'], e['score']) for e in entries], [('DEF', 12345), ('ABC', 30000)])
+        self.submit('minesweeper-easy', 'ABC', 9000)
+        self.assertEqual(self.store.leaderboard('minesweeper-easy')['entries'][0]['initials'], 'ABC')
+
+    def test_points_win_and_shorter_run_breaks_ties(self):
+        self.submit('colorlines-5', 'SLO', 500, 600000)
+        self.submit('colorlines-5', 'FST', 400, 60000)
+        self.submit('colorlines-5', 'TIE', 500, 300000)
+        order = [e['initials'] for e in self.store.leaderboard('colorlines-5')['entries']]
+        self.assertEqual(order, ['TIE', 'SLO', 'FST'])
+        self.submit('colorlines-5', 'SLO', 500, 100000)  # same points, faster: replaces
+        self.submit('colorlines-5', 'TIE', 500, 900000)  # same points, slower: ignored
+        order = [(e['initials'], e['duration']) for e in self.store.leaderboard('colorlines-5')['entries']]
+        self.assertEqual(order, [('SLO', 100000), ('TIE', 300000), ('FST', 60000)])
+
+    def test_migration_from_first_release(self):
+        self.store.close()
+        old_path = str(Path(self.directory.name) / 'old.sqlite')
+        old = sqlite3.connect(old_path)
+        old.executescript('''
+            CREATE TABLE scores (game TEXT NOT NULL, initials TEXT NOT NULL, score INTEGER NOT NULL,
+                achieved INTEGER NOT NULL, PRIMARY KEY(game, initials));
+            CREATE TABLE explorers (id INTEGER PRIMARY KEY, initials TEXT NOT NULL UNIQUE, achieved INTEGER NOT NULL);
+            INSERT INTO scores VALUES ('minesweeper-easy', 'AAA', 9869, 1), ('minesweeper-easy', 'BBB', 9999, 2),
+                ('wordl-5', 'CCC', 3712, 3), ('colorlines-4', 'DDD', 80, 4), ('game2048', 'EEE', 20480, 5);
+            INSERT INTO explorers(initials, achieved) VALUES ('FFF', 6);
+        ''')
+        old.commit()
+        old.close()
+        self.store = Store(old_path, clock=lambda: self.now, difficulty=1, min_age=1)
+        self.assertEqual(self.store.leaderboard('minesweeper-easy')['entries'],
+                         [{'initials': 'AAA', 'score': 13000, 'date': 1, 'duration': 13000}])
+        self.assertEqual(self.store.leaderboard('wordl-5')['entries'], [])
+        self.assertEqual(self.store.leaderboard('game2048')['entries'][0]['score'], 20480)
+        self.assertEqual(self.store.leaderboard('explorers')['entries'][0]['initials'], 'FFF')
+        self.assertEqual(self.store.db.execute("SELECT COUNT(*) FROM scores WHERE game='colorlines-4'").fetchone()[0], 0)
+        self.assertEqual(self.store.db.execute('PRAGMA user_version').fetchone()[0], 1)
 
     def test_explorers_keep_first_date_and_return_duplicate(self):
         status, first = self.submit('explorers', 'ABC', 0)

@@ -1,7 +1,24 @@
+// Minesweeper's score is the solve time in ms: lower is better. Everywhere
+// else more points win, and an equal score goes to the shorter run.
+const lowerIsBetter = gameId => String(gameId).startsWith('minesweeper');
+const rankScores = gameId => (a, b) =>
+    (lowerIsBetter(gameId) ? a.score - b.score : b.score - a.score) ||
+    ((a.duration ?? Infinity) - (b.duration ?? Infinity)) ||
+    ((a.date || 0) - (b.date || 0));
+const RULES_VERSION = 2;
+
 class ScoreManager {
     constructor() {
         this.storageKey = 'nova_scores';
+        this.rulesKey = 'nova_scores_rules';
         this.load();
+    }
+
+    lowerIsBetter(gameId) { return lowerIsBetter(gameId); }
+
+    // How a score reads: Minesweeper as seconds with hundredths, the rest as points.
+    format(gameId, score) {
+        return lowerIsBetter(gameId) ? `${(score / 1000).toFixed(2)} s` : Number(score).toLocaleString();
     }
 
     load() {
@@ -10,18 +27,31 @@ class ScoreManager {
             this.scores = data ? JSON.parse(data) : {};
 
             if (!this.scores || typeof this.scores !== 'object' || Array.isArray(this.scores)) this.scores = {};
-            Object.keys(this.scores).forEach(game => {
-                this.scores[game] = Array.isArray(this.scores[game]) ? this.scores[game]
-                    .filter(row => row && Number.isSafeInteger(row.score) && row.score > 0)
-                    .map(row => ({ initials: NovaUplink.normalize(row.initials), score: row.score, date: Number(row.date) || 0 }))
-                    .sort((a, b) => b.score - a.score).slice(0, 10) : [];
-            });
-
-            // Migration for Minesweeper level-specific scores
+            // Oldest format: one Minesweeper board before levels existed.
             if (this.scores.minesweeper && !this.scores['minesweeper-easy']) {
                 this.scores['minesweeper-easy'] = this.scores.minesweeper;
-                delete this.scores.minesweeper;
+            }
+            delete this.scores.minesweeper;
+            let rules = 1;
+            try { rules = Number(localStorage.getItem(this.rulesKey)) || 1; } catch (_e) { /* treat as old */ }
+            Object.keys(this.scores).forEach(game => {
+                let rows = Array.isArray(this.scores[game]) ? this.scores[game]
+                    .filter(row => row && Number.isSafeInteger(row.score) && row.score > 0)
+                    .map(row => ({ initials: NovaUplink.normalize(row.initials), score: row.score, date: Number(row.date) || 0,
+                        duration: Number.isSafeInteger(row.duration) ? row.duration : null })) : [];
+                if (rules < 2) {
+                    // Minesweeper stored 9999 − 10 × seconds; now the time itself, in ms.
+                    if (lowerIsBetter(game)) rows = rows.filter(row => row.score <= 9999 && row.score % 10 === 9 && row.score < 9999)
+                        .map(row => ({ ...row, score: (9999 - row.score) * 100, duration: (9999 - row.score) * 100 }));
+                    // Wordl's totals included a time bonus that no longer exists.
+                    if (game.startsWith('wordl') || game === 'colorlines-4') rows = [];
+                }
+                this.scores[game] = rows.sort(rankScores(game)).slice(0, 10);
+            });
+
+            if (rules < RULES_VERSION) {
                 this.save();
+                try { localStorage.setItem(this.rulesKey, String(RULES_VERSION)); } catch (_e) { /* retried next load */ }
             }
         } catch(e) {
             this.scores = {};
@@ -32,15 +62,16 @@ class ScoreManager {
         try { localStorage.setItem(this.storageKey, JSON.stringify(this.scores)); } catch (_e) { /* Keep scores in memory if storage is full or blocked. */ }
     }
 
-    addScore(gameId, initials, score) {
+    addScore(gameId, initials, score, duration = null) {
         if (!Number.isSafeInteger(score) || score <= 0) return;
         if (!this.scores[gameId]) this.scores[gameId] = [];
         this.scores[gameId].push({
             initials: NovaUplink.normalize(initials),
             score: score,
-            date: Date.now()
+            date: Date.now(),
+            duration: Number.isSafeInteger(duration) ? duration : null
         });
-        this.scores[gameId].sort((a, b) => b.score - a.score);
+        this.scores[gameId].sort(rankScores(gameId));
         this.scores[gameId] = this.scores[gameId].slice(0, 10); // Top 10 max
         this.save();
         window.dispatchEvent(new CustomEvent('scoresUpdated', { detail: { gameId } }));
@@ -56,11 +87,12 @@ class ScoreManager {
         window.dispatchEvent(new CustomEvent('scoresUpdated', { detail: { gameId } }));
     }
 
-    isHighScore(gameId, score) {
+    // Would this result enter the local top 10?
+    isHighScore(gameId, score, duration = null) {
         if (score <= 0) return false;
         const topScores = this.getTopScores(gameId);
         if (topScores.length < 10) return true;
-        return score > topScores[topScores.length - 1].score;
+        return rankScores(gameId)({ score, duration, date: Infinity }, topScores[topScores.length - 1]) < 0;
     }
 
     showScorePrompt(gameId, score, isWin, onComplete, targetWinId, receipt) {
@@ -74,8 +106,8 @@ class ScoreManager {
             return;
         }
 
-        const topScores = this.getTopScores(gameId);
-        if (!receipt && topScores.length >= 10 && score <= topScores[9].score) {
+        const duration = receipt ? receipt.duration : null;
+        if (!receipt && !this.isHighScore(gameId, score, duration)) {
             if (onComplete) onComplete();
             return;
         }
@@ -99,7 +131,7 @@ class ScoreManager {
                 <h2 class="${isWin ? 'score-prompt-result--win' : 'score-prompt-result--loss'}">
                     ${isWin ? 'Board Cleared!' : 'Game Over'}
                 </h2>
-                <div class="score-prompt-score">${score}</div>
+                <div class="score-prompt-score">${this.format(gameId, score)}</div>
                 <div class="score-prompt-copy">Enter 3 initials for the leaderboard:</div>
                 <input class="score-prompt-input" type="text" aria-label="Initials" id="initials-${winId}" maxlength="3">
                 <button class="btn btn--primary score-prompt-save" id="save-btn-${winId}">Save Score</button>
@@ -167,6 +199,7 @@ class ScoreManager {
         const input = document.getElementById(`initials-${winId}`);
         if(input) {
             input.focus();
+            input.addEventListener('keydown', (e) => NovaUplink.latinKey(e, input));
             input.addEventListener('keyup', (e) => {
                 if (e.key === 'Enter') btn.click();
             });
@@ -177,7 +210,7 @@ class ScoreManager {
             if (dismissed) return;
             dismissed = true;
             const initials = NovaUplink.normalize(input.value);
-            if (save) this.addScore(gameId, initials, score);
+            if (save) this.addScore(gameId, initials, score, duration);
 
             const overlay = document.getElementById(`${winId}-overlay`);
             if (overlay) {
@@ -199,7 +232,6 @@ class ScoreManager {
 
             if (onComplete) onComplete();
             if (save && receipt) void NovaUplink.publish(receipt, initials);
-            input.addEventListener('keydown', (e) => NovaUplink.latinKey(e, input));
         };
         btn.onclick = () => dismiss(true);
         document.getElementById(`skip-btn-${winId}`).onclick = () => dismiss(false);
@@ -317,8 +349,12 @@ class ScoreManager {
                     if (explorers) {
                         value.textContent = formatDate(entry.date);
                     } else {
-                        value.textContent = Number(entry.score).toLocaleString();
+                        value.textContent = this.format(selectedGame, entry.score);
                         date.textContent = formatDate(entry.date);
+                        if (!lowerIsBetter(selectedGame) && Number.isFinite(entry.duration)) {
+                            const seconds = Math.round(entry.duration / 1000);
+                            row.title = `in ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+                        }
                     }
                     row.append(rank, initials, value, date);
                     list.appendChild(row);

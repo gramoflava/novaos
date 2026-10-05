@@ -104,7 +104,6 @@ Apps.register({
                     <h2>Scoring & Leaderboards</h2>
                     <ul>
                         <li><b>Accuracy:</b> Points are awarded based on how many guesses remain.</li>
-                        <li><b>Speed:</b> A quick solve adds up to 1,000 bonus points; the bonus runs out after 100 seconds.</li>
                         <li><b>Dictionary:</b> Obscure words and even "forbidden" vocabulary are supported for validation.</li>
                         <li><b>Genius Bonus:</b> Solving the word in 1 or 2 tries triggers a special system-wide celebration.</li>
                     </ul>
@@ -192,6 +191,8 @@ Apps.register({
                         <li><b>Intermediate:</b> 16x16 grid, 40 mines.</li>
                         <li><b>Expert:</b> 30x16 grid, 99 mines.</li>
                     </ul>
+                    <h2>Records</h2>
+                    <p>A record is your solve time, to the hundredth of a second: the faster, the higher you rank. The clock starts with the first click and stops while the game is paused.</p>
                     <p>Expert mode completion is the highest honor in the Nova OS gaming community.</p>
                 `
             },

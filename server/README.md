@@ -62,13 +62,20 @@ permissions. Back up the SQLite database with its backup API (or stop the servic
 before copying); copying the database alone while WAL is active can miss writes.
 Restarting the service invalidates unfinished tickets, but preserves scoreboards.
 To update: replace the Python file and restart the service. There is no build.
+Schema and rule changes migrate on start, once, tracked by SQLite's
+`PRAGMA user_version`. Version 1 adds the run duration, converts Minesweeper
+records to solve times in milliseconds, and clears Wordl boards (their time bonus
+is gone) and the retired `colorlines-4`. Back up the database before updating.
 
 ## What is stored / transmitted
 
-The permanent database contains only the game's name, initials, best score and
-server-assigned achievement date; Explorers has only initials and its first date.
-Numeric boards show the top 10, retain the top 100 initials per game, and replace
-an initials' previous score only when a new one is higher. Explorers keeps every
+The permanent database contains only the game's name, initials, best score, the
+run's duration and the server-assigned achievement date; Explorers has only
+initials and its first date. Numeric boards show the top 10 and retain the top 100
+initials per game. Minesweeper ranks by solve time (lower is better); every other
+board ranks by points, and equal points go to the shorter run (Wordl reports no
+duration, so its ties go to whoever was first). A new result replaces an initials'
+previous one only when it ranks higher. Explorers keeps every
 unique initials indefinitely; pagination is automatically read to display everyone.
 
 Technical requests carry a game ID and a short-lived random ticket/proof. These
@@ -93,7 +100,7 @@ Explorer acknowledgement and secret-game unlocks. It cannot delete public record
   any field after redemption is rejected. A challenge is obtained at run start
   when consent already exists; the first newly consented result obtains it after
   the save prompt. Nothing contacts the server before opting in.
-- SHA-256 proof-of-work binds ticket + initials + score; the server checks a
+- SHA-256 proof-of-work binds ticket + initials + score + duration; the server checks a
   minimal delay, ranges and game-specific score formats. These are plausibility
   limits, **not proof of game completion**. The proof is an abuse cost, not a
   secret signature. There are no secret keys embedded in browser JavaScript.

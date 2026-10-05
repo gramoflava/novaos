@@ -13,13 +13,25 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
+# Highest accepted score per board. Minesweeper's score is the solve time in
+# milliseconds (lower is better); everywhere else more points win and the
+# shorter run breaks a tie.
 GAMES = {
-    'minesweeper-easy': 9999, 'minesweeper-medium': 9999, 'minesweeper-hard': 9999,
-    'wordl-4': 3000, 'wordl-5': 4000, 'wordl-6': 5200, 'wordl-7': 6600,
+    'minesweeper-easy': 3600000, 'minesweeper-medium': 3600000, 'minesweeper-hard': 3600000,
+    'wordl-4': 2000, 'wordl-5': 3000, 'wordl-6': 4200, 'wordl-7': 5600,
     'game2048': 1000000, 'colorlines-5': 1000000,
     'columns-classic': 10000000, 'novarun-lunar': 1000000,
     'novarun-classic': 1000000, 'asteroids': 10000000, 'explorers': 0,
 }
+LOWER_IS_BETTER = {'minesweeper-easy', 'minesweeper-medium', 'minesweeper-hard'}
+MAX_DURATION = 86400000  # ms
+SCHEMA_VERSION = 1
+
+
+def ranking(game):
+    """ORDER BY clause: best first, then the shorter run, then whoever was first."""
+    direction = 'ASC' if game in LOWER_IS_BETTER else 'DESC'
+    return f'score {direction}, COALESCE(duration, {MAX_DURATION + 1}), achieved, initials'
 INITIALS = re.compile(r'[A-Z0-9?]{1,3}\Z')
 TOKEN = re.compile(r'[a-f0-9]{48}\Z')
 NONCE = re.compile(r'[0-9]{1,10}\Z')
@@ -42,17 +54,37 @@ class Store:
         self.db.executescript('''
             CREATE TABLE IF NOT EXISTS scores (
                 game TEXT NOT NULL, initials TEXT NOT NULL, score INTEGER NOT NULL,
-                achieved INTEGER NOT NULL, PRIMARY KEY(game, initials)
+                achieved INTEGER NOT NULL, duration INTEGER, PRIMARY KEY(game, initials)
             );
             CREATE INDEX IF NOT EXISTS ranked ON scores(game, score DESC, achieved);
             CREATE TABLE IF NOT EXISTS explorers (
                 id INTEGER PRIMARY KEY, initials TEXT NOT NULL UNIQUE, achieved INTEGER NOT NULL
             );
         ''')
+        self.migrate()
         # Tickets/rate limits expire in RAM. No IPs, cookies or profiles in SQLite.
         self.tickets = {}
         self.rates = {}
         self.rate_secret = secrets.token_bytes(32)
+
+    def migrate(self):
+        """One-way upgrades, keyed by PRAGMA user_version; each step runs once."""
+        version = self.db.execute('PRAGMA user_version').fetchone()[0]
+        if version >= SCHEMA_VERSION:
+            return
+        with self.db:
+            columns = {row[1] for row in self.db.execute('PRAGMA table_info(scores)')}
+            if 'duration' not in columns:
+                self.db.execute('ALTER TABLE scores ADD COLUMN duration INTEGER')
+            # v1 scoring rules. Minesweeper stored 9999 - 10 × seconds; it now
+            # stores the time itself in ms, so old records convert exactly.
+            self.db.execute('''UPDATE scores SET score = (9999 - score) * 100, duration = (9999 - score) * 100
+                WHERE game LIKE 'minesweeper-%' AND score BETWEEN 0 AND 9999 AND score % 10 = 9''')
+            self.db.execute("DELETE FROM scores WHERE game LIKE 'minesweeper-%' AND (score <= 0 OR duration IS NULL)")
+            # Wordl dropped its time bonus; old totals can't be split back apart.
+            self.db.execute("DELETE FROM scores WHERE game LIKE 'wordl-%'")
+            self.db.execute("DELETE FROM scores WHERE game = 'colorlines-4'")
+            self.db.execute(f'PRAGMA user_version = {SCHEMA_VERSION}')
 
     def close(self):
         self.db.close()
@@ -82,10 +114,12 @@ class Store:
                 'waitMs': int(self.min_age * 1000), 'expiresIn': self.max_age}
 
     def submit(self, data):
-        allowed = {'ticket', 'nonce', 'initials', 'score'}
+        allowed = {'ticket', 'nonce', 'initials', 'score', 'duration'}
         if not isinstance(data, dict) or set(data) != allowed:
-            raise APIError(400, 'Invalid result fields.')
-        ticket, nonce, initials, score = (data[k] for k in ('ticket', 'nonce', 'initials', 'score'))
+            # Results without a duration come from a page loaded before the
+            # scoring rules changed; their numbers mean something else.
+            raise APIError(400, 'Invalid result fields. Reload NovaOS and try again.')
+        ticket, nonce, initials, score, duration = (data[k] for k in ('ticket', 'nonce', 'initials', 'score', 'duration'))
         if not isinstance(ticket, str) or not TOKEN.fullmatch(ticket):
             raise APIError(400, 'Invalid ticket.')
         if not isinstance(nonce, str) or not NONCE.fullmatch(nonce):
@@ -94,6 +128,8 @@ class Store:
             raise APIError(400, 'Use 1–3 letters or numbers.')
         if type(score) is not int or score < 0:
             raise APIError(400, 'Invalid score.')
+        if type(duration) is not int or duration < 0 or duration > MAX_DURATION:
+            raise APIError(400, 'Invalid duration.')
         with self.lock:
             run = self.tickets.get(ticket)
             if not run or self.clock() - run['created'] > self.max_age:
@@ -101,13 +137,13 @@ class Store:
             game = run['game']
             if score > GAMES[game] or (game != 'explorers' and score == 0):
                 raise APIError(400, 'Score outside game limits.')
-            if game.startswith('minesweeper') and score % 10 != 9:
-                raise APIError(400, 'Invalid Minesweeper score.')
+            if game in LOWER_IS_BETTER and duration != score:
+                raise APIError(400, 'Invalid Minesweeper time.')
             if game == 'game2048' and score % 4:
                 raise APIError(400, 'Invalid 2048 score.')
             if game == 'asteroids' and score % 10:
                 raise APIError(400, 'Invalid Asteroids score.')
-            payload = f'{ticket}:{initials}:{score}:{nonce}'
+            payload = f'{ticket}:{initials}:{score}:{duration}:{nonce}'
             proof = hashlib.sha256(payload.encode()).hexdigest()
             if not proof.startswith('0' * self.difficulty):
                 raise APIError(400, 'Invalid proof.')
@@ -129,12 +165,15 @@ class Store:
                         self.db.execute('INSERT INTO explorers(initials, achieved) VALUES (?, ?)', (initials, achieved))
                         status, result = 201, {'initials': initials, 'date': achieved}
                 else:
-                    self.db.execute('''INSERT INTO scores VALUES (?, ?, ?, ?)
-                        ON CONFLICT(game, initials) DO UPDATE SET score=excluded.score, achieved=excluded.achieved
-                        WHERE excluded.score > scores.score''', (game, initials, score, achieved))
+                    better = ('excluded.score < scores.score' if game in LOWER_IS_BETTER else
+                              f'excluded.score > scores.score OR (excluded.score = scores.score AND '
+                              f'excluded.duration < COALESCE(scores.duration, {MAX_DURATION + 1}))')
+                    self.db.execute(f'''INSERT INTO scores(game, initials, score, achieved, duration) VALUES (?, ?, ?, ?, ?)
+                        ON CONFLICT(game, initials) DO UPDATE SET score=excluded.score, achieved=excluded.achieved,
+                        duration=excluded.duration WHERE {better}''', (game, initials, score, achieved, duration))
                     # Each game retains its best 100 initials, with the public top 10 returned.
-                    self.db.execute('''DELETE FROM scores WHERE game=? AND initials NOT IN
-                        (SELECT initials FROM scores WHERE game=? ORDER BY score DESC, achieved, initials LIMIT 100)''', (game, game))
+                    self.db.execute(f'''DELETE FROM scores WHERE game=? AND initials NOT IN
+                        (SELECT initials FROM scores WHERE game=? ORDER BY {ranking(game)} LIMIT 100)''', (game, game))
                     status, result = 201, {'saved': True}
             run['result'] = (payload, status, result)
             return status, result
@@ -147,8 +186,8 @@ class Store:
                 rows = self.db.execute('SELECT id, initials, achieved FROM explorers WHERE id>? ORDER BY id LIMIT 501', (after,)).fetchall()
                 return {'entries': [{'initials': r[1], 'date': r[2]} for r in rows[:500]],
                         'next': rows[499][0] if len(rows) > 500 else None}
-            rows = self.db.execute('SELECT initials, score, achieved FROM scores WHERE game=? ORDER BY score DESC, achieved, initials LIMIT 10', (game,)).fetchall()
-            return {'entries': [{'initials': r[0], 'score': r[1], 'date': r[2]} for r in rows]}
+            rows = self.db.execute(f'SELECT initials, score, achieved, duration FROM scores WHERE game=? ORDER BY {ranking(game)} LIMIT 10', (game,)).fetchall()
+            return {'entries': [{'initials': r[0], 'score': r[1], 'date': r[2], 'duration': r[3]} for r in rows]}
 
 
 def make_server(store, origins, host='127.0.0.1', port=8787, trust_proxy=False):

@@ -135,11 +135,6 @@ Apps.register({
         let currentGuess = "";
         let gameOver = false;
         let isAnimating = false;
-        // Real elapsed time since the word appeared; a hidden tab or a slow
-        // browser doesn't slow the clock down.
-        let startedAt = 0;
-        let timer = null;
-        const elapsedSeconds = () => Math.floor((performance.now() - startedAt) / 1000);
 
         // Global Dictionary Storage
         if (!window.WordlDict) {
@@ -152,18 +147,6 @@ Apps.register({
         const uiKeyboard = document.getElementById(`wl-keyboard-${winId}`);
         const loadingOverlay = document.getElementById(`wl-loading-${winId}`);
 
-        const stopTimer = () => {
-            if (timer) clearInterval(timer);
-            timer = null;
-        };
-
-        const startTimer = () => {
-            stopTimer();
-            startedAt = performance.now();
-            timer = setInterval(() => {
-                if (!gameOver) document.getElementById(`wl-time-${winId}`).textContent = elapsedSeconds();
-            }, 200);
-        };
 
         async function loadDict() {
             if (window.WordlDict.loaded) {
@@ -249,8 +232,6 @@ Apps.register({
             currentGuess = "";
             gameOver = false;
             isAnimating = false;
-            document.getElementById(`wl-time-${winId}`).textContent = 0;
-            startTimer();
             maxGuesses = wordLength + 1; // 5 -> 6 guesses, 6 -> 7 guesses
 
             const revealBtn = document.getElementById(`wl-reveal-${winId}`);
@@ -394,11 +375,9 @@ Apps.register({
 
             if (guess === target) {
                 gameOver = true;
-                if (timer) clearInterval(timer);
                 handleWin();
             } else if (guesses.length >= maxGuesses) {
                 gameOver = true;
-                if (timer) clearInterval(timer);
                 showMessage('GAME OVER');
                 const revealBtn = document.getElementById(`wl-reveal-${winId}`);
                 if (revealBtn) revealBtn.style.display = 'inline-block';
@@ -431,20 +410,16 @@ Apps.register({
         function handleWin() {
             if (window.AudioMng) AudioMng.play('win');
 
-            const timeElapsed = elapsedSeconds();
-            document.getElementById(`wl-time-${winId}`).textContent = timeElapsed;
-            // Scoring mechanism
-            // Points = ((maxGuesses - guessesTaken) * base) + timeBonus
-            // Base = 100. Length 5 => base 500. Length 6 => base 600.
+            // Points come from guesses left only: everyone gets a different
+            // word, so time says little about skill. Base = 100 × length;
+            // a 5-letter word solved on the first try scores 6 × 500.
             const base = wordLength * 100;
-            const stepPoints = (maxGuesses - guesses.length + 1) * base;
-            const timeBonus = Math.max(0, Math.floor(1000 - timeElapsed * 10));
-            const score = stepPoints + timeBonus;
+            const score = (maxGuesses - guesses.length + 1) * base;
 
             showMessage('GENIUS!');
 
             // Winning now immediately triggers the unified OS-level celebration prompt
-            reportScore(score, true);
+            reportScore(score, true, undefined, 0); // no time tie-break either
         }
 
         function handleKeypress(key) {
@@ -496,7 +471,6 @@ Apps.register({
         const originalCleanup = winObj.cleanup;
         winObj.cleanup = () => {
             if (originalCleanup) originalCleanup();
-            stopTimer();
             document.removeEventListener('keydown', onGlobalKey);
             window.removeEventListener('resize', updateCellSize);
         };

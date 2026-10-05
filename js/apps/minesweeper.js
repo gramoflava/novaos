@@ -54,7 +54,7 @@ Apps.register({
                         </div>
                         <div class="game-stat">
                             <div class="game-stat__label">Time</div>
-                            <div class="game-stat__value" id="ms-time-${winId}">0</div>
+                            <div class="game-stat__value" id="ms-time-${winId}">0.0</div>
                         </div>
                     </div>
                 </div>
@@ -104,7 +104,9 @@ Apps.register({
             uiPause.setAttribute('aria-label', available ? 'Pause' : 'Pause unavailable before the first move');
         };
 
-        const elapsedSeconds = () => Math.floor((elapsedMs + (runningSince ? performance.now() - runningSince : 0)) / 1000);
+        const elapsed = () => Math.round(elapsedMs + (runningSince ? performance.now() - runningSince : 0));
+        // The clock shows tenths; the record keeps milliseconds.
+        const showTime = ms => { uiTime.textContent = (Math.floor(ms / 100) / 10).toFixed(1); };
 
         const stopTimer = () => {
             if (runningSince) elapsedMs += performance.now() - runningSince;
@@ -116,9 +118,7 @@ Apps.register({
         const startTimer = () => {
             stopTimer();
             runningSince = performance.now();
-            timer = setInterval(() => {
-                uiTime.textContent = elapsedSeconds();
-            }, 200);
+            timer = setInterval(() => showTime(elapsed()), 100);
         };
 
         const updateGridCellSize = () => {
@@ -208,7 +208,7 @@ Apps.register({
             minesLeft = totalMines;
             stopTimer();
             elapsedMs = 0;
-            uiTime.textContent = 0;
+            showTime(0);
             uiMines.textContent = minesLeft;
             setPauseAvailable(false);
 
@@ -340,8 +340,8 @@ Apps.register({
         const gameOver = (win) => {
             isGameOver = true;
             stopTimer();
-            const time = elapsedSeconds();
-            uiTime.textContent = time;
+            const time = elapsed();
+            showTime(time);
             setPauseAvailable(false);
 
             // Reveal all mines
@@ -354,12 +354,12 @@ Apps.register({
                 }
             }
 
-            const finalScore = win ? Math.max(0, 9999 - time * 10) : 0;
-
+            // The record is the solve time itself, in ms: lower is better.
             if(win) {
                 if (window.AudioMng) AudioMng.play('win');
                 const report = reportScore;
-                setTimeout(() => report(finalScore, true), 500);
+                const solved = Math.max(1, time);
+                setTimeout(() => report(solved, true, undefined, solved), 500);
             } else {
                 if (window.AudioMng) AudioMng.play('lose');
             }
