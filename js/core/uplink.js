@@ -82,7 +82,7 @@
         consentDialog = new Promise(resolve => {
             const id = 'uplink-consent-' + Date.now();
             WindowManager.create({ id, appId: 'scores', title: 'Galactic uplink', width: 360, height: 320,
-                content: `<div class="uplink-dialog"><h3>Compete across the galaxy?</h3><p>Publish your score and initials to NovaScore. No account, cookies or tracking. Explorers share only initials and the date of discovery.</p><button class="btn btn--primary" data-uplink="yes">Enable uplink</button><button class="btn btn--ghost" data-uplink="no">Keep it local</button></div>` });
+                content: `<div class="uplink-dialog"><h3>Compete across the galaxy?</h3><p>Share your achievements with the galaxy. Only your score, initials and the date are shared — just a little friendly competition.</p><button class="btn btn--primary" data-uplink="yes">Enable uplink</button><button class="btn btn--ghost" data-uplink="no">Keep it local</button></div>` });
             const win = WindowManager.windows.get(id);
             let settled = false;
             const finish = enabled => {
