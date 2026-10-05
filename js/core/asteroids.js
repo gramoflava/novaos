@@ -238,9 +238,12 @@ class AsteroidsGame {
         WindowManager.windows.forEach(w => {
             const el = w.el;
             if (!el || el.dataset.minimized === 'true' || el.style.pointerEvents === 'none') return;
+            // Corner radius as drawn, read once per window: collisions follow
+            // the rounded shape, not its bounding box.
+            if (el.astRadius === undefined) el.astRadius = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0;
             rects.push({
                 x: parseFloat(el.dataset.x), y: parseFloat(el.dataset.y),
-                w: parseFloat(el.dataset.w), h: parseFloat(el.dataset.h)
+                w: parseFloat(el.dataset.w), h: parseFloat(el.dataset.h), r: el.astRadius
             });
         });
         return rects;
@@ -481,28 +484,38 @@ class AsteroidsGame {
         this.updateHud();
     }
 
+    // Distance from a point to a window's rounded outline (negative inside).
+    // The window is its rectangle shrunk by the corner radius, grown back by
+    // it as a circle: corners are arcs, so the empty space a window's rounded
+    // corner leaves is empty for the game too.
+    outline(x, y, rect) {
+        const rc = Math.min(rect.r || 0, rect.w / 2, rect.h / 2);
+        const ix = Math.max(rect.x + rc, Math.min(x, rect.x + rect.w - rc));
+        const iy = Math.max(rect.y + rc, Math.min(y, rect.y + rect.h - rc));
+        const dx = x - ix, dy = y - iy, d = Math.hypot(dx, dy);
+        return { gap: d - rc, d, dx, dy, ix, iy, rc };
+    }
+
     circleRect(x, y, r, rect) {
-        const nx = Math.max(rect.x, Math.min(x, rect.x + rect.w));
-        const ny = Math.max(rect.y, Math.min(y, rect.y + rect.h));
-        return (x - nx) ** 2 + (y - ny) ** 2 < r * r;
+        return this.outline(x, y, rect).gap < r;
     }
 
     bounce(k, rect) {
         const r = k.r * 0.86;
-        const nx = Math.max(rect.x, Math.min(k.x, rect.x + rect.w));
-        const ny = Math.max(rect.y, Math.min(k.y, rect.y + rect.h));
-        let dx = k.x - nx, dy = k.y - ny;
-        let d = Math.hypot(dx, dy);
-        if (d >= r) return;
-        if (d < 0.001) { // centre inside the window: push out the short way
+        const o = this.outline(k.x, k.y, rect);
+        if (o.gap >= r) return;
+        let ux, uy;
+        if (o.d < 0.001) { // centre deep inside the window: push out the short way
             const l = k.x - rect.x, rr = rect.x + rect.w - k.x, t = k.y - rect.y, b = rect.y + rect.h - k.y;
             const m = Math.min(l, rr, t, b);
-            dx = m === l ? -1 : m === rr ? 1 : 0;
-            dy = m === t ? -1 : m === b ? 1 : 0;
-            d = 1;
+            ux = m === l ? -1 : m === rr ? 1 : 0;
+            uy = m === t ? -1 : m === b ? 1 : 0;
+            k.x = ux ? (ux < 0 ? rect.x - r : rect.x + rect.w + r) : k.x;
+            k.y = uy ? (uy < 0 ? rect.y - r : rect.y + rect.h + r) : k.y;
+        } else {
+            ux = o.dx / o.d; uy = o.dy / o.d;
+            k.x = o.ix + ux * (o.rc + r); k.y = o.iy + uy * (o.rc + r);
         }
-        const ux = dx / d, uy = dy / d;
-        k.x = nx + ux * r; k.y = ny + uy * r;
         const vn = k.vx * ux + k.vy * uy;
         if (vn < 0) { k.vx -= 1.85 * vn * ux; k.vy -= 1.85 * vn * uy; }
     }
