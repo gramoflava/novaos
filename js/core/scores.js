@@ -206,10 +206,18 @@ class ScoreManager {
 
     mountLeaderboard(container, initialGame) {
         const variants = {
-            minesweeper: [['minesweeper-easy', 'Easy'], ['minesweeper-medium', 'Med'], ['minesweeper-hard', 'Hard']],
+            minesweeper: [['minesweeper-easy', 'Beginner'], ['minesweeper-medium', 'Intermediate'], ['minesweeper-hard', 'Expert']],
             wordl: [4, 5, 6, 7].map(n => [`wordl-${n}`, `${n} letters`]),
-            colorlines: [['colorlines-5', 'Classic (5)'], ['colorlines-4', 'Quick (4)']],
+            colorlines: [['colorlines-5', 'Classic'], ['colorlines-4', 'Quick']],
             novarun: [['novarun-lunar', 'Lunar'], ['novarun-classic', 'Dino']]
+        };
+        const select = (role, label, items, current) => `<select class="game-select" data-role="${role}" aria-label="${label}">${items.map(([value, text]) =>
+            `<option value="${value}" ${value === current ? 'selected' : ''}>${text}</option>`).join('')}</select>`;
+        const formatDate = timestamp => {
+            if (!timestamp) return '';
+            const date = new Date(timestamp);
+            const sameYear = date.getFullYear() === new Date().getFullYear();
+            return date.toLocaleDateString(undefined, sameYear ? { day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short', year: 'numeric' });
         };
         let game = initialGame;
         let galactic = NovaUplink.enabled;
@@ -218,78 +226,145 @@ class ScoreManager {
         const render = async () => {
             const revision = ++version;
             const selectedGame = game;
+            const explorers = selectedGame === 'explorers';
             const remote = galactic && NovaUplink.enabled;
+            const local = explorers
+                ? (NovaUplink.explorer?.initials ? [NovaUplink.explorer] : []) : this.getTopScores(selectedGame);
+            const gameVariants = variants[selectedGame.split('-')[0]] || [];
             container.innerHTML = `<div class="score-view">
-                <div class="uplink-controls">
-                    <label class="uplink-toggle"><input type="checkbox" ${NovaUplink.enabled ? 'checked' : ''}> Uplink to the galactic scoreboard</label>
-                    <button class="btn btn--ghost uplink-refresh" type="button">Refresh / Retry</button>
+                <div class="game-toolbar">
+                    <div class="game-toolbar__group">
+                        ${select('source', 'Scoreboard', [['local', 'Local'], ['galactic', 'Galaxy']], galactic ? 'galactic' : 'local')}
+                        ${gameVariants.length > 1 ? select('mode', 'Mode', gameVariants, selectedGame) : ''}
+                        <button class="game-icon-btn game-icon-btn--restart uplink-refresh" type="button" title="Refresh" aria-label="Refresh scoreboard"></button>
+                    </div>
+                    <div class="game-toolbar__spacer"></div>
+                    ${!galactic && !explorers && local.length ? '<button type="button" class="btn btn--danger scores-reset-btn">Clear local</button>' : ''}
                 </div>
-                <div class="score-variants score-sources"><button class="btn ${!remote ? 'btn--primary' : 'btn--ghost'}" data-source="local">This browser</button><button class="btn ${remote ? 'btn--primary' : 'btn--ghost'}" data-source="galactic" ${!NovaUplink.enabled ? 'disabled' : ''}>Galaxy</button></div>
-                <div class="score-variants">${(variants[game.split('-')[0]] || []).map(([id, label]) => `<button class="btn ${id === game ? 'btn--primary' : 'btn--ghost'}" data-game="${id}">${label}</button>`).join('')}</div>
-                <p class="uplink-status" role="status"></p><div class="score-view__list"></div>
-                ${!remote && game !== 'explorers' ? '<button class="btn btn--ghost scores-reset-btn">Clear local scores</button>' : ''}
+                <ol class="score-view__list" aria-label="Leaderboard"></ol>
+                <div class="score-footer">
+                    <label class="switch">
+                        <input type="checkbox" class="uplink-switch" ${NovaUplink.enabled ? 'checked' : ''}>
+                        <span class="switch__track"></span>
+                        <span class="score-footer__label">Send new results to the galaxy</span>
+                    </label>
+                    <span class="game-toolbar__spacer"></span>
+                    <div class="game-stat score-stat--uplink" title=""><div class="game-stat__label">Uplink</div><div class="game-stat__value score-status" role="status">—</div></div>
+                </div>
             </div>`;
-            const status = container.querySelector('.uplink-status');
+            const statusBox = container.querySelector('.score-stat--uplink');
+            const status = container.querySelector('.score-status');
+            const refresh = container.querySelector('.uplink-refresh');
             const list = container.querySelector('.score-view__list');
-            container.querySelector('input').onchange = event => {
+            const setStatus = (kind, text, detail) => {
+                status.dataset.kind = kind;
+                status.textContent = text;
+                statusBox.title = detail || text;
+            };
+            container.querySelector('.uplink-switch').onchange = event => {
                 galactic = event.target.checked;
                 NovaUplink.setEnabled(galactic);
             };
-            container.querySelector('.uplink-refresh').onclick = async () => {
-                status.textContent = 'Retrying uplink…';
+            refresh.onclick = async () => {
+                refresh.disabled = true;
+                refresh.classList.add('is-spinning');
+                setStatus('busy', 'Sync', 'Retrying uplink…');
                 await NovaUplink.retry();
                 if (!disposed) void render();
             };
-            container.querySelectorAll('[data-source]').forEach(button => {
-                button.onclick = () => { galactic = button.dataset.source === 'galactic'; void render(); };
-            });
-            container.querySelectorAll('[data-game]').forEach(button => {
-                button.onclick = () => { game = button.dataset.game; void render(); };
-            });
+            container.querySelector('[data-role="source"]').onchange = event => { galactic = event.target.value === 'galactic'; void render(); };
+            const mode = container.querySelector('[data-role="mode"]');
+            if (mode) mode.onchange = event => { game = event.target.value; void render(); };
             const clear = container.querySelector('.scores-reset-btn');
-            if (clear) clear.onclick = () => this.clearScores(game);
+            if (clear) clear.onclick = () => this.clearScores(selectedGame);
+
+            const empty = (title, hint, action) => {
+                const box = document.createElement('li');
+                box.className = 'score-empty';
+                const heading = document.createElement('div');
+                heading.className = 'settings-label';
+                heading.textContent = title;
+                box.appendChild(heading);
+                if (hint) {
+                    const copy = document.createElement('div');
+                    copy.className = 'hint';
+                    copy.textContent = hint;
+                    box.appendChild(copy);
+                }
+                if (action) box.appendChild(action);
+                list.replaceChildren(box);
+            };
             const show = entries => {
                 list.replaceChildren();
                 if (!entries.length) {
-                    const empty = document.createElement('p');
-                    empty.className = 'score-empty';
-                    empty.textContent = selectedGame === 'explorers' ? 'No explorers registered yet.' : 'No scores yet!';
-                    list.appendChild(empty);
+                    if (explorers) return empty('No explorers yet', 'Reach the other side to sign the log.');
+                    return empty('No scores yet', remote ? 'Be the first in the galaxy.' : 'Play a round to set the first record.');
                 }
                 entries.forEach((entry, index) => {
-                    const row = document.createElement('div');
+                    const row = document.createElement('li');
                     row.className = 'score-row';
+                    if (index < 3) row.dataset.podium = String(index + 1);
                     const rank = document.createElement('span');
                     rank.className = 'score-row__rank';
-                    rank.textContent = `#${index + 1}`;
+                    rank.textContent = String(index + 1);
                     const initials = document.createElement('span');
                     initials.className = 'score-row__initials';
                     initials.textContent = NovaUplink.normalize(entry.initials);
                     const value = document.createElement('span');
                     value.className = 'score-row__value';
-                    value.textContent = selectedGame === 'explorers' ? new Date(entry.date).toLocaleDateString() : entry.score;
-                    row.append(rank, initials, value);
+                    const date = document.createElement('span');
+                    date.className = 'score-row__date';
+                    if (explorers) {
+                        value.textContent = formatDate(entry.date);
+                    } else {
+                        value.textContent = Number(entry.score).toLocaleString();
+                        date.textContent = formatDate(entry.date);
+                    }
+                    row.append(rank, initials, value, date);
                     list.appendChild(row);
                 });
             };
-            const local = selectedGame === 'explorers'
-                ? (NovaUplink.explorer?.initials ? [NovaUplink.explorer] : []) : this.getTopScores(selectedGame);
+
+            const waiting = NovaUplink.enabled ? NovaUplink.pendingCount : 0;
             if (!remote) {
-                status.textContent = NovaUplink.enabled ? 'Local scores · uplink enabled for new results.' : 'Uplink off · scores stay in this browser.';
+                refresh.disabled = !waiting;
+                if (!NovaUplink.enabled) setStatus('off', 'Off', 'Uplink off · scores stay in this browser.');
+                else if (waiting) setStatus('warn', `${waiting} queued`, `${waiting} result(s) waiting. Refresh to send.`);
+                else setStatus('ok', 'On', 'Uplink enabled for new results.');
+                if (galactic) {
+                    const enable = document.createElement('button');
+                    enable.type = 'button';
+                    enable.className = 'btn btn--primary';
+                    enable.textContent = 'Turn on uplink';
+                    enable.onclick = () => NovaUplink.setEnabled(true);
+                    return empty('Uplink is off', 'Turn it on to see the galactic scoreboard.', enable);
+                }
                 show(local);
                 return;
             }
-            status.textContent = 'Connecting to NovaScore…';
+            setStatus('busy', 'Sync', 'Connecting to NovaScore…');
+            list.setAttribute('aria-busy', 'true');
+            // Only the request sits in try: a rendering bug must not pose as "Offline".
+            let entries;
             try {
-                const entries = await NovaUplink.board(selectedGame);
+                entries = await NovaUplink.board(selectedGame);
+            } catch (error) {
                 if (disposed || revision !== version) return;
-                status.textContent = NovaUplink.pendingCount ? `Uplink connected · ${NovaUplink.pendingCount} result(s) waiting. Retry to send.` : 'Uplink connected · galactic scoreboard.';
-                show(entries);
-            } catch (_e) {
-                if (disposed || revision !== version) return;
-                status.textContent = 'Uplink unavailable · showing this browser’s records. Refresh to retry.';
+                list.removeAttribute('aria-busy');
+                const reason = error.status ? `NovaScore answered ${error.status}` : 'NovaScore could not be reached from this page';
+                setStatus('error', 'Offline', `${reason} · showing this browser’s records. Refresh to retry.`);
                 show(local);
+                const note = document.createElement('li');
+                note.className = 'score-note hint';
+                note.textContent = `Galaxy unavailable (${error.status || 'no response'}) — showing this browser’s records.`;
+                list.prepend(note);
+                return;
             }
+            if (disposed || revision !== version) return;
+            list.removeAttribute('aria-busy');
+            if (waiting) setStatus('warn', `${waiting} queued`, `Connected · ${waiting} result(s) waiting. Refresh to send.`);
+            else setStatus('ok', 'Online', 'Connected to the galactic scoreboard.');
+            show(entries);
         };
         const update = () => { if (!disposed) void render(); };
         window.addEventListener('scoresUpdated', update);
@@ -309,7 +384,7 @@ class ScoreManager {
     showLeaderboard(_gameName, gameId) {
         const id = 'leaderboard-' + gameId + '-' + Date.now();
         WindowManager.create({ id, appId: 'scores', title: 'Scores', width: 370, height: 520,
-            content: '<div class="score-board-mount" style="height:100%;padding:24px"></div>' });
+            content: '<div class="score-board-mount" style="height:100%;padding:var(--space-5)"></div>' });
         const win = WindowManager.windows.get(id);
         const view = this.mountLeaderboard(win.content.firstElementChild, gameId);
         const cleanup = win.cleanup;

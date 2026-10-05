@@ -6,17 +6,11 @@ Apps.register({
     keepInDock: true,
     launch: () => {
         const id = 'scoresapp-' + Date.now();
-        WindowManager.create({ id, appId: 'scores', title: 'Scores', width: 600, height: 560,
+        WindowManager.create({ id, appId: 'scores', title: 'Scores', width: 620, height: 560,
             content: `<div class="scores-container">
                 <nav class="scores-sidebar" aria-label="Games"></nav>
                 <div class="scores-content"></div>
-            </div><style>
-                .scores-container { display:flex; height:100%; color:var(--text); }
-                .scores-sidebar { width:140px; flex:none; border-right:1px solid var(--line); padding:12px; overflow-y:auto; }
-                .scores-sidebar button { display:block; width:100%; margin-bottom:4px; text-align:left; }
-                .scores-content { flex:1; min-width:0; padding:20px; }
-                @media(max-width:600px) { .scores-container { flex-direction:column; } .scores-sidebar { display:flex; width:auto; border-right:0; border-bottom:1px solid var(--line); gap:4px; flex-wrap:wrap; } .scores-sidebar button { width:auto; font-size:var(--text-xs); } }
-            </style>` });
+            </div>` });
         const win = WindowManager.windows.get(id);
         const sidebar = win.content.querySelector('nav');
         const view = Scores.mountLeaderboard(win.content.querySelector('.scores-content'), 'minesweeper-easy');
@@ -29,7 +23,9 @@ Apps.register({
             sidebar.replaceChildren();
             games.forEach(([game, label]) => {
                 const button = document.createElement('button');
-                button.className = `btn ${selected === game ? 'btn--primary' : 'btn--ghost'}`;
+                button.type = 'button';
+                button.className = 'scores-nav__item';
+                if (selected === game) button.setAttribute('aria-current', 'page');
                 button.textContent = label;
                 button.onclick = () => { selected = game; view.select(game); menu(); };
                 sidebar.appendChild(button);
