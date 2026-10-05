@@ -104,12 +104,19 @@ class AsteroidsGame {
         this.hud = document.createElement('div');
         this.hud.className = 'ast-hud';
         this.hud.setAttribute('role', 'status');
+        // Two layers in one pill: the controls show first, then float away to
+        // lives · wave · score. Hovering the pill brings the controls back.
         this.hud.innerHTML =
-            '<span class="ast-hud__score">0</span>' +
-            '<span class="ast-hud__lives"></span>' +
-            '<span class="ast-hud__wave">Wave 1</span>' +
-            '<span class="ast-hud__help">← → turn · ↑ thrust · Space fire · Esc leave</span>';
+            '<div class="ast-hud__main">' +
+                '<span class="ast-hud__lives"></span>' +
+                '<span class="ast-hud__wave">Wave 1</span>' +
+                '<span class="ast-hud__score">0</span>' +
+            '</div>' +
+            '<div class="ast-hud__help">← → turn · ↑ thrust · Space fire · Esc leave</div>';
         document.body.appendChild(this.hud);
+        this.showHelp(2000);
+        this.hud.addEventListener('mouseenter', () => this.showHelp());
+        this.hud.addEventListener('mouseleave', () => this.showHelp(500));
         this.banner = document.createElement('div');
         this.banner.className = 'ast-banner';
         document.body.appendChild(this.banner);
@@ -147,8 +154,17 @@ class AsteroidsGame {
         this.raf = requestAnimationFrame(this.frame);
     }
 
+    // Show the controls in the HUD; with a delay, hide them again after it.
+    showHelp(hideAfter) {
+        if (!this.hud) return;
+        clearTimeout(this.helpTimer);
+        this.hud.classList.add('is-help');
+        if (hideAfter) this.helpTimer = setTimeout(() => this.hud && this.hud.classList.remove('is-help'), hideAfter);
+    }
+
     stop() {
         cancelAnimationFrame(this.raf);
+        clearTimeout(this.helpTimer);
         window.removeEventListener('keydown', this.onKeyDown, true);
         window.removeEventListener('keyup', this.onKeyUp, true);
         window.removeEventListener('resize', this.onResize);
