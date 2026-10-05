@@ -28,11 +28,6 @@ Apps.register({
                     <div class="settings-label">Something is out there</div>
                     <div class="hint">The oldest cheat code in gaming still works on this desktop.</div>
                 </div>
-
-                <div class="settings-version">
-                    Nova OS v1.0<br>
-                    Running on JS FileSystem
-                </div>
             </div>
         `;
 
@@ -41,7 +36,7 @@ Apps.register({
             appId: 'settings',
             title: 'Settings',
             width: 480,
-            height: 460,
+            height: 418,
             content: html
         });
     }

@@ -626,13 +626,6 @@
     .settings-card--egg { display: none; }
 }
 
-.settings-version {
-    margin-top: auto;
-    color: var(--text-secondary);
-    font-size: var(--text-sm);
-    text-align: center;
-}
-
 @media (max-width: 640px) {
     .game-toolbar {
         min-height: 44px;
