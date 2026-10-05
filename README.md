@@ -21,11 +21,15 @@ Abandoning traditional rigid window boundaries and the standard "dock and top-ba
 - **Purposeful Iconography:** Geometric marks identify apps; interface actions use the shared Tabler set.
 
 ### 💻 Included Workspace Applications
-- **Files:** A `localStorage` backed virtual file system with folder navigation.
 - **Calculator:** A refined, fully functional inline glass calculator.
-- **Notes & Code:** Elegant markdown and code editors featuring `JetBrains Mono`.
+- **Codex:** An in-app reference for the desktop controls and game rules.
+- **Scores:** Local leaderboards with optional NovaScore galaxy uplink.
+- **Minesweeper, Color Lines, Columns & Wordl:** Built-in puzzle games.
 - **2048:** A built-in iteration of the classic tile game, heavily stylized for the Nova theme.
 - **Nova Run:** A large-pixel endless runner with a default lunar astronaut route and a switchable monochrome Dino classic.
+
+The core includes a localStorage-backed virtual file system, but Files, Notes
+and Code editor applications are not included in the current version.
 
 ## 🚀 Quick Start
 

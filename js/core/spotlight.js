@@ -36,6 +36,13 @@ class SpotlightSearch {
 
         // Input search
         this.input.addEventListener('input', () => this.performSearch());
+        this.input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && this.matches?.length) {
+                e.preventDefault();
+                Apps.launch(this.matches[0].id);
+                this.close();
+            }
+        });
     }
 
     toggle() {
@@ -51,6 +58,7 @@ class SpotlightSearch {
         this.overlay.style.display = 'flex';
         this.input.value = '';
         this.results.innerHTML = '';
+        this.matches = [];
         setTimeout(() => this.input.focus(), 100);
     }
 
@@ -63,11 +71,13 @@ class SpotlightSearch {
     performSearch() {
         const query = this.input.value.toLowerCase().trim();
         this.results.innerHTML = '';
+        this.matches = [];
 
         if (!query) return;
 
         // Search apps
         const apps = Apps.getAll().filter(a => a.name.toLowerCase().includes(query) || a.id.includes(query));
+        this.matches = apps;
 
         apps.forEach(app => {
             const el = document.createElement('div');
@@ -86,7 +96,7 @@ class SpotlightSearch {
         if(apps.length === 0) {
             const el = document.createElement('div');
             el.className = 'spotlight-item';
-            el.innerHTML = `<div style="opacity:0.5;">No results found for "${query}"</div>`;
+            el.textContent = `No results found for "${query}"`;
             this.results.appendChild(el);
         }
     }
