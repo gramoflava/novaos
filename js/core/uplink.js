@@ -18,6 +18,19 @@
     let preference = read(preferenceKey) || { asked: false, enabled: false };
     let explorer = read(explorerKey);
     const changed = () => window.dispatchEvent(new CustomEvent('uplinkUpdated'));
+    // Initials are Latin. On another layout (Russian «И Ф» for B A) take the
+    // letter printed on the physical key instead of dropping it to "?".
+    const latinKey = (event, input) => {
+        if (!event || event.ctrlKey || event.metaKey || event.altKey || typeof event.key !== 'string') return false;
+        if (event.key.length !== 1 || /[A-Za-z0-9]/.test(event.key) || !/^Key[A-Z]$/.test(event.code || '')) return false;
+        event.preventDefault();
+        const start = input.selectionStart ?? input.value.length;
+        const end = input.selectionEnd ?? start;
+        const value = (input.value.slice(0, start) + event.code.slice(3) + input.value.slice(end)).slice(0, 3);
+        input.value = value;
+        input.setSelectionRange?.(Math.min(start + 1, value.length), Math.min(start + 1, value.length));
+        return true;
+    };
     const normalize = value => String(value || '???').toUpperCase().replace(/[^A-Z0-9?]/g, '').slice(0, 3) || '???';
 
     async function request(path, body) {
@@ -245,12 +258,15 @@
                 save.disabled = false;
             }
         };
-        input.onkeydown = event => { if (event.key === 'Enter' && !save.disabled) save.click(); };
+        input.onkeydown = event => {
+            if (latinKey(event, input)) return;
+            if (event.key === 'Enter' && !save.disabled) save.click();
+        };
         input.focus();
     }
 
     window.NovaUplink = Object.freeze({
-        bindGame, publish, board, retry, discovered, normalize, setEnabled,
+        bindGame, publish, board, retry, discovered, normalize, latinKey, setEnabled,
         get enabled() { return !!preference.enabled; },
         get pendingCount() { return pending.size; },
         get explorer() { return explorer ? { ...explorer } : null; },

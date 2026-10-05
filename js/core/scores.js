@@ -199,6 +199,7 @@ class ScoreManager {
 
             if (onComplete) onComplete();
             if (save && receipt) void NovaUplink.publish(receipt, initials);
+            input.addEventListener('keydown', (e) => NovaUplink.latinKey(e, input));
         };
         btn.onclick = () => dismiss(true);
         document.getElementById(`skip-btn-${winId}`).onclick = () => dismiss(false);
