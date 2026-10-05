@@ -1,3 +1,5 @@
+(() => {
+    const startScoreRun = NovaUplink.bindGame('game2048');
 Apps.register({
     id: 'game2048',
     name: '2048',
@@ -63,6 +65,7 @@ Apps.register({
         let activeTiles = [];
         let nextId = 0;
         let score = 0;
+        let reportScore;
         let isGameOver = false;
         let hasWon = false;
 
@@ -128,7 +131,7 @@ Apps.register({
                  hasWon = true;
                  isGameOver = true;
                  if (window.AudioMng) AudioMng.play('win');
-                 Scores.showScorePrompt('game2048', score, true, null, winId);
+                 reportScore(score, true);
                  return;
              }
              if(getEmpty().length > 0) return;
@@ -147,7 +150,7 @@ Apps.register({
              document.getElementById(`gameover-${winId}`).style.display = 'flex';
              const isHighScore = Scores.isHighScore('game2048', score);
              if (window.AudioMng) AudioMng.play(isHighScore ? 'win' : 'lose');
-             Scores.showScorePrompt('game2048', score, isHighScore, null, winId);
+             reportScore(score, isHighScore);
         };
 
         const getLine = (i, dir) => {
@@ -269,6 +272,7 @@ Apps.register({
         }
 
         const initBoard = () => {
+            reportScore = startScoreRun('game2048', winId);
             activeTiles = [];
             nextId = 0;
             score = 0;
@@ -286,3 +290,5 @@ Apps.register({
         initBoard();
     }
 });
+
+})();

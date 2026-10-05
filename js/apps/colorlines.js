@@ -1,3 +1,5 @@
+(() => {
+    const startScoreRun = NovaUplink.bindGame('colorlines');
 Apps.register({
     id: 'colorlines',
     name: 'Color Lines',
@@ -86,6 +88,7 @@ Apps.register({
         const colors = 7;
         let board = Array(size*size).fill(-1);
         let score = 0;
+        let reportScore;
         let selectedIdx = -1;
         let isGameOver = false;
         let isAnimating = false;
@@ -420,7 +423,7 @@ Apps.register({
             const gameId = getGameId();
             const isHighScore = Scores.isHighScore(gameId, score);
             if (window.AudioMng) AudioMng.play(isHighScore ? 'win' : 'lose');
-            Scores.showScorePrompt(gameId, score, isHighScore, null, winId);
+            reportScore(score, isHighScore);
         };
 
         const initBoard = async () => {
@@ -431,6 +434,7 @@ Apps.register({
             isAnimating = false;
             nextBalls = [];
             lineLength = parseInt(document.getElementById(`cl-level-${winId}`).value) || 5;
+            reportScore = startScoreRun(getGameId(), winId);
             render();
             await spawnBalls(5);
         };
@@ -457,3 +461,5 @@ Apps.register({
         initBoard();
     }
 });
+
+})();

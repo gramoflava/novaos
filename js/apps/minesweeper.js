@@ -1,3 +1,5 @@
+(() => {
+    const startScoreRun = NovaUplink.bindGame('minesweeper');
 Apps.register({
     id: 'minesweeper',
     name: 'Minesweeper',
@@ -187,7 +189,9 @@ Apps.register({
             });
         };
 
+        let reportScore;
         const initBoard = () => {
+            reportScore = startScoreRun('minesweeper-' + (document.getElementById(`ms-level-${winId}`).value || 'easy'), winId);
             if (pauseController) pauseController.reset();
             updateGridCellSize();
             board = [];
@@ -341,13 +345,12 @@ Apps.register({
                 }
             }
 
-            const levels = { 'easy': 'Beginner', 'medium': 'Intermediate', 'hard': 'Expert' };
-            const levelId = 'minesweeper-' + (document.getElementById(`ms-level-${winId}`).value || 'easy');
             const finalScore = win ? Math.max(0, 9999 - time * 10) : 0;
 
             if(win) {
                 if (window.AudioMng) AudioMng.play('win');
-                setTimeout(() => Scores.showScorePrompt(levelId, finalScore, true, null, winId), 500);
+                const report = reportScore;
+                setTimeout(() => report(finalScore, true), 500);
             } else {
                 if (window.AudioMng) AudioMng.play('lose');
             }
@@ -410,3 +413,5 @@ Apps.register({
         initBoard();
     }
 });
+
+})();

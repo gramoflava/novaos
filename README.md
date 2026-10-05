@@ -39,6 +39,12 @@ Nova OS requires zero build steps or heavy node.js dependencies. It runs strictl
    ```
 3. Visit `http://localhost:8080` in Chrome, Safari, or Firefox to enter Nova OS.
 
+## Galactic scoreboard
+
+Games keep working entirely in the browser. Players can opt into NovaScore to
+share new results and initials; the optional Python + SQLite API uses only the
+standard library. Setup, deployment and protection limits: [server/README.md](server/README.md).
+
 ## 🏗️ Architecture
 
 Nova is built around an internal singleton pattern for absolute zero-dependency simplicity:

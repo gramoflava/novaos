@@ -1,3 +1,5 @@
+(() => {
+    const startScoreRun = NovaUplink.bindGame('columns');
 Apps.register({
   id: 'columns',
   name: 'Columns',
@@ -129,6 +131,7 @@ Apps.register({
     let nextPiece = null;
     let state = 'ready';
     let score = 0;
+    let reportScore;
     let level = 1;
     let clearedJewels = 0;
     let best = 0;
@@ -533,11 +536,12 @@ Apps.register({
       render();
       playSound('lose');
       if (window.Scores && score > 0) {
-        window.Scores.showScorePrompt(GAME_ID, Math.floor(score), false, null, winId);
+        reportScore(Math.floor(score), false);
       }
     };
 
     const reset = () => {
+      reportScore = startScoreRun(GAME_ID, winId);
       if (pauseController) pauseController.reset();
       roundToken += 1;
       board = Array.from({ length: ROWS }, () => Array(COLS).fill(-1));
@@ -708,3 +712,5 @@ Apps.register({
     }
   }
 });
+
+})();

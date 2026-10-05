@@ -43,3 +43,11 @@ node_modules/
 .Trashes
 ehthumbs.db
 Desktop.ini
+
+# Optional NovaScore server runtime
+server/data/
+data/
+__pycache__/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

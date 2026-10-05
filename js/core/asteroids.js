@@ -1,3 +1,6 @@
+(() => {
+    const startScoreRun = NovaUplink.bindGame('asteroids');
+    const asteroidRuns = new WeakMap();
 // Nova Asteroids — a hidden game played on the desktop itself (desktop only).
 //
 // The Konami code (↑ ↑ ↓ ↓ ← → ← → B A) starts it; Esc leaves. The ship flies
@@ -121,7 +124,9 @@ class AsteroidsGame {
         this.particles = [];
         this.trail = [];
         this.phantoms = [];
-        this.score = 0;
+        asteroidRuns.set(this, { score: 0, report: startScoreRun('asteroids') });
+        this.exploring = false;
+        try { localStorage.setItem('novaos_asteroids_seen', '1'); } catch (_e) { }
         this.lives = T.lives;
         this.wave = 0;
         this.fireTimer = 0;
@@ -416,7 +421,7 @@ class AsteroidsGame {
             rects.forEach(r => this.bounce(k, r));
             if (holes.some(h => Math.hypot(h.x - k.x, h.y - k.y) < 26 + k.r * 0.3)) {
                 this.sparks(k.x, k.y, 10, this.colors.alt);
-                this.score += T.points[k.size];
+                asteroidRuns.get(this).score += T.points[k.size];
                 this.rocks.splice(i, 1);
                 continue;
             }
@@ -488,7 +493,7 @@ class AsteroidsGame {
         const T = AsteroidsGame.T;
         const k = this.rocks[i];
         this.rocks.splice(i, 1);
-        this.score += T.points[k.size];
+        asteroidRuns.get(this).score += T.points[k.size];
         this.sparks(k.x, k.y, 8 + k.size * 2, this.colors.secondary);
         if (k.size < T.sizes.length - 1) {
             const base = Math.atan2(bullet.vy, bullet.vx);
@@ -626,6 +631,7 @@ class AsteroidsGame {
     // The Horizon ends the game whatever lives are left. The game freezes
     // underneath, then shows "Game over" once the player wakes up.
     enterHorizon(hole) {
+        this.exploring = true;
         this.state = 'over';
         this.keys.clear();
         if (this.canvas) this.canvas.classList.add('is-hidden');
@@ -651,8 +657,8 @@ class AsteroidsGame {
         this.showBanner('Game over');
         setTimeout(() => {
             if (this.state !== 'over') return;
-            if (window.Scores && Scores.isHighScore('asteroids', this.score)) {
-                Scores.showScorePrompt('asteroids', this.score, false, () => this.stop());
+            if (!this.exploring && window.Scores && asteroidRuns.get(this).score > 0) {
+                asteroidRuns.get(this).report(asteroidRuns.get(this).score, false, () => this.stop());
             } else {
                 this.stop();
             }
@@ -830,7 +836,7 @@ class AsteroidsGame {
 
     updateHud() {
         if (!this.hud) return;
-        this.hud.querySelector('.ast-hud__score').textContent = this.score.toLocaleString();
+        this.hud.querySelector('.ast-hud__score').textContent = asteroidRuns.get(this).score.toLocaleString();
         const wave = this.waveBreak > 0 ? `Wave ${this.wave} cleared` : `Wave ${this.wave} · ${this.rocks.length} left`;
         const waveEl = this.hud.querySelector('.ast-hud__wave');
         if (waveEl.textContent !== wave) waveEl.textContent = wave;
@@ -852,3 +858,5 @@ class AsteroidsGame {
 }
 
 window.NovaAsteroids = new AsteroidsGame();
+
+})();

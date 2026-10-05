@@ -1,0 +1,25 @@
+[Unit]
+Description=NovaScore galactic scoreboard
+After=network.target
+
+[Service]
+Type=simple
+User=novascore
+Group=novascore
+WorkingDirectory=/opt/novascore
+ExecStart=/usr/bin/python3 /opt/novascore/novascore.py --database /var/lib/novascore/novascore.sqlite --trust-proxy
+Environment=NOVASCORE_ORIGINS=https://novaos.gramoflava.xyz
+Restart=on-failure
+RestartSec=3
+StateDirectory=novascore
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+TasksMax=64
+MemoryMax=256M
+
+[Install]
+WantedBy=multi-user.target

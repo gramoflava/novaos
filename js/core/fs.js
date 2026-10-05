@@ -130,6 +130,11 @@ class FileSystem {
     factoryReset() {
         localStorage.removeItem(FS_KEY);
         localStorage.removeItem('novaos_booted'); // next start plays the full boot
+        localStorage.removeItem('nova_scores');
+        localStorage.removeItem('novaos_horizon_falls');
+        localStorage.removeItem('novaos_phantoms');
+        localStorage.removeItem('novaos_asteroids_seen');
+        if (window.NovaUplink) NovaUplink.reset();
         this.tree = this.createDefaultStructure();
         this.save();
         location.reload();

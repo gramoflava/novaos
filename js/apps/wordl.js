@@ -1,3 +1,5 @@
+(() => {
+    const startScoreRun = NovaUplink.bindGame('wordl');
 Apps.register({
     id: 'wordl',
     name: 'Wordl',
@@ -236,8 +238,10 @@ Apps.register({
             uiBoard.style.setProperty('--cell-size', `${cellSize}px`);
         }
 
+        let reportScore;
         function initGame() {
             wordLength = parseInt(document.getElementById(`wl-len-${winId}`).value);
+            reportScore = startScoreRun(`wordl-${wordLength}`, winId);
             const list = window.WordlDict[wordLength];
             targetWord = list[Math.floor(Math.random() * list.length)];
             guesses = [];
@@ -439,7 +443,7 @@ Apps.register({
             showMessage('GENIUS!');
 
             // Winning now immediately triggers the unified OS-level celebration prompt
-            Scores.showScorePrompt(`wordl-${wordLength}`, score, true, null, winId);
+            reportScore(score, true);
         }
 
         function handleKeypress(key) {
@@ -500,3 +504,5 @@ Apps.register({
         loadDict();
     }
 });
+
+})();

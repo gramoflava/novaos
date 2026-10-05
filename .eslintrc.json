@@ -20,7 +20,9 @@
     "ContextMenu": "readonly",
     "Shell": "readonly",
     "Boot": "readonly",
-    "Icons": "readonly"
+    "Icons": "readonly",
+    "NovaUplink": "readonly",
+    "Scores": "readonly"
   },
   "rules": {
     "indent": ["error", 2, { "SwitchCase": 1 }],

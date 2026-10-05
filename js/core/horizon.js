@@ -138,6 +138,7 @@ class Horizon {
         this.onDone = onDone || null;
         this.hue = ((opts.hue || 0) + 24) % 360;  // base disc orange ≈ 24°
         this.t = 0;
+        this.skipped = false;
         this.homeSeconds = 0;
         this.startDate = new Date();
         this.saved = new Map();
@@ -167,6 +168,7 @@ class Horizon {
         e.stopPropagation();
         const P = Horizon.P;
         if (e.key === 'Escape' && this.t < P.fallEnd) {
+            this.skipped = true;
             this.t = P.fallEnd;
             this.music.cut();
         }
@@ -192,6 +194,7 @@ class Horizon {
         const done = this.onDone;
         this.onDone = null;
         if (done) done();
+        if (!this.skipped && window.NovaUplink) NovaUplink.discovered();
     }
 
     // ── DOM ──────────────────────────────────────────────────────────────────

@@ -1,3 +1,5 @@
+(() => {
+    const startScoreRun = NovaUplink.bindGame('novarun');
 Apps.register({
   id: 'novarun',
   name: 'Nova Run',
@@ -113,6 +115,7 @@ Apps.register({
     let theme = initialTheme;
     let state = 'ready';
     let score = 0;
+    let reportScore;
     let distanceRan = 0;
     let best = 0;
     let speed = RUNNER_CONFIG.startSpeed;
@@ -321,6 +324,7 @@ Apps.register({
     };
 
     const reset = () => {
+      reportScore = startScoreRun(getGameId(), winId);
       if (pauseController) pauseController.reset();
       state = 'ready';
       score = 0;
@@ -598,15 +602,13 @@ Apps.register({
       }
       if (window.Scores) {
         scorePromptOpen = true;
-        window.Scores.showScorePrompt(
-          getGameId(),
+        reportScore(
           finalScore,
           false,
           () => {
             scorePromptOpen = false;
             canvas.focus({ preventScroll: true });
-          },
-          winId
+          }
         );
       }
     };
@@ -1152,3 +1154,5 @@ Apps.register({
     }
   }
 });
+
+})();

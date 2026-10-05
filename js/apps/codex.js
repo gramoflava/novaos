@@ -169,7 +169,7 @@ Apps.register({
                     <p>Unlike standard versions, Nova's 2048 uses the <b>Push/Pull Engine</b>. If you play 2048 while another window is nearby, you might see them react to the tile movements.</p>
 
                     <h2>Winning</h2>
-                    <p>The goal is to reach the 2048 tile, but the game continues as long as moves are possible. High scores are automatically synced to the Global Leaderboard.</p>
+                    <p>The goal is to reach the 2048 tile, but the game continues as long as moves are possible. Save your result locally, then optionally enable the galactic uplink to share new scores and initials.</p>
                 `
             },
             'minesweeper': {

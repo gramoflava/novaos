@@ -9,6 +9,14 @@ class ScoreManager {
             const data = localStorage.getItem(this.storageKey);
             this.scores = data ? JSON.parse(data) : {};
 
+            if (!this.scores || typeof this.scores !== 'object' || Array.isArray(this.scores)) this.scores = {};
+            Object.keys(this.scores).forEach(game => {
+                this.scores[game] = Array.isArray(this.scores[game]) ? this.scores[game]
+                    .filter(row => row && Number.isSafeInteger(row.score) && row.score > 0)
+                    .map(row => ({ initials: NovaUplink.normalize(row.initials), score: row.score, date: Number(row.date) || 0 }))
+                    .sort((a, b) => b.score - a.score).slice(0, 10) : [];
+            });
+
             // Migration for Minesweeper level-specific scores
             if (this.scores.minesweeper && !this.scores['minesweeper-easy']) {
                 this.scores['minesweeper-easy'] = this.scores.minesweeper;
@@ -21,13 +29,14 @@ class ScoreManager {
     }
 
     save() {
-        localStorage.setItem(this.storageKey, JSON.stringify(this.scores));
+        try { localStorage.setItem(this.storageKey, JSON.stringify(this.scores)); } catch (_e) { /* Keep scores in memory if storage is full or blocked. */ }
     }
 
     addScore(gameId, initials, score) {
+        if (!Number.isSafeInteger(score) || score <= 0) return;
         if (!this.scores[gameId]) this.scores[gameId] = [];
         this.scores[gameId].push({
-            initials: (initials || '???').toUpperCase().substring(0,3),
+            initials: NovaUplink.normalize(initials),
             score: score,
             date: Date.now()
         });
@@ -38,7 +47,7 @@ class ScoreManager {
     }
 
     getTopScores(gameId) {
-        return this.scores[gameId] || [];
+        return (this.scores[gameId] || []).map(row => ({ ...row }));
     }
 
     clearScores(gameId) {
@@ -54,7 +63,7 @@ class ScoreManager {
         return score > topScores[topScores.length - 1].score;
     }
 
-    showScorePrompt(gameId, score, isWin, onComplete, targetWinId) {
+    showScorePrompt(gameId, score, isWin, onComplete, targetWinId, receipt) {
         if (!this.scores[gameId]) {
             this.scores[gameId] = [];
         }
@@ -66,7 +75,7 @@ class ScoreManager {
         }
 
         const topScores = this.getTopScores(gameId);
-        if (topScores.length >= 10 && score <= topScores[9].score) {
+        if (!receipt && topScores.length >= 10 && score <= topScores[9].score) {
             if (onComplete) onComplete();
             return;
         }
@@ -92,8 +101,9 @@ class ScoreManager {
                 </h2>
                 <div class="score-prompt-score">${score}</div>
                 <div class="score-prompt-copy">Enter 3 initials for the leaderboard:</div>
-                <input class="score-prompt-input" type="text" id="initials-${winId}" maxlength="3">
+                <input class="score-prompt-input" type="text" aria-label="Initials" id="initials-${winId}" maxlength="3">
                 <button class="btn btn--primary score-prompt-save" id="save-btn-${winId}">Save Score</button>
+                <button class="btn btn--ghost" id="skip-btn-${winId}" style="margin-top:12px">Skip</button>
             </div>
             <style id="style-${winId}">
                 .score-prompt-overlay { position: absolute; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(var(--blur-panel)); opacity: 0; pointer-events: auto; animation: scoreFadeIn var(--dur-slow) var(--ease-smooth) forwards; transition: opacity var(--dur-slow) var(--ease-smooth); }
@@ -162,9 +172,12 @@ class ScoreManager {
             });
         }
 
-        btn.onclick = () => {
-            const initials = input.value || '???';
-            this.addScore(gameId, initials, score);
+        let dismissed = false;
+        const dismiss = save => {
+            if (dismissed) return;
+            dismissed = true;
+            const initials = NovaUplink.normalize(input.value);
+            if (save) this.addScore(gameId, initials, score);
 
             const overlay = document.getElementById(`${winId}-overlay`);
             if (overlay) {
@@ -185,83 +198,122 @@ class ScoreManager {
             }
 
             if (onComplete) onComplete();
+            if (save && receipt) void NovaUplink.publish(receipt, initials);
+        };
+        btn.onclick = () => dismiss(true);
+        document.getElementById(`skip-btn-${winId}`).onclick = () => dismiss(false);
+    }
+
+    mountLeaderboard(container, initialGame) {
+        const variants = {
+            minesweeper: [['minesweeper-easy', 'Easy'], ['minesweeper-medium', 'Med'], ['minesweeper-hard', 'Hard']],
+            wordl: [4, 5, 6, 7].map(n => [`wordl-${n}`, `${n} letters`]),
+            colorlines: [['colorlines-5', 'Classic (5)'], ['colorlines-4', 'Quick (4)']],
+            novarun: [['novarun-lunar', 'Lunar'], ['novarun-classic', 'Dino']]
+        };
+        let game = initialGame;
+        let galactic = NovaUplink.enabled;
+        let version = 0;
+        let disposed = false;
+        const render = async () => {
+            const revision = ++version;
+            const selectedGame = game;
+            const remote = galactic && NovaUplink.enabled;
+            container.innerHTML = `<div class="score-view">
+                <div class="uplink-controls">
+                    <label class="uplink-toggle"><input type="checkbox" ${NovaUplink.enabled ? 'checked' : ''}> Uplink to the galactic scoreboard</label>
+                    <button class="btn btn--ghost uplink-refresh" type="button">Refresh / Retry</button>
+                </div>
+                <div class="score-variants score-sources"><button class="btn ${!remote ? 'btn--primary' : 'btn--ghost'}" data-source="local">This browser</button><button class="btn ${remote ? 'btn--primary' : 'btn--ghost'}" data-source="galactic" ${!NovaUplink.enabled ? 'disabled' : ''}>Galaxy</button></div>
+                <div class="score-variants">${(variants[game.split('-')[0]] || []).map(([id, label]) => `<button class="btn ${id === game ? 'btn--primary' : 'btn--ghost'}" data-game="${id}">${label}</button>`).join('')}</div>
+                <p class="uplink-status" role="status"></p><div class="score-view__list"></div>
+                ${!remote && game !== 'explorers' ? '<button class="btn btn--ghost scores-reset-btn">Clear local scores</button>' : ''}
+            </div>`;
+            const status = container.querySelector('.uplink-status');
+            const list = container.querySelector('.score-view__list');
+            container.querySelector('input').onchange = event => {
+                galactic = event.target.checked;
+                NovaUplink.setEnabled(galactic);
+            };
+            container.querySelector('.uplink-refresh').onclick = async () => {
+                status.textContent = 'Retrying uplink…';
+                await NovaUplink.retry();
+                if (!disposed) void render();
+            };
+            container.querySelectorAll('[data-source]').forEach(button => {
+                button.onclick = () => { galactic = button.dataset.source === 'galactic'; void render(); };
+            });
+            container.querySelectorAll('[data-game]').forEach(button => {
+                button.onclick = () => { game = button.dataset.game; void render(); };
+            });
+            const clear = container.querySelector('.scores-reset-btn');
+            if (clear) clear.onclick = () => this.clearScores(game);
+            const show = entries => {
+                list.replaceChildren();
+                if (!entries.length) {
+                    const empty = document.createElement('p');
+                    empty.className = 'score-empty';
+                    empty.textContent = selectedGame === 'explorers' ? 'No explorers registered yet.' : 'No scores yet!';
+                    list.appendChild(empty);
+                }
+                entries.forEach((entry, index) => {
+                    const row = document.createElement('div');
+                    row.className = 'score-row';
+                    const rank = document.createElement('span');
+                    rank.className = 'score-row__rank';
+                    rank.textContent = `#${index + 1}`;
+                    const initials = document.createElement('span');
+                    initials.className = 'score-row__initials';
+                    initials.textContent = NovaUplink.normalize(entry.initials);
+                    const value = document.createElement('span');
+                    value.className = 'score-row__value';
+                    value.textContent = selectedGame === 'explorers' ? new Date(entry.date).toLocaleDateString() : entry.score;
+                    row.append(rank, initials, value);
+                    list.appendChild(row);
+                });
+            };
+            const local = selectedGame === 'explorers'
+                ? (NovaUplink.explorer?.initials ? [NovaUplink.explorer] : []) : this.getTopScores(selectedGame);
+            if (!remote) {
+                status.textContent = NovaUplink.enabled ? 'Local scores · uplink enabled for new results.' : 'Uplink off · scores stay in this browser.';
+                show(local);
+                return;
+            }
+            status.textContent = 'Connecting to NovaScore…';
+            try {
+                const entries = await NovaUplink.board(selectedGame);
+                if (disposed || revision !== version) return;
+                status.textContent = NovaUplink.pendingCount ? `Uplink connected · ${NovaUplink.pendingCount} result(s) waiting. Retry to send.` : 'Uplink connected · galactic scoreboard.';
+                show(entries);
+            } catch (_e) {
+                if (disposed || revision !== version) return;
+                status.textContent = 'Uplink unavailable · showing this browser’s records. Refresh to retry.';
+                show(local);
+            }
+        };
+        const update = () => { if (!disposed) void render(); };
+        window.addEventListener('scoresUpdated', update);
+        window.addEventListener('uplinkUpdated', update);
+        void render();
+        return {
+            select(id) { game = id; update(); },
+            dispose() {
+                disposed = true;
+                version++;
+                window.removeEventListener('scoresUpdated', update);
+                window.removeEventListener('uplinkUpdated', update);
+            }
         };
     }
 
-    showLeaderboard(gameName, gameId) {
-        const winId = 'leaderboard-' + gameId + '-' + Date.now();
-        let currentSubId = gameId;
-
-        const isMines = gameId.startsWith('minesweeper');
-
-        const renderList = (id) => {
-            const scores = this.getTopScores(id);
-            let listHtml = '';
-            if(scores.length === 0) {
-                listHtml = '<div style="color: var(--text-secondary); text-align: center; padding: 20px;">No scores yet!</div>';
-            } else {
-                scores.forEach((s, i) => {
-                    listHtml += `
-                        <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line);">
-                            <span style="font-weight: 600; color: var(--text-secondary); width: 30px;">#${i+1}</span>
-                            <span style="font-weight: bold; color: var(--text); flex: 1; text-align: left;">${s.initials}</span>
-                            <span style="color: var(--accent); font-variant-numeric: tabular-nums;">${s.score}</span>
-                        </div>
-                    `;
-                });
-            }
-            return listHtml;
-        };
-
-        const selectorHtml = isMines ? `
-            <div class="lb-selector" style="display: flex; background: var(--surface-sunk); padding: 4px; border-radius: var(--radius-sm); margin-bottom: 16px;">
-                <div class="lb-opt ${gameId === 'minesweeper-easy' ? 'active' : ''}" data-id="minesweeper-easy" style="flex: 1; text-align: center; font-size: 11px; padding: 6px; border-radius: var(--radius-sm); cursor: pointer;">Easy</div>
-                <div class="lb-opt ${gameId === 'minesweeper-medium' ? 'active' : ''}" data-id="minesweeper-medium" style="flex: 1; text-align: center; font-size: 11px; padding: 6px; border-radius: var(--radius-sm); cursor: pointer;">Med</div>
-                <div class="lb-opt ${gameId === 'minesweeper-hard' ? 'active' : ''}" data-id="minesweeper-hard" style="flex: 1; text-align: center; font-size: 11px; padding: 6px; border-radius: var(--radius-sm); cursor: pointer;">Hard</div>
-            </div>
-        ` : '';
-
-        const html = `
-            <div style="padding: 24px; display: flex; flex-direction: column; height: 100%; background: var(--bg);">
-                <h3 style="color: var(--text); margin-bottom: 16px; text-align: center;">${gameName} Leaderboard</h3>
-                ${selectorHtml}
-                <div id="lb-list-${winId}" style="flex: 1; overflow-y: auto; padding-right: 8px;">
-                    ${renderList(gameId)}
-                </div>
-                <button id="lb-close-${winId}" style="margin-top: 16px; background: var(--surface-sunk); color: var(--text); border: 1px solid var(--line); padding: 8px 16px; border-radius: var(--radius-sm); cursor: pointer; transition: background 0.2s;">Close</button>
-            </div>
-            <style>
-                #lb-close-${winId}:hover { background: var(--glass-hover); }
-                .lb-opt { transition: all 0.2s; color: var(--text-secondary); }
-                .lb-opt:hover { background: var(--surface-sunk); color: var(--text); }
-                .lb-opt.active { background: var(--accent); color: var(--text-on-accent); box-shadow: var(--shadow-md); }
-            </style>
-        `;
-
-        WindowManager.create({
-            id: winId,
-            appId: 'scores',
-            title: 'Scores',
-            width: 300,
-            height: 500,
-            content: html
-        });
-
-        const winEl = WindowManager.windows.get(winId).el;
-        if (isMines) {
-            winEl.querySelectorAll('.lb-opt').forEach(opt => {
-                opt.onclick = () => {
-                    winEl.querySelectorAll('.lb-opt').forEach(o => o.classList.remove('active'));
-                    opt.classList.add('active');
-                    const list = winEl.querySelector(`#lb-list-${winId}`);
-                    list.innerHTML = renderList(opt.dataset.id);
-                };
-            });
-        }
-
-        document.getElementById(`lb-close-${winId}`).onclick = () => {
-            WindowManager.close(winId);
-        };
+    showLeaderboard(_gameName, gameId) {
+        const id = 'leaderboard-' + gameId + '-' + Date.now();
+        WindowManager.create({ id, appId: 'scores', title: 'Scores', width: 370, height: 520,
+            content: '<div class="score-board-mount" style="height:100%;padding:24px"></div>' });
+        const win = WindowManager.windows.get(id);
+        const view = this.mountLeaderboard(win.content.firstElementChild, gameId);
+        const cleanup = win.cleanup;
+        win.cleanup = () => { view.dispose(); if (cleanup) cleanup(); };
     }
 }
 
