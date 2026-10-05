@@ -62,6 +62,11 @@
     }
 }
 
+/* While a window or the canvas is dragged: no text selection, and window
+   contents don't recompute hover styles as the cursor sweeps over them. */
+body.is-dragging { user-select: none; -webkit-user-select: none; }
+body.is-dragging .window-content { pointer-events: none; }
+
 .nova-window.is-active {
     box-shadow: var(--shadow-lg), var(--glass-edge);
     border-color: var(--line-strong);

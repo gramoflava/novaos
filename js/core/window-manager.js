@@ -57,13 +57,18 @@ class WindowManagerClass {
         return this.mobileQuery.matches;
     }
 
+    // Runs every frame, so it must not touch the DOM unless something changed:
+    // rebuilding the markers each frame kept style and layout busy forever and
+    // made clicks and drags stutter.
     startIndicatorsLoop() {
+        let shownKey = '';
         const loop = () => {
-            this.indicatorsContainer.innerHTML = '';
             if (this.isMobile()) {
+                if (shownKey) { this.indicatorsContainer.replaceChildren(); shownKey = ''; }
                 requestAnimationFrame(loop);
                 return;
             }
+            const markers = [];
 
             const vW = window.innerWidth;
             const vH = window.innerHeight;
@@ -104,10 +109,19 @@ class WindowManagerClass {
                         edgeX = scX + (edgeY - scY) / slope;
                     }
 
+                    const game = w.appId === 'game2048' || w.appId === 'minesweeper' || w.appId === 'colorlines' || w.appId === 'columns' || w.appId === 'wordl' || w.appId === 'novarun';
+                    markers.push({ x: Math.round(edgeX), y: Math.round(edgeY), game });
+                }
+            });
+
+            const key = markers.map(m => `${m.x},${m.y},${m.game ? 1 : 0}`).join(';');
+            if (key !== shownKey) {
+                shownKey = key;
+                this.indicatorsContainer.replaceChildren(...markers.map(({ x, y, game }) => {
                     const ind = document.createElement('div');
                     ind.style.position = 'absolute';
-                    ind.style.left = edgeX + 'px';
-                    ind.style.top = edgeY + 'px';
+                    ind.style.left = x + 'px';
+                    ind.style.top = y + 'px';
                     ind.style.width = '6px';
                     ind.style.height = '6px';
                     ind.style.background = 'var(--text)';
@@ -116,22 +130,24 @@ class WindowManagerClass {
                     ind.style.transform = 'translate(-50%, -50%)';
                     ind.style.transition = 'opacity 0.2s';
 
-                    // Slightly point the diamond shape
-                    if(w.appId === 'game2048' || w.appId === 'minesweeper' || w.appId === 'colorlines' || w.appId === 'columns' || w.appId === 'wordl' || w.appId === 'novarun') {
+                    if (game) {
                         ind.style.background = 'var(--accent)';
                         ind.style.boxShadow = '0 0 12px var(--accent)';
                     }
-
-                    this.indicatorsContainer.appendChild(ind);
-                }
-            });
+                    return ind;
+                }));
+            }
 
             // Animate remnants
             this.activeRemnants.forEach(rem => {
+                // Ease toward the target, then settle exactly so the writes stop.
                 rem.currentDepth += (rem.targetDepth - rem.currentDepth) * 0.02;
                 rem.currentOpacity += (rem.targetOpacity - rem.currentOpacity) * 0.02;
+                if (Math.abs(rem.targetDepth - rem.currentDepth) < 0.001) rem.currentDepth = rem.targetDepth;
+                if (Math.abs(rem.targetOpacity - rem.currentOpacity) < 0.001) rem.currentOpacity = rem.targetOpacity;
 
-                rem.el.style.opacity = Math.max(0, rem.currentOpacity);
+                const opacity = String(Math.max(0, rem.currentOpacity));
+                if (rem.shownOpacity !== opacity) { rem.el.style.opacity = opacity; rem.shownOpacity = opacity; }
 
                 const M = 0.95 * rem.currentDepth;
                 const dx = (this.cameraX - rem.initCameraX);
@@ -140,7 +156,8 @@ class WindowManagerClass {
                 const offsetX = -M * dx / this.cameraZ;
                 const offsetY = -M * dy / this.cameraZ;
 
-                rem.el.style.transform = `translate3d(${offsetX}px, ${offsetY}px, 0) scale(${1 - rem.currentDepth * 0.3})`;
+                const transform = `translate3d(${offsetX.toFixed(1)}px, ${offsetY.toFixed(1)}px, 0) scale(${(1 - rem.currentDepth * 0.3).toFixed(4)})`;
+                if (rem.shownTransform !== transform) { rem.el.style.transform = transform; rem.shownTransform = transform; }
 
                 if (rem.targetOpacity <= 0 && rem.currentOpacity <= 0.01) {
                     if (rem.el.parentNode) rem.el.remove();
@@ -165,7 +182,9 @@ class WindowManagerClass {
                 return;
             }
 
+            if (e.button !== 0) return;
             this.isPanning = true;
+            document.body.classList.add('is-dragging');
             this.panStartX = e.clientX - this.cameraX;
             this.panStartY = e.clientY - this.cameraY;
             document.body.style.cursor = 'grabbing';
@@ -174,6 +193,13 @@ class WindowManagerClass {
         document.body.addEventListener('mousemove', (e) => {
             if (this.isMobile()) return;
             if (!this.isPanning) return;
+            // Released outside the page: the mouseup never came here.
+            if (!(e.buttons & 1)) {
+                this.isPanning = false;
+                document.body.classList.remove('is-dragging');
+                document.body.style.cursor = 'default';
+                return;
+            }
 
             this.cameraX = e.clientX - this.panStartX;
             this.cameraY = e.clientY - this.panStartY;
@@ -184,6 +210,7 @@ class WindowManagerClass {
         document.body.addEventListener('mouseup', () => {
             if (this.isPanning) {
                 this.isPanning = false;
+                document.body.classList.remove('is-dragging');
                 document.body.style.cursor = 'default';
             }
         });
@@ -465,9 +492,10 @@ class WindowManagerClass {
         win.titlebar.addEventListener('mousedown', (e) => {
             if (this.isMobile()) return;
             // Ignore if clicking window controls
-            if (e.target.closest('.window-btn')) return;
+            if (e.target.closest('.window-btn') || e.button !== 0) return;
 
             isDragging = true;
+            document.body.classList.add('is-dragging');
             this.focus(win.id);
 
             startClientX = e.clientX;
@@ -481,6 +509,9 @@ class WindowManagerClass {
         // Use global mouse handlers for dragging to prevent losing drag when mouse moves fast
         const onMouseMove = (e) => {
             if (!isDragging) return;
+            // Released outside the page: the mouseup never came, so the window
+            // would stay glued to the cursor.
+            if (!(e.buttons & 1)) { onMouseUp(); return; }
 
             // Adjust delta by camera zoom to move perfectly with the mouse
             const deltaX = (e.clientX - startClientX) / this.cameraZ;
@@ -498,17 +529,20 @@ class WindowManagerClass {
         const onMouseUp = () => {
             if (isDragging) {
                 isDragging = false;
+                document.body.classList.remove('is-dragging');
                 document.body.style.cursor = 'default';
             }
         };
 
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
+        window.addEventListener('blur', onMouseUp);
 
         // Store listeners so we can clean up if window closes
         win.cleanup = () => {
             document.removeEventListener('mousemove', onMouseMove);
             document.removeEventListener('mouseup', onMouseUp);
+            window.removeEventListener('blur', onMouseUp);
         };
     }
 

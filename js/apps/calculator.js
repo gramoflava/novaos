@@ -63,7 +63,11 @@ Apps.register({
                 if (!upsideDown && current === '5318008' && !newNumber) {
                     upsideDown = true;
                     const calculatorWindow = WindowManager.windows.get(winId);
-                    if (calculatorWindow) calculatorWindow.el.style.rotate = '180deg';
+                    if (calculatorWindow) {
+                        calculatorWindow.el.style.rotate = '180deg';
+                        calculatorWindow.el.classList.add('is-flipped');
+                        keepLightOnTop();
+                    }
                 }
             }
         };
@@ -78,14 +82,22 @@ Apps.register({
                 font-size: 20px;
                 color: var(--text);
                 cursor: pointer;
-                transition: all 0.2s;
+                /* Only cheap properties animate, and the key never moves out from
+                   under the pointer: a lift on hover plus a dip on press used to
+                   carry it away mid-click, so the press was lost. */
+                transition: background-color 0.12s, transform 0.08s;
                 display: flex; align-items: center; justify-content: center;
                 user-select: none;
+                -webkit-user-select: none;
+                touch-action: manipulation;
+                -webkit-tap-highlight-color: transparent;
             }
-            .calc-btn:hover { background: var(--glass-hover); transform: translateY(-2px); box-shadow: var(--shadow-md), var(--glass-edge); }
-            .calc-btn:active { transform: translateY(2px); background: var(--surface-sunk); box-shadow: var(--glass-edge); }
+            @media (hover: hover) {
+                .calc-btn:hover { background: var(--glass-hover); }
+                .calc-btn.op:hover { background: var(--accent-mid); }
+            }
+            .calc-btn:active { transform: scale(0.96); background: var(--glass-active, var(--surface-sunk)); }
             .calc-btn.op { background: var(--accent-soft); color: var(--accent); border-color: var(--accent-ring); }
-            .calc-btn.op:hover { background: var(--accent-mid); }
             .calc-btn.equals { background: var(--accent); color: var(--text-on-accent); }
             .calc-btn.zero { grid-column: span 2; }
             .calc-display {
@@ -110,6 +122,8 @@ Apps.register({
                 overflow: hidden;
                 flex-shrink: 0;
             }
+            .calc-display { transition: box-shadow 700ms cubic-bezier(0.22, 1, 0.36, 1); }
+            .calc-window.is-flipped .calc-display { box-shadow: inset 0 -2px 8px var(--surface-sunk), var(--glass-edge); }
             .calc-display svg {
                 display: block;
                 height: 42px;
@@ -137,8 +151,8 @@ Apps.register({
                 }
             }
             @media (prefers-reduced-motion: no-preference) {
-                .nova-window:has(.calc-display) {
-                    transition: rotate 700ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+                .nova-window.calc-window {
+                    transition: rotate 700ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 700ms cubic-bezier(0.22, 1, 0.36, 1), border-color 0.3s ease;
                 }
             }
         `;
@@ -221,7 +235,11 @@ Apps.register({
         };
 
         const grid = document.getElementById(`calc-grid-${winId}`);
-        grid.addEventListener('click', (e) => {
+        // A key counts the moment it is pressed, like a real calculator. A click
+        // needs press and release on the same element and was lost whenever the
+        // pointer slipped between keys.
+        grid.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return;
             const btn = e.target.closest('.calc-btn');
             if(!btn) return;
             handleInput(btn.dataset.val, btn.dataset.action);
@@ -255,11 +273,45 @@ Apps.register({
 
         document.addEventListener('keydown', handleKeydown);
 
+        // Upside down, the window's shadows would turn with it and fall upward,
+        // as if lit from below. The flipped window gets the theme's shadows
+        // mirrored vertically, so after the turn the light is on top again.
+        // Its keys inherit them too. Recomputed when the theme changes.
+        const mirrorShadows = value => value.split(/,(?![^(]*\))/).map(shadow => {
+            let lengths = 0;
+            return (shadow.trim().match(/[^\s(]+(?:\([^)]*\))?/g) || []).map(token => {
+                if (!/^-?[\d.]+(?:px|rem|em)?$/.test(token) || ++lengths !== 2) return token;
+                return token.startsWith('-') ? token.slice(1) : (parseFloat(token) === 0 ? token : '-' + token);
+            }).join(' ');
+        }).join(', ');
+        const lightTokens = ['--shadow-sm', '--shadow-md', '--shadow-lg', '--glass-edge'];
+        let themeObserver = null;
+        let darkQuery = null;
+        const applyMirroredLight = () => {
+            const win = WindowManager.windows.get(winId);
+            if (!win) return;
+            const root = getComputedStyle(document.documentElement);
+            lightTokens.forEach(name => {
+                const value = root.getPropertyValue(name).trim();
+                if (value) win.el.style.setProperty(name, mirrorShadows(value));
+            });
+        };
+        function keepLightOnTop() {
+            applyMirroredLight();
+            themeObserver = new MutationObserver(applyMirroredLight);
+            themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+            darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            darkQuery.addEventListener('change', applyMirroredLight);
+        }
+
         const winObj = WindowManager.windows.get(winId);
         if(winObj) {
+            winObj.el.classList.add('calc-window');
             const originalCleanup = winObj.cleanup;
             winObj.cleanup = () => {
                 if (originalCleanup) originalCleanup();
+                if (themeObserver) themeObserver.disconnect();
+                if (darkQuery) darkQuery.removeEventListener('change', applyMirroredLight);
                 document.removeEventListener('keydown', handleKeydown);
             };
         }
