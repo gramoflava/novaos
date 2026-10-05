@@ -51,18 +51,23 @@ Apps.register({
         const html = `
             <div class="cl-container" id="cl-container-${winId}">
                 <div class="game-toolbar">
-                    <div class="cl-preview-group">
-                        <button class="cl-preview-btn" id="cl-toggle-preview-${winId}" type="button" title="Toggle preview" aria-label="Toggle preview">
-                            <!-- SVG handled dynamically by JS -->
-                        </button>
-                        <div class="cl-preview-wrap ${localStorage.getItem('novaos_colorlines_preview') === 'false' ? 'collapsed' : ''}" id="cl-preview-${winId}"></div>
+                    <div class="game-toolbar__group">
+                        <button class="game-icon-btn game-icon-btn--restart" id="cl-restart-${winId}" type="button" title="Restart" aria-label="Restart"></button>
+                        <button class="game-icon-btn game-icon-btn--forfeit" id="cl-forfeit-${winId}" type="button" title="Forfeit" aria-label="Forfeit"></button>
+                        <div class="cl-preview-group">
+                            <button class="cl-preview-btn" id="cl-toggle-preview-${winId}" type="button" title="Toggle preview" aria-label="Toggle preview">
+                                <!-- SVG handled dynamically by JS -->
+                            </button>
+                            <div class="cl-preview-wrap ${localStorage.getItem('novaos_colorlines_preview') === 'false' ? 'collapsed' : ''}" id="cl-preview-${winId}"></div>
+                        </div>
                     </div>
-                    <div class="game-stat" style="min-width: 48px;">
-                        <div class="game-stat__label">Score</div>
-                        <div class="game-stat__value" id="cl-score-${winId}">0</div>
+                    <div class="game-toolbar__spacer"></div>
+                    <div class="game-stat-group">
+                        <div class="game-stat">
+                            <div class="game-stat__label">Score</div>
+                            <div class="game-stat__value" id="cl-score-${winId}">0</div>
+                        </div>
                     </div>
-                    <button class="game-icon-btn game-icon-btn--restart" id="cl-restart-${winId}" type="button" title="Restart" aria-label="Restart"></button>
-                    <button class="game-icon-btn game-icon-btn--forfeit" id="cl-forfeit-${winId}" type="button" title="Forfeit" aria-label="Forfeit"></button>
                 </div>
                 <div class="cl-grid" id="cl-grid-${winId}"></div>
             </div>

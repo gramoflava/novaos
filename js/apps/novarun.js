@@ -50,10 +50,6 @@ Apps.register({
               <div class="game-stat__label">Score</div>
               <div class="game-stat__value" id="nr-score-${winId}">0</div>
             </div>
-            <div class="game-stat">
-              <div class="game-stat__label">Best</div>
-              <div class="game-stat__value" id="nr-best-${winId}">0</div>
-            </div>
           </div>
         </div>
         <div class="nr-play-area" id="nr-play-area-${winId}">
@@ -109,7 +105,6 @@ Apps.register({
     const ctx = canvas.getContext('2d');
     const themeSelect = document.getElementById(`nr-theme-${winId}`);
     const scoreNode = document.getElementById(`nr-score-${winId}`);
-    const bestNode = document.getElementById(`nr-best-${winId}`);
     const routeNode = document.getElementById(`nr-route-${winId}`);
 
     let theme = initialTheme;
@@ -117,7 +112,6 @@ Apps.register({
     let score = 0;
     let reportScore;
     let distanceRan = 0;
-    let best = 0;
     let speed = RUNNER_CONFIG.startSpeed;
     let distanceUntilSpawn = 320;
     let lastFrame = performance.now();
@@ -317,12 +311,6 @@ Apps.register({
       ctx.imageSmoothingEnabled = false;
     };
 
-    const updateBest = () => {
-      const topScore = window.Scores && window.Scores.getTopScores(getGameId())[0];
-      best = Math.max(score, topScore ? topScore.score : 0);
-      bestNode.textContent = best;
-    };
-
     const reset = () => {
       reportScore = startScoreRun(getGameId(), winId);
       if (pauseController) pauseController.reset();
@@ -341,7 +329,6 @@ Apps.register({
       player.ducking = false;
       player.fastFalling = false;
       scoreNode.textContent = '0';
-      updateBest();
       canvas.focus({ preventScroll: true });
     };
 
@@ -596,7 +583,6 @@ Apps.register({
       const finalScore = Math.floor(score);
       score = finalScore;
       scoreNode.textContent = finalScore;
-      updateBest();
       if (window.AudioMng) {
         window.AudioMng.play('lose');
       }

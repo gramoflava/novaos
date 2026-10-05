@@ -61,16 +61,12 @@ Apps.register({
           <div class="game-toolbar__spacer"></div>
           <div class="game-stat-group">
             <div class="game-stat">
-              <div class="game-stat__label">Score</div>
-              <div class="game-stat__value" id="co-score-${winId}">0</div>
-            </div>
-            <div class="game-stat">
               <div class="game-stat__label">Level</div>
               <div class="game-stat__value" id="co-level-${winId}">1</div>
             </div>
             <div class="game-stat">
-              <div class="game-stat__label">Best</div>
-              <div class="game-stat__value" id="co-best-${winId}">0</div>
+              <div class="game-stat__label">Score</div>
+              <div class="game-stat__value" id="co-score-${winId}">0</div>
             </div>
           </div>
         </div>
@@ -120,7 +116,6 @@ Apps.register({
     const gameArea = document.getElementById(`co-game-area-${winId}`);
     const scoreNode = document.getElementById(`co-score-${winId}`);
     const levelNode = document.getElementById(`co-level-${winId}`);
-    const bestNode = document.getElementById(`co-best-${winId}`);
     const nextNode = document.getElementById(`co-next-${winId}`);
     const chainNode = document.getElementById(`co-chain-${winId}`);
     const statusNode = document.getElementById(`co-status-${winId}`);
@@ -134,7 +129,6 @@ Apps.register({
     let reportScore;
     let level = 1;
     let clearedJewels = 0;
-    let best = 0;
     let piecesUntilMagic = 12;
     let dropAccumulator = 0;
     let lastFrame = performance.now();
@@ -164,16 +158,9 @@ Apps.register({
       }
     };
 
-    const updateBest = () => {
-      const topScore = window.Scores && window.Scores.getTopScores(GAME_ID)[0];
-      best = Math.max(score, topScore ? topScore.score : 0);
-      bestNode.textContent = best;
-    };
-
     const updateStats = () => {
       scoreNode.textContent = Math.floor(score);
       levelNode.textContent = level;
-      updateBest();
     };
 
     const createGem = value => {

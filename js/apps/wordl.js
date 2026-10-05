@@ -58,15 +58,8 @@ Apps.register({
                             <option value="6">6 Letters</option>
                             <option value="7">7 Letters</option>
                         </select>
-                        <button class="game-icon-btn game-icon-btn--reveal" id="wl-reveal-${winId}" type="button" title="Reveal word" aria-label="Reveal word" style="display:none;"></button>
                         <button class="game-icon-btn game-icon-btn--restart" id="wl-restart-${winId}" type="button" title="Restart" aria-label="Restart"></button>
-                    </div>
-                    <div class="game-toolbar__spacer"></div>
-                    <div class="game-stat-group">
-                        <div class="game-stat">
-                            <div class="game-stat__label">Time</div>
-                            <div class="game-stat__value" id="wl-time-${winId}">0</div>
-                        </div>
+                        <button class="game-icon-btn game-icon-btn--reveal" id="wl-reveal-${winId}" type="button" title="Reveal word" aria-label="Reveal word" style="display:none;"></button>
                     </div>
                 </div>
 
