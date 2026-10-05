@@ -12,7 +12,7 @@ function browser(saved = {}) {
     const prompts = [];
     const windows = new Map();
     let nonceId = 0;
-    const node = () => ({ onclick: null, onkeydown: null, value: '', disabled: false, focus() {}, select() {} });
+    const node = () => ({ onclick: null, onkeydown: null, style: {}, value: '', disabled: false, focus() {}, select() {} });
     const context = {
         console, setTimeout, clearTimeout, TextEncoder, Uint8Array, AbortController, URL, crypto: webcrypto,
         document: { readyState: 'loading', currentScript: { src: 'https://nova.test/js/apps/game2048.js' } },
@@ -145,6 +145,10 @@ test('Explorer duplicate exposes original date and lets user change initials', a
     assert.match(win.content.querySelector('.explorer-status').textContent, /ABC already arrived/);
     assert.equal(win.content.querySelector('.explorer-save').disabled, false);
     assert.equal(b.uplink.explorer.initials, undefined);
+    assert.equal(win.content.querySelector('.explorer-ack').style.display, '');
+    win.content.querySelector('input').value = 'DEF';
+    win.content.querySelector('input').oninput();
+    assert.equal(win.content.querySelector('.explorer-ack').style.display, 'none');
     b.context.fetch = async (url, options) => url.endsWith('/results')
         ? { ok: true, json: async () => ({ initials: 'DEF', date: 2000 }) } : working(url, options);
     win.content.querySelector('input').value = 'DEF';
@@ -152,6 +156,41 @@ test('Explorer duplicate exposes original date and lets user change initials', a
     assert.equal(b.uplink.explorer.initials, 'DEF');
     assert.equal(b.uplink.explorer.date, 2000);
     assert.equal(b.windows.size, 0);
+});
+
+test('Explorer acknowledgement stays unavailable before consent and on network failure', async () => {
+    const b = browser();
+    b.uplink.discovered();
+    const win = [...b.windows.values()][0];
+    const ack = win.content.querySelector('.explorer-ack');
+    assert.equal(ack.style.display, 'none');
+    ack.onclick();
+    assert.equal(b.windows.size, 1);
+    const registering = win.content.querySelector('.explorer-save').onclick();
+    assert.equal(ack.style.display, 'none');
+    b.context.fetch = async () => { throw new Error('offline'); };
+    [...b.windows.values()].find(w => w !== win).content.querySelector('[data-uplink="yes"]').onclick();
+    await registering;
+    assert.equal(ack.style.display, 'none');
+    assert.doesNotMatch(win.content.querySelector('.explorer-status').textContent, /Acknowledge/);
+    assert.equal(win.content.querySelector('.explorer-save').disabled, false);
+});
+
+test('Explorer acknowledgement preserves only a server-confirmed existing registration', async () => {
+    const b = browser(enabled);
+    b.uplink.discovered();
+    const win = [...b.windows.values()][0];
+    win.content.querySelector('input').value = 'ABC';
+    const working = b.context.fetch;
+    b.context.fetch = async (url, options) => url.endsWith('/results')
+        ? { ok: false, status: 409, json: async () => ({ existing: { initials: 'ABC', date: 1000 } }) }
+        : working(url, options);
+    await win.content.querySelector('.explorer-save').onclick();
+    win.content.querySelector('.explorer-ack').onclick();
+    assert.equal(b.windows.size, 0);
+    assert.equal(b.uplink.explorer.initials, 'ABC');
+    assert.equal(b.uplink.explorer.date, 1000);
+    assert.equal(b.uplink.explorer.published, true);
 });
 
 test('Explorer API pagination is read completely', async () => {

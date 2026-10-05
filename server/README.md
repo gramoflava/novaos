@@ -115,6 +115,8 @@ Explorer acknowledgement and secret-game unlocks. It cannot delete public record
 New results that fail to uplink remain local. A retry queue exists only in the
 current page's memory, is cleared when uplink is disabled, and is never recovered
 from editable localStorage. The user can retry from Scores (up to 50 pending results per session). Explorers keeps its
-registration dialog open on a network failure; Retry/other initials or Acknowledge
-remain available. Closing/acknowledging the dialog prevents a prompt on later
+registration dialog open on a network failure so the player can retry.
+Acknowledge appears only after the server confirms those initials already exist;
+it preserves that registration's original date. Changing initials hides it until
+the server confirms another duplicate. Closing/acknowledging the dialog prevents a prompt on later
 falls in the same browser. A skipped cinematic doesn't award Explorer status.

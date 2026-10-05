@@ -229,8 +229,23 @@
         const input = win.content.querySelector('input');
         const status = win.content.querySelector('.explorer-status');
         const save = win.content.querySelector('.explorer-save');
-        win.content.querySelector('.explorer-ack').onclick = () => WindowManager.close(id);
+        const acknowledge = win.content.querySelector('.explorer-ack');
+        let existing = null;
+        const clearAcknowledgement = () => {
+            existing = null;
+            acknowledge.style.display = 'none';
+        };
+        clearAcknowledgement();
+        input.oninput = clearAcknowledgement;
+        acknowledge.onclick = () => {
+            if (!existing || normalize(input.value) !== existing.initials) return;
+            explorer = { offered: true, initials: existing.initials, date: existing.date, published: true };
+            write(explorerKey, explorer);
+            changed();
+            WindowManager.close(id);
+        };
         save.onclick = async () => {
+            clearAcknowledgement();
             save.disabled = true;
             const initials = normalize(input.value);
             input.value = initials;
@@ -252,18 +267,22 @@
                 if (error.status === 409 && error.data.existing) {
                     const previous = error.data.existing;
                     status.textContent = `${previous.initials} already arrived on ${new Date(previous.date).toLocaleDateString()}. Try other initials or Acknowledge.`;
+                    if (normalize(input.value) === previous.initials) {
+                        existing = previous;
+                        acknowledge.style.display = '';
+                    }
                     receipt.run.challenge = null;
                     input.focus();
                     input.select();
                 } else {
                     if (error.status === 410) receipt.run.challenge = null;
-                    status.textContent = 'Uplink unavailable. You can retry here or Acknowledge.';
+                    status.textContent = 'Uplink unavailable. You can retry here.';
                 }
                 save.disabled = false;
             }
         };
         input.onkeydown = event => {
-            if (latinKey(event, input)) return;
+            if (latinKey(event, input)) { clearAcknowledgement(); return; }
             if (event.key === 'Enter' && !save.disabled) save.click();
         };
         input.focus();
