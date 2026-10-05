@@ -34,6 +34,12 @@ class GamePauseController {
         this.unsubscribeRestore = Bus.on('window:restored', id => {
             if (id === this.winId) this.setAutoPaused('window', false);
         });
+        // Asteroids takes the keyboard and the player's eyes: a running game
+        // pauses and stays paused until the player resumes it.
+        this.unsubscribeAsteroids = Bus.on('asteroids:start', () => {
+            this.manuallyPaused = true;
+            this.sync();
+        });
 
         if (document.hidden) {
             this.autoReasons.add('document');
@@ -114,6 +120,7 @@ class GamePauseController {
         document.removeEventListener('visibilitychange', this.onVisibilityChange);
         this.unsubscribeMinimize();
         this.unsubscribeRestore();
+        this.unsubscribeAsteroids();
         this.resumeAnimations();
         this.overlay.remove();
     }

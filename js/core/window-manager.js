@@ -183,6 +183,9 @@ class WindowManagerClass {
             }
 
             if (e.button !== 0) return;
+            // A click on empty space means "no window": keys stop going to the
+            // last app (the cheat code's arrows used to start Columns).
+            if (this.activeWindowId) this.releaseFocus(this.activeWindowId);
             this.isPanning = true;
             document.body.classList.add('is-dragging');
             this.panStartX = e.clientX - this.cameraX;

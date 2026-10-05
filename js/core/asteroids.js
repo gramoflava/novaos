@@ -94,6 +94,11 @@ class AsteroidsGame {
         const desktop = document.getElementById('desktop');
         if (!desktop || desktop.style.display === 'none') return;
 
+        // The desktop is the playfield now: no window keeps the keyboard, and
+        // games that were running pause instead of playing on unattended.
+        if (WindowManager.activeWindowId) WindowManager.releaseFocus(WindowManager.activeWindowId);
+        if (window.Bus) Bus.emit('asteroids:start');
+
         const T = AsteroidsGame.T;
         this.canvas = document.createElement('canvas');
         this.canvas.className = 'ast-canvas';
