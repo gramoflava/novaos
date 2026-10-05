@@ -17,9 +17,6 @@ Apps.register({
       .nr-stage { position: relative; display: flex; width: 100%; aspect-ratio: 16 / 7; flex: 0 1 auto; min-height: 0; overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius-md); background: var(--surface-sunk); box-shadow: var(--glass-edge); }
       .nr-canvas { width: 100%; height: 100%; min-height: 250px; outline: none; touch-action: none; overscroll-behavior: contain; cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
       .nr-canvas:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
-      .nr-caption { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 30px; color: var(--text-secondary); font-size: 10px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; }
-      .nr-caption__route { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      .nr-caption__keys { flex: 0 0 auto; font-variant-numeric: tabular-nums; }
       .nr-touch-controls { display: none; width: 100%; gap: var(--space-2); }
       .nr-touch-btn { display: inline-flex; flex: 1 1 0; min-width: 0; height: 44px; align-items: center; justify-content: center; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-sunk); color: var(--text); font: 600 var(--text-sm) var(--font-sans); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
       .nr-touch-btn:active { background: var(--glass-active); transform: scale(0.98); }
@@ -27,8 +24,9 @@ Apps.register({
         .nr-shell { padding: 12px; }
         .nr-stage { flex: 0 0 auto; width: 100%; aspect-ratio: 8 / 7; }
         .nr-canvas { min-height: 0; }
-        .nr-caption { min-height: 52px; padding-top: var(--space-2); }
-        .nr-caption__route, .nr-caption__keys { display: none; }
+        /* On phones the chin holds the touch buttons instead of the text. */
+        .nr-shell .game-caption { min-height: 52px; padding-top: var(--space-2); }
+        .nr-shell .game-caption > span { display: none; }
         .nr-touch-controls { display: flex; }
       }
     `;
@@ -56,9 +54,9 @@ Apps.register({
           <div class="nr-stage">
             <canvas class="nr-canvas" id="nr-canvas-${winId}" width="640" height="280" tabindex="0" aria-label="Nova Run. Press Space or tap to jump. Press Down to duck."></canvas>
           </div>
-          <div class="nr-caption">
-            <span class="nr-caption__route" id="nr-route-${winId}">${initialTheme === 'lunar' ? 'Lunar route 07 · clear terrain · read saucer altitude' : 'Offline classic · clear cacti · read bird altitude'}</span>
-            <span class="nr-caption__keys">Space / ↑ jump · ↓ duck</span>
+          <div class="game-caption">
+            <span class="game-caption__goal" id="nr-route-${winId}">${initialTheme === 'lunar' ? 'Lunar route 07 · clear terrain · read saucer altitude' : 'Offline classic · clear cacti · read bird altitude'}</span>
+            <span class="game-caption__keys game-caption__keys--mouse">Space / ↑ jump · ↓ duck</span>
             <div class="nr-touch-controls" aria-label="Touch controls">
               <button class="nr-touch-btn" id="nr-touch-jump-${winId}" type="button" aria-label="Jump">↑ Jump</button>
               <button class="nr-touch-btn" id="nr-touch-duck-${winId}" type="button" aria-label="Duck while held">↓ Hold duck</button>
@@ -74,7 +72,7 @@ Apps.register({
       appId: 'novarun',
       title: 'Nova Run',
       width: 680,
-      height: 470,
+      height: 449,
       content: html
     });
 

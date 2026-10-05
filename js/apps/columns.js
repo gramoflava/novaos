@@ -36,8 +36,6 @@ Apps.register({
       .co-chain strong { display: block; color: var(--accent); font-size: 18px; font-variant-numeric: tabular-nums; }
       .co-status { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; background: color-mix(in srgb, var(--bg) 72%, transparent); color: var(--text); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; text-align: center; text-transform: uppercase; pointer-events: none; }
       .co-status.hidden { display: none; }
-      .co-caption { display: flex; min-height: 28px; align-items: flex-end; justify-content: center; color: var(--text-muted); font-size: 10px; font-weight: 500; letter-spacing: 0.04em; text-align: center; text-transform: uppercase; }
-      .co-caption-mobile { display: none; }
       @keyframes coClear { to { opacity: 0; transform: scale(1.35) rotate(8deg); } }
       @keyframes coMagic { 0% { filter: hue-rotate(0deg); } 100% { filter: hue-rotate(120deg); } }
       @media (max-width: 640px) {
@@ -45,9 +43,6 @@ Apps.register({
         .co-game { gap: 8px; }
         .co-side { width: 66px; flex-basis: 66px; gap: 8px; }
         .co-next, .co-chain { padding: 6px; }
-        .co-caption { min-height: 34px; }
-        .co-caption-desktop { display: none; }
-        .co-caption-mobile { display: inline; }
       }
     `;
 
@@ -87,9 +82,10 @@ Apps.register({
               </div>
             </aside>
           </div>
-          <div class="co-caption">
-            <span class="co-caption-desktop">← → move · ↑ cycle colours · ↓ drop</span>
-            <span class="co-caption-mobile">Swipe ← → move · ↑ cycle · ↓ drop</span>
+          <div class="game-caption">
+              <span class="game-caption__goal">Match three in any line</span>
+              <span class="game-caption__keys game-caption__keys--mouse">← → move · ↑ cycle · ↓ drop</span>
+              <span class="game-caption__keys game-caption__keys--touch">Swipe ← → move · ↑ cycle · ↓ drop</span>
           </div>
         </div>
       </div>

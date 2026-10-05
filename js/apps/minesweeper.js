@@ -63,6 +63,11 @@ Apps.register({
                 <div class="ms-grid-wrap" id="ms-grid-wrap-${winId}">
                     <div class="ms-grid" id="ms-grid-${winId}"></div>
                 </div>
+                <div class="game-caption">
+                    <span class="game-caption__goal">Clear every safe cell</span>
+                    <span class="game-caption__keys game-caption__keys--mouse">Click reveal · right-click or Space flag</span>
+                    <span class="game-caption__keys game-caption__keys--touch">Tap reveal · hold to flag</span>
+                </div>
             </div>
             <style>${style}</style>
         `;
@@ -375,8 +380,8 @@ Apps.register({
             const val = e.target.value;
             const winEl = WindowManager.windows.get(winId).el;
             if (val === 'easy') { rows=9; cols=9; totalMines=10; winEl.style.width='440px'; winEl.style.height='500px'; }
-            if (val === 'medium') { rows=16; cols=16; totalMines=40; winEl.style.width='650px'; winEl.style.height='720px'; }
-            if (val === 'hard') { rows=16; cols=30; totalMines=99; winEl.style.width='1100px'; winEl.style.height='720px'; }
+            if (val === 'medium') { rows=16; cols=16; totalMines=40; winEl.style.width='650px'; winEl.style.height='734px'; }
+            if (val === 'hard') { rows=16; cols=30; totalMines=99; winEl.style.width='1100px'; winEl.style.height='734px'; }
 
             winEl.dataset.w = parseFloat(winEl.style.width);
             winEl.dataset.h = parseFloat(winEl.style.height);

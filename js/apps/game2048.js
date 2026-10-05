@@ -49,6 +49,11 @@ Apps.register({
                     <div id="tiles-${winId}"></div>
                     <div id="gameover-${winId}" style="position: absolute; top:0; left:0; width:100%; height:100%; background: color-mix(in srgb, var(--bg) 75%, transparent); color: white; display: none; align-items: center; justify-content: center; font-size: 32px; font-weight: bold; z-index: 20; backdrop-filter: blur(var(--blur-panel));">Game Over</div>
                 </div>
+                <div class="game-caption">
+                    <span class="game-caption__goal">Merge equal tiles · reach 2048</span>
+                    <span class="game-caption__keys game-caption__keys--mouse">Arrows slide</span>
+                    <span class="game-caption__keys game-caption__keys--touch">Swipe to slide</span>
+                </div>
             </div>
             <style>${style}</style>
         `;
@@ -58,7 +63,7 @@ Apps.register({
             appId: 'game2048',
             title: '2048',
             width: 380,
-            height: 500,
+            height: 482,
             content: html
         });
 

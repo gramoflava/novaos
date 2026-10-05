@@ -70,6 +70,11 @@ Apps.register({
                     </div>
                 </div>
                 <div class="cl-grid" id="cl-grid-${winId}"></div>
+                <div class="game-caption">
+                    <span class="game-caption__goal">Line up five</span>
+                    <span class="game-caption__keys game-caption__keys--mouse">Click a ball, then a cell</span>
+                    <span class="game-caption__keys game-caption__keys--touch">Tap a ball, then a cell</span>
+                </div>
             </div>
             <style>${style}</style>
         `;
@@ -79,7 +84,7 @@ Apps.register({
             appId: 'colorlines',
             title: 'Color Lines',
             width: 380,
-            height: 540,
+            height: 488,
             content: html
         });
 

@@ -24,6 +24,8 @@ Apps.register({
             .wl-cell.shaking { animation: shake 0.4s; }
             .wl-cell.flipping { animation: flip 0.6s ease; }
 
+            /* Same chin as every game: below the keyboard, 16px from the edge. */
+            .wl-wrap > .game-caption { margin-top: 0; padding: var(--space-3) 16px 16px; min-height: 44px; }
             .wl-keyboard { padding: 16px; display: flex; flex-direction: column; gap: 6px; align-items: center; border-top: 1px solid var(--line); background: var(--surface-sunk); }
             .wl-kb-row { display: flex; gap: 6px; }
             .wl-kb-key { min-height: 44px; background: var(--glass-hover); border: none; color: var(--text); font-family: var(--font-sans); font-size: 14px; font-weight: 600; padding: 12px 10px; border-radius: var(--radius-xs); cursor: pointer; text-transform: uppercase; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: background 0.2s; min-width: 32px; display: flex; justify-content: center; align-items: center; }
@@ -104,6 +106,11 @@ Apps.register({
                         <button class="wl-kb-key large" data-key="Backspace">DEL</button>
                         </div>
                     </div>
+                </div>
+                <div class="game-caption">
+                    <span class="game-caption__goal">Guess the hidden word</span>
+                    <span class="game-caption__keys game-caption__keys--mouse">Type · Enter check · ⌫ erase</span>
+                    <span class="game-caption__keys game-caption__keys--touch">Tap the letters</span>
                 </div>
 
                 <div id="wl-loading-${winId}" class="wl-loading">Loading Dictionary...</div>

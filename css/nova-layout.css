@@ -546,6 +546,44 @@
     font-weight: 600;
 }
 
+/* Game chin: one line pinned to the bottom of every game window — what to do
+   on the left, how to do it on the right. Touch screens get their own keys. */
+.game-caption {
+    display: flex;
+    flex: none;
+    align-self: stretch;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    min-height: 28px;
+    margin-top: auto;
+    padding-top: var(--space-3);
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.game-caption__goal {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.game-caption__keys {
+    flex: none;
+    font-variant-numeric: tabular-nums;
+}
+
+.game-caption__keys--touch { display: none; }
+
+@media (hover: none) and (pointer: coarse) {
+    .game-caption__keys--mouse { display: none; }
+    .game-caption__keys--touch { display: inline; }
+}
+
 .settings-app {
     display: flex;
     flex-direction: column;
