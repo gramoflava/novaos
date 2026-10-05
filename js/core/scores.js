@@ -208,7 +208,6 @@ class ScoreManager {
         const variants = {
             minesweeper: [['minesweeper-easy', 'Beginner'], ['minesweeper-medium', 'Intermediate'], ['minesweeper-hard', 'Expert']],
             wordl: [4, 5, 6, 7].map(n => [`wordl-${n}`, `${n} letters`]),
-            colorlines: [['colorlines-5', 'Classic'], ['colorlines-4', 'Quick']],
             novarun: [['novarun-lunar', 'Lunar'], ['novarun-classic', 'Dino']]
         };
         const select = (role, label, items, current) => `<select class="game-select" data-role="${role}" aria-label="${label}">${items.map(([value, text]) =>

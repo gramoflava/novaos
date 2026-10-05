@@ -16,7 +16,7 @@ from urllib.parse import parse_qs, urlsplit
 GAMES = {
     'minesweeper-easy': 9999, 'minesweeper-medium': 9999, 'minesweeper-hard': 9999,
     'wordl-4': 3000, 'wordl-5': 4000, 'wordl-6': 5200, 'wordl-7': 6600,
-    'game2048': 1000000, 'colorlines-4': 1000000, 'colorlines-5': 1000000,
+    'game2048': 1000000, 'colorlines-5': 1000000,
     'columns-classic': 10000000, 'novarun-lunar': 1000000,
     'novarun-classic': 1000000, 'asteroids': 10000000, 'explorers': 0,
 }

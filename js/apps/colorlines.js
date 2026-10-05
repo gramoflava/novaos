@@ -30,9 +30,7 @@ Apps.register({
             .cl-preview-group { display: flex; flex: none; min-width: 34px; height: 36px; align-items: center; background: var(--surface-sunk); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 2px 4px; gap: 2px; transition: background 0.2s; }
             .cl-preview-btn { background: transparent; border: none; color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 4px; opacity: 0.6; transition: opacity 0.2s; }
             .cl-preview-btn:hover { opacity: 1; }
-            /* the preview never shrinks; the level select gives way instead */
             .cl-container .game-toolbar { gap: 4px; }
-            .cl-container .game-select { min-width: 0; flex: 0 1 auto; padding: 0 22px 0 8px; }
             .cl-container .game-stat { min-width: 44px; }
             .cl-preview-wrap { overflow: hidden; transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; width: 76px; opacity: 1; display: flex; gap: 2px; align-items: center; }
             .cl-preview-wrap.collapsed { width: 0; opacity: 0; pointer-events: none; }
@@ -53,10 +51,6 @@ Apps.register({
         const html = `
             <div class="cl-container" id="cl-container-${winId}">
                 <div class="game-toolbar">
-                    <select id="cl-level-${winId}" class="game-select" aria-label="Line length">
-                        <option value="5" selected>Classic</option>
-                        <option value="4">Quick</option>
-                    </select>
                     <div class="cl-preview-group">
                         <button class="cl-preview-btn" id="cl-toggle-preview-${winId}" type="button" title="Toggle preview" aria-label="Toggle preview">
                             <!-- SVG handled dynamically by JS -->
@@ -93,10 +87,12 @@ Apps.register({
         let isGameOver = false;
         let isAnimating = false;
         let nextBalls = [];
-        let lineLength = 5;
+        // One mode: lines of five. The id keeps its suffix so existing local
+        // and galactic records stay on the same board.
+        const lineLength = 5;
         let isPreviewVisible = localStorage.getItem('novaos_colorlines_preview') !== 'false';
 
-        const getGameId = () => 'colorlines-' + lineLength;
+        const getGameId = () => 'colorlines-5';
 
         const svgEyeOpen = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3 -7 10 -7s10 7 10 7s-3 7 -10 7s-10 -7 -10 -7"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
         const svgEyeClosed = `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18M10.58 10.58a2 2 0 0 0 2.83 2.83M9.88 4.24a9.84 9.84 0 0 1 2.12 -.24c7 0 10 8 10 8a15.09 15.09 0 0 1 -1.67 2.68M6.61 6.61c-3.12 2.05 -4.61 5.39 -4.61 5.39s3 8 10 8a9.74 9.74 0 0 0 5.39 -1.61"></path></svg>`;
@@ -433,14 +429,12 @@ Apps.register({
             isGameOver = false;
             isAnimating = false;
             nextBalls = [];
-            lineLength = parseInt(document.getElementById(`cl-level-${winId}`).value) || 5;
             reportScore = startScoreRun(getGameId(), winId);
             render();
             await spawnBalls(5);
         };
 
         document.getElementById(`cl-restart-${winId}`).onclick = initBoard;
-        document.getElementById(`cl-level-${winId}`).onchange = initBoard;
         document.getElementById(`cl-forfeit-${winId}`).onclick = () => {
             if (!isGameOver) {
                 gameOver();
