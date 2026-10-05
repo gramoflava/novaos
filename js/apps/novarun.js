@@ -128,6 +128,8 @@ Apps.register({
     let downPressed = false;
     let jumpHeld = false;
     let scorePromptOpen = false;
+    let endedAt = 0;
+    const RETRY_DELAY = 600; // ms after a crash before Space or a tap restarts
     let pauseController = null;
     const player = {
       y: GROUND - 48,
@@ -342,7 +344,9 @@ Apps.register({
 
     const jump = () => {
       if (state === 'gameover') {
-        if (scorePromptOpen) {
+        // A jump already on its way when the runner crashed must not start the
+        // next run: retry only after a short beat.
+        if (scorePromptOpen || performance.now() - endedAt < RETRY_DELAY) {
           return;
         }
         reset();
@@ -578,6 +582,7 @@ Apps.register({
         return;
       }
       state = 'gameover';
+      endedAt = performance.now();
       const finalScore = Math.floor(score);
       score = finalScore;
       scoreNode.textContent = finalScore;
