@@ -79,7 +79,10 @@ Apps.register({
         let totalMines = 10;
         let board = [];
         let minesLeft = totalMines;
-        let time = 0;
+        // The clock is real elapsed time (pauses excluded), not a count of
+        // interval ticks: throttled timers and pause/resume can't shave it.
+        let elapsedMs = 0;
+        let runningSince = 0;
         let timer = null;
         let isGameOver = false;
         let isFirstClick = true;
@@ -101,17 +104,21 @@ Apps.register({
             uiPause.setAttribute('aria-label', available ? 'Pause' : 'Pause unavailable before the first move');
         };
 
+        const elapsedSeconds = () => Math.floor((elapsedMs + (runningSince ? performance.now() - runningSince : 0)) / 1000);
+
         const stopTimer = () => {
+            if (runningSince) elapsedMs += performance.now() - runningSince;
+            runningSince = 0;
             if (timer) clearInterval(timer);
             timer = null;
         };
 
         const startTimer = () => {
             stopTimer();
+            runningSince = performance.now();
             timer = setInterval(() => {
-                time++;
-                uiTime.textContent = time;
-            }, 1000);
+                uiTime.textContent = elapsedSeconds();
+            }, 200);
         };
 
         const updateGridCellSize = () => {
@@ -199,10 +206,10 @@ Apps.register({
             isFirstClick = true;
             revealedCount = 0;
             minesLeft = totalMines;
-            time = 0;
-            uiTime.textContent = time;
-            uiMines.textContent = minesLeft;
             stopTimer();
+            elapsedMs = 0;
+            uiTime.textContent = 0;
+            uiMines.textContent = minesLeft;
             setPauseAvailable(false);
 
             uiGrid.innerHTML = '';
@@ -333,6 +340,8 @@ Apps.register({
         const gameOver = (win) => {
             isGameOver = true;
             stopTimer();
+            const time = elapsedSeconds();
+            uiTime.textContent = time;
             setPauseAvailable(false);
 
             // Reveal all mines

@@ -124,7 +124,7 @@ class AsteroidsGame {
         this.particles = [];
         this.trail = [];
         this.phantoms = [];
-        asteroidRuns.set(this, { score: 0, report: startScoreRun('asteroids') });
+        asteroidRuns.set(this, { score: 0, points: 0, report: startScoreRun('asteroids') });
         this.exploring = false;
         try { localStorage.setItem('novaos_asteroids_seen', '1'); } catch (_e) { }
         this.lives = T.lives;
@@ -323,9 +323,11 @@ class AsteroidsGame {
         let dt = (now - this.last) / 1000;
         this.last = now;
         if (document.hidden) dt = 0;
-        dt = Math.min(dt, 1 / 30);
+        // Real time, in steps of at most 1/60 s: a slow browser gets no slow
+        // motion and no shots passing through rocks. The cap only absorbs stalls.
+        dt = Math.min(dt, 0.25);
 
-        if (this.state !== 'over') this.update(dt);
+        for (let left = dt; left > 1e-6 && this.state !== 'over'; left -= 1 / 60) this.update(Math.min(left, 1 / 60));
         this.followCamera(dt);
         this.draw();
         this.raf = requestAnimationFrame(this.frame);
@@ -421,7 +423,7 @@ class AsteroidsGame {
             rects.forEach(r => this.bounce(k, r));
             if (holes.some(h => Math.hypot(h.x - k.x, h.y - k.y) < 26 + k.r * 0.3)) {
                 this.sparks(k.x, k.y, 10, this.colors.alt);
-                asteroidRuns.get(this).score += T.points[k.size];
+                // No points: they would grow with the number of minimised windows.
                 this.rocks.splice(i, 1);
                 continue;
             }
@@ -493,7 +495,7 @@ class AsteroidsGame {
         const T = AsteroidsGame.T;
         const k = this.rocks[i];
         this.rocks.splice(i, 1);
-        asteroidRuns.get(this).score += T.points[k.size];
+        this.award(T.points[k.size]);
         this.sparks(k.x, k.y, 8 + k.size * 2, this.colors.secondary);
         if (k.size < T.sizes.length - 1) {
             const base = Math.atan2(bullet.vy, bullet.vx);
@@ -504,6 +506,15 @@ class AsteroidsGame {
             }
         }
         if (window.AudioMng) AudioMng.play('flag_off');
+    }
+
+    // A wave holds more rocks on a bigger or zoomed-out view (same density),
+    // so each rock is worth proportionally less: every wave is worth the same
+    // on every screen. Rounded down to tens, as the scoreboard expects.
+    award(points) {
+        const run = asteroidRuns.get(this);
+        run.points += points / (this.waveArea || 1);
+        run.score = Math.floor(run.points / 10) * 10;
     }
 
     crash(cause) {

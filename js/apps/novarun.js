@@ -950,9 +950,16 @@ Apps.register({
 
     const frame = now => {
       animationFrame = 0;
-      const delta = Math.min(now - lastFrame, 34);
+      // Game time is real time. Long frames are split into steps of at most
+      // 1/60 s, so a slow browser neither runs in slow motion nor skips
+      // collisions; the cap only absorbs stalls.
+      let delta = Math.min(now - lastFrame, 250);
       lastFrame = now;
-      update(delta);
+      while (delta > 0 && state === 'playing') {
+        const step = Math.min(delta, 1000 / 60);
+        update(step);
+        delta -= step;
+      }
       draw(now);
       if (!(pauseController && pauseController.isPaused())) {
         animationFrame = requestAnimationFrame(frame);

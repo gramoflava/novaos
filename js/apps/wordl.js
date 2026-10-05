@@ -135,8 +135,11 @@ Apps.register({
         let currentGuess = "";
         let gameOver = false;
         let isAnimating = false;
-        let time = 0;
+        // Real elapsed time since the word appeared; a hidden tab or a slow
+        // browser doesn't slow the clock down.
+        let startedAt = 0;
         let timer = null;
+        const elapsedSeconds = () => Math.floor((performance.now() - startedAt) / 1000);
 
         // Global Dictionary Storage
         if (!window.WordlDict) {
@@ -156,12 +159,10 @@ Apps.register({
 
         const startTimer = () => {
             stopTimer();
+            startedAt = performance.now();
             timer = setInterval(() => {
-                if (!gameOver) {
-                    time++;
-                    document.getElementById(`wl-time-${winId}`).textContent = time;
-                }
-            }, 1000);
+                if (!gameOver) document.getElementById(`wl-time-${winId}`).textContent = elapsedSeconds();
+            }, 200);
         };
 
         async function loadDict() {
@@ -248,8 +249,7 @@ Apps.register({
             currentGuess = "";
             gameOver = false;
             isAnimating = false;
-            time = 0;
-            document.getElementById(`wl-time-${winId}`).textContent = time;
+            document.getElementById(`wl-time-${winId}`).textContent = 0;
             startTimer();
             maxGuesses = wordLength + 1; // 5 -> 6 guesses, 6 -> 7 guesses
 
@@ -431,7 +431,8 @@ Apps.register({
         function handleWin() {
             if (window.AudioMng) AudioMng.play('win');
 
-            const timeElapsed = time;
+            const timeElapsed = elapsedSeconds();
+            document.getElementById(`wl-time-${winId}`).textContent = timeElapsed;
             // Scoring mechanism
             // Points = ((maxGuesses - guessesTaken) * base) + timeBonus
             // Base = 100. Length 5 => base 500. Length 6 => base 600.

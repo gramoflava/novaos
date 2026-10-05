@@ -563,12 +563,14 @@ Apps.register({
     const dropInterval = () => Math.max(110, Math.round(820 * 0.86 ** (level - 1)));
     const frame = now => {
       animationFrame = 0;
-      const delta = Math.min(50, now - lastFrame);
+      // Real time drives the fall: a slow frame rate drops the column several
+      // rows at once instead of slowing the game down. The cap only absorbs stalls.
+      const delta = Math.min(250, now - lastFrame);
       lastFrame = now;
       if (state === 'playing') {
         dropAccumulator += delta;
-        if (dropAccumulator >= dropInterval()) {
-          dropAccumulator %= dropInterval();
+        while (state === 'playing' && dropAccumulator >= dropInterval()) {
+          dropAccumulator -= dropInterval();
           stepDown();
         }
       }

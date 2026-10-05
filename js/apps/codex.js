@@ -104,6 +104,7 @@ Apps.register({
                     <h2>Scoring & Leaderboards</h2>
                     <ul>
                         <li><b>Accuracy:</b> Points are awarded based on how many guesses remain.</li>
+                        <li><b>Speed:</b> A quick solve adds up to 1,000 bonus points; the bonus runs out after 100 seconds.</li>
                         <li><b>Dictionary:</b> Obscure words and even "forbidden" vocabulary are supported for validation.</li>
                         <li><b>Genius Bonus:</b> Solving the word in 1 or 2 tries triggers a special system-wide celebration.</li>
                     </ul>

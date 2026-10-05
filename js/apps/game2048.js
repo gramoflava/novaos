@@ -127,12 +127,11 @@ Apps.register({
         };
 
         const checkState = () => {
+             // 2048 is a milestone, not the end: an open-ended score keeps the
+             // best players apart instead of all stopping near 20,000.
              if(!hasWon && activeTiles.some(t => !t.deleted && t.val === 2048)) {
                  hasWon = true;
-                 isGameOver = true;
                  if (window.AudioMng) AudioMng.play('win');
-                 reportScore(score, true);
-                 return;
              }
              if(getEmpty().length > 0) return;
 
@@ -150,7 +149,7 @@ Apps.register({
              document.getElementById(`gameover-${winId}`).style.display = 'flex';
              const isHighScore = Scores.isHighScore('game2048', score);
              if (window.AudioMng) AudioMng.play(isHighScore ? 'win' : 'lose');
-             reportScore(score, isHighScore);
+             reportScore(score, hasWon || isHighScore);
         };
 
         const getLine = (i, dir) => {
