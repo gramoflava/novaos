@@ -1,0 +1,7 @@
+{
+  "owns": {
+    "viewport-zoom": "The infinite desktop is a physics world driven by pinch and drag; browser zoom fights the camera and the window manager. A deliberate choice until the world handles zoom.",
+    "motion": "Physics-first world: window springs, star drift, nova bursts and game feedback run on their own clocks (100 ms to 100 s), not the 120–200 ms UI range.",
+    "colour": "Game apps and window controls carry their own fixed palettes (2048 tiles, Wordl cells, traffic lights) that do not follow the theme."
+  }
+}

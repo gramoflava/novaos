@@ -33,7 +33,7 @@ Apps.register({
                 line-height: 1.6;
                 min-height: 0; /* Critical for flex scrolling */
             }
-            .cx-content h1 { font-size: 28px; margin-bottom: 8px; font-weight: 700; }
+            .cx-content h1 { font-size: 28px; margin-bottom: 8px; font-weight: var(--weight-semibold); }
             .cx-content h2 { font-size: 20px; margin-top: 24px; margin-bottom: 12px; color: var(--accent); font-weight: 600; }
             .cx-content p { font-size: 15px; margin-bottom: 16px; opacity: 0.9; }
             .cx-content ul { padding-left: 20px; margin-bottom: 16px; opacity: 0.9; }

@@ -40,7 +40,7 @@
     box-shadow: var(--shadow-lg), var(--glass-edge);
     transition: all var(--dur-base) var(--ease-smooth);
     color: var(--text);
-    font-weight: 500;
+    font-weight: var(--weight-medium);
     font-size: var(--text-md);
 }
 
@@ -63,7 +63,7 @@
 
 .island-app-name {
     font-family: var(--font-display);
-    font-weight: 700;
+    font-weight: var(--weight-semibold);
     background: linear-gradient(90deg, var(--accent), var(--nova-accent-alt));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -222,8 +222,8 @@
     border: none;
     padding: 24px 32px;
     font-family: var(--font-sans);
-    font-size: 28px;
-    font-weight: 300;
+    font-size: var(--nova-text-spotlight);
+    font-weight: var(--weight-regular);
     color: var(--text);
     outline: none;
 }
@@ -309,7 +309,7 @@
 }
 .app-title {
     font-size: var(--text-xl);
-    font-weight: 700;
+    font-weight: var(--weight-semibold);
     color: var(--text);
 }
 .app-controls {
@@ -322,8 +322,8 @@
 /* Secondary Button by default */
 .app-btn {
     font-family: var(--font-sans);
-    font-size: 12px;
-    font-weight: 500;
+    font-size: var(--text-sm);
+    font-weight: var(--weight-medium);
     background: var(--surface-sunk);
     border: 1px solid var(--line);
     color: var(--text);
@@ -351,14 +351,14 @@
     min-width: 56px;
 }
 .app-stat-label {
-    font-size: 10px;
-    font-weight: 400;
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-regular);
     color: var(--text-muted);
     text-transform: uppercase;
 }
 .app-stat-val {
-    font-weight: 600;
-    font-size: 18px;
+    font-weight: var(--weight-semibold);
+    font-size: var(--nova-text-stat);
     color: var(--text);
 }
 
@@ -398,7 +398,7 @@
     min-width: 96px;
     padding: 0 28px 0 10px;
     outline: none;
-    font: 500 var(--text-sm) var(--font-sans);
+    font: var(--weight-medium) var(--text-sm) var(--font-sans);
     cursor: pointer;
 }
 
@@ -501,7 +501,7 @@
     -webkit-backdrop-filter: blur(var(--blur-panel)) saturate(55%);
     color: var(--text);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
     letter-spacing: 0.08em;
     text-transform: uppercase;
 }
@@ -534,7 +534,7 @@
 .game-stat__label {
     color: var(--text-muted);
     font-size: var(--text-2xs);
-    font-weight: 500;
+    font-weight: var(--weight-medium);
     letter-spacing: 0.04em;
     text-transform: uppercase;
 }
@@ -543,7 +543,7 @@
     margin-top: 2px;
     color: var(--text);
     font-size: var(--text-lg);
-    font-weight: 600;
+    font-weight: var(--weight-semibold);
 }
 
 /* Game chin: one line pinned to the bottom of every game window — what to do
@@ -559,8 +559,8 @@
     margin-top: auto;
     padding-top: var(--space-3);
     color: var(--text-secondary);
-    font-size: 10px;
-    font-weight: 500;
+    font-size: var(--text-2xs);
+    font-weight: var(--weight-medium);
     letter-spacing: 0.06em;
     text-transform: uppercase;
     white-space: nowrap;
@@ -594,7 +594,7 @@
 
 .settings-app h2 {
     margin-bottom: var(--space-2);
-    font-weight: 400;
+    font-weight: var(--weight-regular);
 }
 
 .settings-card {
@@ -612,7 +612,7 @@
 }
 
 .settings-label {
-    font-weight: 500;
+    font-weight: var(--weight-medium);
 }
 
 .settings-row .hint,

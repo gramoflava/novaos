@@ -142,7 +142,7 @@ class ScoreManager {
                 .score-prompt-result--win, .score-prompt-result--loss { margin-bottom: 8px; }
                 .score-prompt-result--win { color: var(--success); }
                 .score-prompt-result--loss { color: var(--danger); }
-                .score-prompt-score { margin-bottom: 24px; color: var(--text); font-size: 48px; font-weight: 300; text-shadow: var(--shadow-sm); }
+                .score-prompt-score { margin-bottom: 24px; color: var(--text); font-size: 48px; font-weight: var(--weight-regular); text-shadow: var(--shadow-sm); }
                 .score-prompt-copy { margin-bottom: 16px; color: var(--text-secondary); font-size: 14px; }
                 .score-prompt-input { width: 100px; margin-bottom: 24px; padding: 8px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); outline: none; background: var(--glass-hover); box-shadow: var(--glass-edge); color: var(--text); text-align: center; text-transform: uppercase; font-size: 24px; letter-spacing: 4px; }
                 .score-prompt-save { padding: 12px 24px; font-size: 16px; }

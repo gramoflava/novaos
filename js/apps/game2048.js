@@ -47,7 +47,7 @@ Apps.register({
                 <div class="grid-2048" id="grid-${winId}">
                     <div class="grid-bg">${bgGrid}</div>
                     <div id="tiles-${winId}"></div>
-                    <div id="gameover-${winId}" style="position: absolute; top:0; left:0; width:100%; height:100%; background: color-mix(in srgb, var(--bg) 75%, transparent); color: white; display: none; align-items: center; justify-content: center; font-size: 32px; font-weight: bold; z-index: 20; backdrop-filter: blur(var(--blur-panel));">Game Over</div>
+                    <div id="gameover-${winId}" style="position: absolute; top:0; left:0; width:100%; height:100%; background: color-mix(in srgb, var(--bg) 75%, transparent); color: white; display: none; align-items: center; justify-content: center; font-size: 32px; font-weight: var(--weight-semibold); z-index: 20; backdrop-filter: blur(var(--blur-panel));">Game Over</div>
                 </div>
                 <div class="game-caption">
                     <span class="game-caption__goal">Merge equal tiles · reach 2048</span>

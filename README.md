@@ -64,4 +64,4 @@ desktop interaction model.
 
 ## 📜 License
 
-MIT License - feel free to fork, explore, and expand your own universe.
+[Unlicense](LICENSE): public domain. Fork, explore, and expand your own universe.

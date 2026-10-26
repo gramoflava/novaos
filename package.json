@@ -15,7 +15,7 @@
     "glassmorphism"
   ],
   "author": "",
-  "license": "MIT",
+  "license": "Unlicense",
   "devDependencies": {
     "eslint": "^8.57.0",
     "prettier": "^3.2.5"

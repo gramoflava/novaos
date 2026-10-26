@@ -15,7 +15,7 @@ Apps.register({
             /* Room for 999.9 from the start, so the clock never pushes the toolbar. */
             .ms-time { min-width: calc(5ch + 2 * var(--space-2) + 6px); }
             .ms-grid { --ms-cell-size: 32px; display: grid; flex: none; gap: 2px; padding: 12px; background: var(--surface-sunk); border-radius: var(--radius-md); border: 1px solid var(--line-strong); box-shadow: var(--glass-edge); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-            .ms-cell { width: var(--ms-cell-size); height: var(--ms-cell-size); background: var(--surface-sunk); border-radius: var(--radius-xs); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: clamp(12px, calc(var(--ms-cell-size) * 0.5), 16px); cursor: pointer; touch-action: manipulation; transition: background 0.1s, transform 0.1s; color: var(--text); -webkit-tap-highlight-color: transparent; }
+            .ms-cell { width: var(--ms-cell-size); height: var(--ms-cell-size); background: var(--surface-sunk); border-radius: var(--radius-xs); display: flex; align-items: center; justify-content: center; font-weight: var(--weight-semibold); font-size: clamp(12px, calc(var(--ms-cell-size) * 0.5), 16px); cursor: pointer; touch-action: manipulation; transition: background 0.1s, transform 0.1s; color: var(--text); -webkit-tap-highlight-color: transparent; }
             .ms-cell.is-pressing { background: var(--glass-hover); transform: scale(0.96); }
             @media (hover: hover) and (pointer: fine) {
                 .ms-cell:hover { background: var(--glass-hover); }

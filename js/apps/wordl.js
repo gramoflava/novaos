@@ -16,7 +16,7 @@ Apps.register({
             .wl-board-wrap { flex-grow: 1; display: flex; justify-content: center; align-items: center; overflow: hidden; padding: 16px; }
             .wl-board { display: grid; gap: 6px; }
             .wl-row { display: grid; gap: 6px; }
-            .wl-cell { width: var(--cell-size, 50px); height: var(--cell-size, 50px); border: 2px solid var(--glass-hover); border-radius: var(--radius-sm); display: flex; justify-content: center; align-items: center; font-size: calc(var(--cell-size, 50px) * 0.45); font-weight: 700; text-transform: uppercase; transition: all 0.3s ease; }
+            .wl-cell { width: var(--cell-size, 50px); height: var(--cell-size, 50px); border: 2px solid var(--glass-hover); border-radius: var(--radius-sm); display: flex; justify-content: center; align-items: center; font-size: calc(var(--cell-size, 50px) * 0.45); font-weight: var(--weight-semibold); text-transform: uppercase; transition: all 0.3s ease; }
             .wl-cell.filled { border-color: var(--line-strong); }
             .wl-cell.correct { background-color: #22C55E; border-color: #22C55E; color: #fff; }
             .wl-cell.present { background-color: #EAB308; border-color: #EAB308; color: #fff; }
