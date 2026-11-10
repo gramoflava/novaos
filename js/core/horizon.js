@@ -79,9 +79,10 @@ class Horizon {
         return -44;
     }
 
-    // The flight console's outline (fractions of the view): top edge just
-    // under the dash lip, wider toward the pilot.
-    static get CONSOLE() { return [[0.32, 0.705], [0.68, 0.705], [0.71, 0.96], [0.29, 0.96]]; }
+    // The flight console's outline (fractions of the view): it rises a little
+    // above the dash lip and runs out of the bottom of the view, wider toward
+    // the pilot.
+    static get CONSOLE() { return [[0.32, 0.66], [0.68, 0.66], [0.722, 1.04], [0.278, 1.04]]; }
 
     // log10 of how many home seconds pass per cockpit second: for a static
     // observer, dt_home/dτ = 1/√(1 − rs/r).
@@ -483,8 +484,8 @@ class Horizon {
     }
 
     // Pilot's view. The whole window is the outside, ray-traced; the craft is
-    // only its white wireframe — the same lines as the ship in the game — and
-    // the few readouts sit small in the corners.
+    // only its white wireframe — a glass-fronted cockpit, the hull's nose
+    // running out ahead below — and the few readouts sit small on the console.
     drawView(t) {
         const P = Horizon.P;
         const ctx = this.view.getContext('2d');
@@ -538,11 +539,23 @@ class Horizon {
         }
 
         // ── The craft: a white wireframe cockpit ──
-        ctx.drawImage(this.cockpitFrame(W, H, u), 0, 0);
+        // Inside the horizon the tide grows as 1/r³: it stretches the craft
+        // along the fall — the line of sight — and squeezes it across, so
+        // the hull closes in around the pilot.
+        const tide = h.tide || 0;
+        ctx.save();
+        if (tide > 0) {
+            const k = 1 - 0.15 * tide;
+            ctx.translate(W / 2, H * 0.42);
+            ctx.scale(k, k);
+            ctx.translate(-W / 2, -H * 0.42);
+        }
+        ctx.drawImage(this.cockpitFrame(W, H, u), -Horizon.HULL_MARGIN * W, -Horizon.HULL_MARGIN * H);
         this.drawInstruments(ctx, W, H, u, t, outside);
 
         // ── Readouts, on the console ──
         this.drawConsole(ctx, W, H, u, t, fall);
+        ctx.restore();
     }
 
     // Distance and status on the left of the console; thrust and the shift of
@@ -555,8 +568,8 @@ class Horizon {
         const alarm = h.falling || h.strain > 0.7;
         ctx.save();
         // left column
-        // content block (~56u tall) centred in the console (y 0.705…0.96 of H)
-        const lx = W * 0.335, top = H * 0.8325 - 34 * u;
+        // content block (~70u tall) centred in the visible console (y 0.66…1 of H)
+        const lx = W * 0.335, top = H * 0.8325 - 41 * u;
         ctx.textAlign = 'left';
         ctx.fillStyle = dim; ctx.font = mono(8.5);
         ctx.fillText('DISTANCE', lx, top + 20 * u);
@@ -580,74 +593,88 @@ class Horizon {
         sg.addColorStop(0, '#6b8cff'); sg.addColorStop(0.5, '#e8ecf8'); sg.addColorStop(1, '#ff4a2a');
         ctx.globalAlpha = 0.7; ctx.fillStyle = sg; ctx.fillRect(rx, top + 51 * u, bw, 2 * u); ctx.globalAlpha = 1;
         ctx.fillStyle = '#fff'; ctx.fillRect(rx + bw * shift - 1 * u, top + 48 * u, 2 * u, 8 * u);
+        // what the pilot weighs while holding; in free fall nothing, only the tide
+        ctx.fillStyle = dim; ctx.font = mono(8.5);
+        ctx.fillText(h.loadLabel, rx, top + 70 * u);
+        ctx.textAlign = 'right';
+        ctx.fillStyle = h.falling ? warn : calm;
+        ctx.fillText(h.load, rx + bw, top + 70 * u);
+        ctx.textAlign = 'left';
         // caution light, top right of the console, only in the fall
         if (h.falling && Math.floor(t * 4) % 2 === 0) {
             ctx.fillStyle = warn; ctx.shadowColor = warn; ctx.shadowBlur = 10 * u;
-            ctx.beginPath(); ctx.arc(W * 0.665, H * 0.705 + 12 * u, 3 * u, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(W * 0.665, H * 0.66 + 12 * u, 3 * u, 0, Math.PI * 2); ctx.fill();
         }
         ctx.restore();
     }
 
-    // The cockpit as white lines, built once per size: overhead panel, a
-    // front pane narrowing toward the dash, two pillars, side panes, and the
-    // dash lip below. Surfaces are a dark veil, edges white; both fade toward
-    // the middle of the view and grow stronger toward the corners, so the
-    // frame reads without getting in the way.
+    static get HULL_MARGIN() { return 0.12; }
+
+    // Cockpit geometry, in fractions of the view. The front of the craft is
+    // glass: one wide canopy with nothing solid above the dash. What frames
+    // the view is little — a slim pillar far out on each side, a bow overhead,
+    // the dash curving round the pilot, and the console standing up from it.
+    static get HULL() {
+        // the dash lip: a shallow arc, lowest at the sides
+        const dashY = x => { const t = (x + 0.02) / 1.04; return 0.83 - 0.56 * t * (1 - t); };
+        const footL = [0.10, dashY(0.10)], footR = [0.90, dashY(0.90)];
+        const headL = [-0.07, -0.10], headR = [1.07, -0.10];      // the pillars leave the view at the top
+        return { dashY, footL, footR, headL, headR };
+    }
+
+    // The cockpit as white lines, built once per size. Surfaces are a dark
+    // veil, edges white; both fade toward the middle of the view and grow
+    // stronger toward the corners, so the frame reads without getting in the
+    // way.
     cockpitFrame(W, H, u) {
-        if (this.frameCache && this.frameCache.width === W && this.frameCache.height === H) return this.frameCache;
+        // Drawn with a margin all round (HULL_MARGIN of the view): when the
+        // tide squeezes the frame, there is still hull past the view's edges.
+        const M = Horizon.HULL_MARGIN;
+        const cw = Math.round(W * (1 + 2 * M)), ch = Math.round(H * (1 + 2 * M));
+        if (this.frameCache && this.frameCache.width === cw && this.frameCache.height === ch) return this.frameCache;
         const c = this.frameCache || document.createElement('canvas');
-        c.width = W; c.height = H;
+        c.width = cw; c.height = ch;
         const g = c.getContext('2d');
-        g.clearRect(0, 0, W, H);
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        g.clearRect(0, 0, cw, ch);
+        g.translate(M * W, M * H);
+        const G = Horizon.HULL;
         const P = (x, y) => [x * W, y * H];
-        // Every sill/strut foot lies on this same straight dash edge. Keeping
-        // the joins derived avoids a bend that isn't attached to any member.
-        const sillY = x => 0.8 - 0.14 * Math.min(x, 1 - x) / 0.385;
-        const roofY = x => 0.04 + (x + 0.02) / 0.275 * 0.12;
-        // key points (fractions of the view)
-        const tl = P(0.29, 0.17), tr = P(0.71, 0.17);      // front pane, top corners
-        const bl = P(0.385, 0.66), br = P(0.615, 0.66);     // front pane, bottom corners
+        const Q = pt => P(pt[0], pt[1]);
         const veil = 'rgba(6, 8, 14, 0.72)';
         const poly = (pts, fill) => {
             g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
             for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
             g.closePath(); g.fillStyle = fill; g.fill();
         };
-        const pw = 0.035;                                   // pillar width, in W
-        // A restrained dichroic coating: broad, transparent reflections on the
-        // glass, and a narrow coloured bevel beside each white structural edge.
-        const glass = g.createLinearGradient(W * 0.24, H * 0.1, W * 0.78, H * 0.8);
-        glass.addColorStop(0, 'rgba(145,225,255,0.045)');
-        glass.addColorStop(0.37, 'rgba(230,245,255,0.008)');
-        glass.addColorStop(0.58, 'rgba(202,166,255,0.035)');
-        glass.addColorStop(1, 'rgba(151,235,230,0.015)');
-        poly([tl, tr, br, bl], glass);
-        poly([P(0, 0.04), tl, bl, P(0, 0.8)], glass);
-        poly([tr, P(1, 0.04), P(1, 0.8), br], glass);
-        // overhead panel
-        poly([P(-0.02, -0.02), P(1.02, -0.02), P(1.02, 0.04), tr, tl, P(-0.02, 0.04)], veil);
-        // pillars (front pane edges), thick at the top, thinner at the dash
-        poly([tl, P(0.255, 0.16), P(0.3675, sillY(0.3675)), bl], veil);
-        poly([tr, P(0.745, 0.16), P(0.6325, sillY(0.6325)), br], veil);
-        // side-pane struts from the overhead corners down to the sills
-        // (they run from the overhead edge down to the dash lip, so they meet
-        // the rest of the frame instead of floating across it)
-        poly([P(0.085, roofY(0.085)), P(0.115, roofY(0.115)), P(0.055, sillY(0.055)), P(0.025, sillY(0.025))], veil);
-        poly([P(0.915, roofY(0.085)), P(0.885, roofY(0.115)), P(0.945, sillY(0.945)), P(0.975, sillY(0.975))], veil);
-        // dash: lip from the sides to the bottom of the front pane, console below
-        poly([P(0, 0.8), bl, br, P(1, 0.8), P(1, 1), P(0, 1)], veil);
+        // the dash lip as points, running on past both edges of the view
+        const lip = [];
+        for (let i = 0; i <= 40; i++) { const x = -0.02 + 1.04 * i / 40; lip.push(P(x, G.dashY(x))); }
+        const lipWide = [P(-0.3, 0.97), ...lip, P(1.3, 0.97)];
+
+        // A restrained dichroic coating over the whole canopy.
+        const glass = g.createLinearGradient(W * 0.1, 0, W * 0.9, H * 0.8);
+        glass.addColorStop(0, 'rgba(145,225,255,0.04)');
+        glass.addColorStop(0.4, 'rgba(230,245,255,0.006)');
+        glass.addColorStop(0.62, 'rgba(202,166,255,0.03)');
+        glass.addColorStop(1, 'rgba(151,235,230,0.012)');
+        poly([P(-0.3, -0.12), P(1.3, -0.12), ...lipWide.slice().reverse()], glass);
+        // pillars: slim, and far out
+        const thick = 0.016;
+        poly([Q(G.headL), Q(G.footL), P(G.footL[0] - thick, G.dashY(G.footL[0] - thick)), P(G.headL[0] - thick, G.headL[1])], veil);
+        poly([Q(G.headR), Q(G.footR), P(G.footR[0] + thick, G.dashY(G.footR[0] + thick)), P(G.headR[0] + thick, G.headR[1])], veil);
+        // dash and everything below it
+        poly([...lipWide, P(1.3, 1.3), P(-0.3, 1.3)], veil);
         // the flight console: the readouts live here, on a dark inset display
         const panel = Horizon.CONSOLE.map(([x, y]) => P(x, y));
-        const panelGlass = g.createLinearGradient(0, H * 0.705, 0, H * 0.96);
+        const panelGlass = g.createLinearGradient(0, H * 0.66, 0, H * 1.0);
         panelGlass.addColorStop(0, 'rgba(144,194,228,0.07)');
         panelGlass.addColorStop(1, 'rgba(8,14,24,0.6)');
         poly(panel, panelGlass);
 
         // edges
         g.lineCap = 'round'; g.lineJoin = 'round';
-        const edge = (pts, a, w) => {
-            g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
-            for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
+        const stroke = (a, w) => {
             const tint = g.createLinearGradient(0, 0, W, H);
             tint.addColorStop(0, `rgba(123,219,255,${a * 0.45})`);
             tint.addColorStop(0.48, `rgba(207,179,255,${a * 0.3})`);
@@ -655,25 +682,30 @@ class Horizon {
             g.strokeStyle = tint; g.lineWidth = (w + 2) * u; g.stroke();
             g.strokeStyle = `rgba(235, 240, 255, ${a})`; g.lineWidth = w * u; g.stroke();
         };
-        edge([tl, tr, br, bl, tl], 0.9, 1.3);                                  // front pane
-        edge([P(0.255, 0.16), P(0.3675, sillY(0.3675))], 0.7, 1.1);
-        edge([P(0.745, 0.16), P(0.6325, sillY(0.6325))], 0.7, 1.1);
-        edge([P(-0.02, 0.04), [tl[0] - pw * W, tl[1] - 0.01 * H]], 0.7, 1.1);  // overhead
-        edge([P(1.02, 0.04), [tr[0] + pw * W, tr[1] - 0.01 * H]], 0.7, 1.1);
-        edge([P(0.1, roofY(0.1)), P(0.04, sillY(0.04))], 0.6, 1.1);           // side struts
-        edge([P(0.9, roofY(0.1)), P(0.96, sillY(0.96))], 0.6, 1.1);
-        edge([P(0, 0.8), bl, br, P(1, 0.8)], 0.8, 1.2);                      // unbroken dash lip
-        edge([...panel, panel[0]], 0.65, 0.9);                               // inset flight console
-        edge([P(0.5225, 0.725), P(0.5225, 0.935)], 0.22, 0.7);              // its two columns
-        // overhead warning strip: four small empty panels
-        for (let i = 0; i < 4; i++) {
-            const x0 = 0.33 + i * 0.087;
-            edge([P(x0, 0.07), P(x0 + 0.075, 0.07), P(x0 + 0.075, 0.12), P(x0, 0.12), P(x0, 0.07)], 0.35, 0.9);
-        }
-        // a few ribs on the overhead, for scale
-        for (let i = 0; i < 14; i++) {
-            const x = 0.35 + i * 0.022;
-            edge([P(x, 0.015), P(x, 0.04)], 0.3, 0.8);
+        const edge = (pts, a, w) => {
+            g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
+            for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
+            stroke(a, w);
+        };
+        const arc = (from, ctrl, to, a, w) => {
+            g.beginPath(); g.moveTo(from[0], from[1]); g.quadraticCurveTo(ctrl[0], ctrl[1], to[0], to[1]);
+            stroke(a, w);
+        };
+        edge([Q(G.headL), Q(G.footL)], 0.85, 1.2);                                              // pillars
+        edge([Q(G.headR), Q(G.footR)], 0.85, 1.2);
+        edge([P(G.headL[0] - thick, G.headL[1]), P(G.footL[0] - thick, G.dashY(G.footL[0] - thick))], 0.5, 0.9);
+        edge([P(G.headR[0] + thick, G.headR[1]), P(G.footR[0] + thick, G.dashY(G.footR[0] + thick))], 0.5, 0.9);
+        arc(P(-0.12, 0.15), P(0.5, 0.035), P(1.12, 0.15), 0.5, 1.0);                             // the bow overhead
+        // dash lip, broken where the console stands in front of it
+        edge([...lipWide.filter(pt => pt[0] < 0.3145 * W), P(0.3145, G.dashY(0.3145))], 0.8, 1.2);
+        edge([P(0.6855, G.dashY(0.6855)), ...lipWide.filter(pt => pt[0] > 0.6855 * W)], 0.8, 1.2);
+        edge([panel[3], panel[0], panel[1], panel[2]], 0.65, 0.9);                               // flight console: top and sides
+        edge([P(0.5225, 0.69), P(0.5225, 0.975)], 0.22, 0.7);                                   // its two columns
+        // station marks along the dash lip, for scale
+        for (let i = 0; i < 6; i++) {
+            const x = 0.725 + i * 0.027;
+            edge([P(x, G.dashY(x)), P(x, G.dashY(x) + 0.012)], 0.3, 0.8);
+            edge([P(1 - x, G.dashY(x)), P(1 - x, G.dashY(x) + 0.012)], 0.3, 0.8);
         }
 
         // fade toward the middle, stronger toward the corners
@@ -682,7 +714,7 @@ class Horizon {
         m.addColorStop(0, 'rgba(0,0,0,0.12)');
         m.addColorStop(0.45, 'rgba(0,0,0,0.45)');
         m.addColorStop(1, 'rgba(0,0,0,1)');
-        g.fillStyle = m; g.fillRect(0, 0, W, H);
+        g.fillStyle = m; g.fillRect(-M * W, -M * H, cw, ch);
         // The console is a physical dark inset, not another window: exterior
         // light should not show straight through its instrument display.
         g.globalCompositeOperation = 'destination-over';
@@ -699,33 +731,24 @@ class Horizon {
         // The forward pane remains clear; the moving highlight is a coating,
         // not a second bright black hole floating over the pilot's view.
         if (outside) {
+            const G = Horizon.HULL;
             ctx.save(); ctx.beginPath();
-            ctx.moveTo(0, H * 0.06); ctx.lineTo(W * 0.255, H * 0.16);
-            ctx.lineTo(W * 0.3675, H * (0.8 - 0.14 * 0.3675 / 0.385)); ctx.lineTo(0, H * 0.8); ctx.closePath();
-            ctx.moveTo(W, H * 0.06); ctx.lineTo(W * 0.745, H * 0.16);
-            ctx.lineTo(W * 0.6325, H * (0.8 - 0.14 * 0.3675 / 0.385)); ctx.lineTo(W, H * 0.8); ctx.closePath();
+            // outboard of the pillars, where the glass turns away from the pilot
+            ctx.moveTo(-0.12 * W, -0.12 * H); ctx.lineTo(G.headL[0] * W, G.headL[1] * H); ctx.lineTo(G.footL[0] * W, G.footL[1] * H); ctx.lineTo(-0.12 * W, 0.9 * H); ctx.closePath();
+            ctx.moveTo(1.12 * W, -0.12 * H); ctx.lineTo(G.headR[0] * W, G.headR[1] * H); ctx.lineTo(G.footR[0] * W, G.footR[1] * H); ctx.lineTo(1.12 * W, 0.9 * H); ctx.closePath();
             ctx.clip();
             ctx.globalAlpha = 0.035 + 0.012 * Math.sin(t * 0.37);
             ctx.translate(W, 0); ctx.scale(-1, 1);
             ctx.drawImage(outside, -W * 0.08 + W * 0.025 * Math.sin(t * 0.18), H * 0.025, W * 1.16, H * 0.94);
             ctx.restore();
         }
-        // The four existing overhead panels wake gradually as the engine
-        // works harder. A short, deterministic dropout is a warning, not noise
-        // on the home clock (which remains an honest physics readout).
-        const pulse = h.dropout ? 0.2 : 1;
+        const HULL = Horizon.HULL;
         const warm = h.strain;
-        for (let i = 0; i < 4; i++) {
-            const x = (0.33 + i * 0.087) * W;
-            const level = Math.max(0, Math.min(1, h.thrust * 1.2 - i * 0.17));
-            ctx.fillStyle = h.falling || (warm > 0.65 && i > 1) ? `rgba(255,139,110,${0.24 * pulse})` : `rgba(163,215,255,${0.12 * pulse})`;
-            ctx.fillRect(x + 5 * u, H * 0.095, W * 0.06 * level, 2 * u);
-        }
         // A changing reflection, faint and clipped to the front pane. It lends
         // the frame glassiness without bloom/post-processing on the ray image.
         ctx.save();
-        ctx.beginPath(); ctx.moveTo(W * 0.29, H * 0.17); ctx.lineTo(W * 0.71, H * 0.17);
-        ctx.lineTo(W * 0.615, H * 0.66); ctx.lineTo(W * 0.385, H * 0.66); ctx.closePath(); ctx.clip();
+        ctx.beginPath(); ctx.moveTo(HULL.headL[0] * W, HULL.headL[1] * H); ctx.lineTo(HULL.headR[0] * W, HULL.headR[1] * H);
+        ctx.lineTo(HULL.footR[0] * W, HULL.footR[1] * H); ctx.lineTo(HULL.footL[0] * W, HULL.footL[1] * H); ctx.closePath(); ctx.clip();
         const x = W * (0.36 + 0.035 * Math.sin(t * 0.22));
         const sheen = ctx.createLinearGradient(x, 0, x + W * 0.16, H * 0.2);
         sheen.addColorStop(0, 'rgba(190,230,255,0)');
@@ -759,6 +782,23 @@ class Horizon {
         const x = falling && !inside ? fs.x : this.logR1(t);
         const radius = inside ? `r = ${fs.r.toFixed(3)} rs`
             : x > -3 ? `r = ${(1 + Math.pow(10, x)).toFixed(5)} rs` : `r = (1 + 10${this.sup(Math.round(x))}) rs`;
+        // Proper acceleration of a craft held still at r, for a hole of ten
+        // solar masses (rs ≈ 29.5 km): a = c²/(2rs) / (ρ²√(1 − 1/ρ)), ρ = r/rs;
+        // c²/(2rs) ≈ 1.55·10¹¹ g. It has no upper bound as ρ → 1. In free fall
+        // the pilot weighs nothing; what is left is the tide, the difference
+        // in pull across the craft, 2GM/r³ ≈ 1.05·10⁷ g per metre at the
+        // horizon and growing as 1/ρ³ inside.
+        const pow10 = v => `10${this.sup(Math.round(v))}`;
+        let load, loadLabel = 'LOAD', tide = 0;
+        if (!falling) {
+            const lrho = Math.log10(1 + Math.pow(10, x));
+            load = `${pow10(11.19 - 2 * lrho - 0.5 * (x - lrho))} g`;
+        } else if (!inside) {
+            load = '0 g';
+        } else {
+            loadLabel = 'TIDE'; load = `${pow10(7.02 - 3 * Math.log10(fs.r))} g/m`;
+            tide = Math.pow(this.s(1 - fs.r, 0.2, 1), 2);
+        }
         const strain = this.s(t, P.geomEnd + 3, P.hoverEnd);
         const dropout = !falling && ((t > 25.1 && t < 25.3) || (t > 32.7 && t < 33.05) || (t > 36.5 && t < 36.95));
         const thrust = falling ? Math.max(0, 0.45 - (t - P.hoverEnd) * 0.5) * (Math.sin(t * 37) > -0.3 ? 1 : 0) : (0.5 + 0.48 * hold) * (dropout ? 0.84 : 1);
@@ -767,7 +807,7 @@ class Horizon {
             thrust,
             falling,
             strain, dropout,
-            radius,
+            radius, load, loadLabel, tide,
             status: falling ? (inside ? 'inside the horizon' : 'engine failure') : dropout ? 'thrust instability' : strain > 0.7 ? 'holding · engine at limit' : t < P.geomEnd ? 'descending' : 'holding position'
         };
     }

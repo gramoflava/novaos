@@ -46,7 +46,11 @@
 
 .nova-island:hover {
     background: var(--glass-hover);
-    transform: scale(1.02);
+}
+
+.island-clock {
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
 }
 
 .island-left, .island-center, .island-right {
@@ -82,7 +86,14 @@
     height: 30px;
     padding: 0;
     border-radius: var(--radius-pill);
-    transition: color 0.2s, background 0.2s;
+    transition:
+        color var(--dur-base) var(--ease-smooth),
+        background var(--dur-base) var(--ease-smooth),
+        transform var(--dur-fast) var(--ease-out);
+}
+
+.island-btn:active {
+    transform: scale(0.92);
 }
 
 .island-tools {
@@ -140,7 +151,45 @@
 .shelf-item svg {
     width: 28px;
     height: 28px;
-    transition: transform 0.2s var(--ease-spring);
+    transition: transform var(--dur-base) var(--ease-spring);
+}
+
+/* Proximity swell: --mag (0–1) is how close the pointer is (js/core/shelf.js).
+   Items grow from the baseline, like marks pressed up through the glass. */
+.shelf-item {
+    --mag: 0;
+    transform-origin: 50% 100%;
+    scale: calc(1 + var(--mag) * 0.3);
+    translate: 0 calc(var(--mag) * -5px);
+}
+
+/* The app's name, above its mark. */
+.shelf-item::before {
+    content: attr(data-label);
+    position: absolute;
+    bottom: calc(100% + var(--space-3));
+    left: 50%;
+    padding: var(--space-1) var(--space-3);
+    translate: -50% 4px;
+    border: 1px solid var(--tooltip-line);
+    border-radius: var(--radius-pill);
+    background: var(--tooltip-bg);
+    box-shadow: var(--shadow-md);
+    color: var(--tooltip-text);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    line-height: var(--leading-tight);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+        opacity var(--dur-fast) var(--ease-smooth),
+        translate var(--dur-base) var(--ease-out);
+}
+
+.shelf-item:hover::before {
+    opacity: 1;
+    translate: -50% 0;
 }
 
 .spotlight-item .app-mark {
@@ -151,11 +200,10 @@
 .shelf-item:hover {
     background: var(--glass-hover);
     border: 1px solid var(--line);
-    transform: translateY(-8px) scale(1.1);
 }
 
-.shelf-item:active {
-    transform: translateY(-4px) scale(0.95);
+.shelf-item:active svg {
+    transform: scale(0.86);
 }
 
 .shelf-item::after {
@@ -171,13 +219,15 @@
 }
 
 .shelf-item.is-running::after {
-    opacity: 0.5;
+    opacity: 0.85;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
 }
 
 .shelf-item.is-active::after {
     opacity: 1;
     background: var(--accent);
-    box-shadow: var(--shadow-sm);
+    box-shadow: 0 0 12px var(--accent);
 }
 
 .shelf-divider {
@@ -216,10 +266,14 @@
     animation: slideDown var(--dur-base) var(--ease-spring);
 }
 
-.spotlight-input {
+/* Scoped under the modal so the bare search field outranks the family's
+   boxed text input. */
+.spotlight-modal .spotlight-input {
     width: 100%;
     background: transparent;
     border: none;
+    border-radius: var(--radius-none);
+    box-shadow: none;
     padding: 24px 32px;
     font-family: var(--font-sans);
     font-size: var(--nova-text-spotlight);
@@ -249,6 +303,10 @@
 
 .spotlight-item:hover, .spotlight-item.selected {
     background: var(--glass-hover);
+}
+
+.spotlight-item:first-child {
+    background: var(--accent-soft);
 }
 
 @keyframes slideDown {
@@ -285,6 +343,7 @@
 
 .context-item:hover {
     background: var(--accent);
+    color: var(--text-on-accent);
 }
 
 .context-separator {
@@ -753,7 +812,11 @@
         display: none;
     }
 
+    .nova-shelf.tabbar .shelf-item::before { display: none; }
+
     .nova-shelf.tabbar .shelf-item {
+        scale: none;
+        translate: none;
         flex: 0 0 48px;
         width: 48px;
         height: 48px;

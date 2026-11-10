@@ -9,6 +9,26 @@
   --nova-text-stat:      18px;   /* app stat values */
   --nova-text-code:      24px;   /* score-code entry */
   --nova-text-spotlight: 28px;   /* spotlight search field */
+
+  /* The sky leans with the camera; this much of it waits past each edge. */
+  --nova-sky-room: 56px;
+
+  /* Black holes: the void, and an accretion disc from deep red to white-hot. */
+  --nova-void:    #04050a;
+  --nova-bh-deep: #b32400;
+  --nova-bh-warm: #ff6a00;
+  --nova-bh-hot:  #ffd27a;
+  --nova-bh-glare: #fff4d6;
+  --nova-bh-size: 150px;
+
+  /* Physical clocks. */
+  --nova-dur-shock: 560ms;    /* the shock front crossing its reach */
+  --nova-dur-settle: 600ms;   /* springs coming to rest */
+}
+
+.nova-sky {
+  inset: calc(-1 * var(--nova-sky-room));
+  will-change: transform;
 }
 
 * {
@@ -44,38 +64,15 @@ body {
   -webkit-text-fill-color: transparent;
 }
 
+/* The starfield (js/core/starfield.js): parallax, twinkle, lensing. */
 .stars-overlay {
   position: absolute;
-  inset: -50%;
-  z-index: -1;
+  inset: var(--nova-sky-room);
+  width: calc(100% - 2 * var(--nova-sky-room));
+  height: calc(100% - 2 * var(--nova-sky-room));
   pointer-events: none;
-  background-image:
-    radial-gradient(1.5px 1.5px at 20px 30px, var(--text-secondary), transparent),
-    radial-gradient(2px 2px at 50px 80px, var(--text), transparent),
-    radial-gradient(1px 1px at 90px 40px, var(--text-muted), transparent),
-    radial-gradient(2.5px 2.5px at 160px 120px, var(--accent-hover), transparent),
-    radial-gradient(1px 1px at 200px 50px, var(--nova-accent-alt), transparent),
-    radial-gradient(1.5px 1.5px at 270px 170px, var(--text-secondary), transparent);
-  background-repeat: repeat;
-  background-size: 400px 400px;
-  animation: slow-star-drift 100s linear infinite;
 }
 
-.theme-light .stars-overlay {
-  display: none;
-}
-
-@media (prefers-color-scheme: light) {
-  :root:not(.theme-dark) .stars-overlay {
-    display: none;
-  }
-}
-
-@keyframes slow-star-drift {
-  to {
-    transform: translateY(400px);
-  }
-}
 
 .noise-overlay {
   position: absolute;
@@ -105,6 +102,7 @@ body {
   height: 96px;
   margin-bottom: var(--space-10);
   animation: pulse 2s infinite alternate;
+  filter: drop-shadow(0 0 28px color-mix(in srgb, var(--accent) 45%, transparent));
 }
 
 .boot-logo img {

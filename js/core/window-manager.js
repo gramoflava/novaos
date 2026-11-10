@@ -6,7 +6,9 @@ class WindowManagerClass {
         this.container.style.transformOrigin = '0 0'; // Simplifies zoom math
         this.activeWindowId = null;
         this.zIndexCounter = 100;
-        this.activeBlackHoles = new Map();
+        this.activeBlackHoles = new Map();   // window id -> hole element (shared when merged)
+        this.holeCounter = 0;
+        this.holes = new Map();              // hole element -> { el, x, y, hue, members: [window ids] }
         this.remnantCounter = 0;
         this.activeRemnants = new Set();
         this.mobileQuery = window.matchMedia('(max-width: 640px)');
@@ -18,17 +20,15 @@ class WindowManagerClass {
         this.isPanning = false;
         this.panStartX = 0;
         this.panStartY = 0;
+        // Camera motion: a fling after a pan, or a spring toward a target.
+        this.camVX = 0;
+        this.camVY = 0;
+        this.camTarget = null;
 
         // Off-screen indicators
         this.indicatorsContainer = document.createElement('div');
         this.indicatorsContainer.id = 'window-indicators';
-        this.indicatorsContainer.style.position = 'absolute';
-        this.indicatorsContainer.style.top = '0';
-        this.indicatorsContainer.style.left = '0';
-        this.indicatorsContainer.style.width = '100%';
-        this.indicatorsContainer.style.height = '100%';
-        this.indicatorsContainer.style.pointerEvents = 'none';
-        this.indicatorsContainer.style.zIndex = '8000';
+        this.indicatorsContainer.className = 'window-indicators';
         document.getElementById('desktop').appendChild(this.indicatorsContainer);
 
         // Black Hole Preview Tooltip
@@ -40,13 +40,24 @@ class WindowManagerClass {
         this.backgroundLayer = document.getElementById('nova-background');
 
         this.desktopContentStyle = getComputedStyle(document.getElementById('desktop'));
+        this.physics = window.NovaPhysics;
+        this.physics.camera = { step: (dt) => this.stepCamera(dt) };
+        this.physics.holes = () => this.holeList();
+        this.physics.onCapture = (id, hole) => this.swallow(id, hole);
+        this.physics.onImpact = (speed) => this.bump(speed);
+        this.lastBump = 0;
+
         this.initCanvasControls();
         this.startIndicatorsLoop();
         this.mobileQuery.addEventListener('change', () => {
+            this.stopCamera();
             if (this.isMobile()) {
                 this.cameraX = 0;
                 this.cameraY = 0;
                 this.cameraZ = 1;
+            } else {
+                this.windows.forEach(w => this.physics.resync(w.id));
+                this.physics.wakeAll();
             }
             this.applyCameraTransform();
             if (this.activeWindowId) this.focus(this.activeWindowId);
@@ -119,21 +130,9 @@ class WindowManagerClass {
                 shownKey = key;
                 this.indicatorsContainer.replaceChildren(...markers.map(({ x, y, game }) => {
                     const ind = document.createElement('div');
-                    ind.style.position = 'absolute';
+                    ind.className = game ? 'window-indicator window-indicator--game' : 'window-indicator';
                     ind.style.left = x + 'px';
                     ind.style.top = y + 'px';
-                    ind.style.width = '6px';
-                    ind.style.height = '6px';
-                    ind.style.background = 'var(--text)';
-                    ind.style.boxShadow = '0 0 12px var(--text)';
-                    ind.style.borderRadius = '50%';
-                    ind.style.transform = 'translate(-50%, -50%)';
-                    ind.style.transition = 'opacity 0.2s';
-
-                    if (game) {
-                        ind.style.background = 'var(--accent)';
-                        ind.style.boxShadow = '0 0 12px var(--accent)';
-                    }
                     return ind;
                 }));
             }
@@ -186,6 +185,8 @@ class WindowManagerClass {
             // A click on empty space means "no window": keys stop going to the
             // last app (the cheat code's arrows used to start Columns).
             if (this.activeWindowId) this.releaseFocus(this.activeWindowId);
+            this.stopCamera();
+            this.panT = performance.now();
             this.isPanning = true;
             document.body.classList.add('is-dragging');
             this.panStartX = e.clientX - this.cameraX;
@@ -204,8 +205,17 @@ class WindowManagerClass {
                 return;
             }
 
-            this.cameraX = e.clientX - this.panStartX;
-            this.cameraY = e.clientY - this.panStartY;
+            const nx = e.clientX - this.panStartX;
+            const ny = e.clientY - this.panStartY;
+            // What the hand has been doing lately; a release keeps it.
+            const now = performance.now();
+            const dt = Math.max(0.004, (now - this.panT) / 1000);
+            const k = Math.min(1, dt / 0.04);
+            this.camVX += ((nx - this.cameraX) / dt - this.camVX) * k;
+            this.camVY += ((ny - this.cameraY) / dt - this.camVY) * k;
+            this.panT = now;
+            this.cameraX = nx;
+            this.cameraY = ny;
 
             this.applyCameraTransform();
         });
@@ -215,6 +225,9 @@ class WindowManagerClass {
                 this.isPanning = false;
                 document.body.classList.remove('is-dragging');
                 document.body.style.cursor = 'default';
+                // The desktop keeps gliding, unless the hand had stopped first.
+                if (performance.now() - this.panT > 90 || this.physics.reduced.matches) this.camVX = this.camVY = 0;
+                else this.physics.start();
             }
         });
 
@@ -226,6 +239,7 @@ class WindowManagerClass {
             if (this.isMobile()) return;
             clearTimeout(wheelTimeout);
             wheelTimeout = setTimeout(() => { wheelGestureMode = null; }, 150);
+            const stopGlide = () => this.stopCamera();
 
             // Ignore and let native scroll take over if hovering any scrollable element
             if (!e.ctrlKey) {
@@ -260,6 +274,7 @@ class WindowManagerClass {
             }
 
             e.preventDefault();
+            stopGlide();
 
             if (e.ctrlKey) {
                 // Pinch to zoom towards cursor
@@ -291,8 +306,14 @@ class WindowManagerClass {
         }
         this.container.style.transform = `translate3d(${this.cameraX}px, ${this.cameraY}px, 0) scale(${this.cameraZ})`;
         if (this.backgroundLayer) {
-            this.backgroundLayer.style.transform = `translate3d(${this.cameraX * 0.05}px, ${this.cameraY * 0.05}px, 0)`;
+            // The nebula is far away: it leans with the camera but never
+            // leaves, however far the desktop is panned.
+            const lean = (v) => (Math.tanh(v / 3000) * 48).toFixed(1);
+            this.backgroundLayer.style.transform = `translate3d(${lean(this.cameraX)}px, ${lean(this.cameraY)}px, 0)`;
         }
+        if (window.NovaStarfield) NovaStarfield.touch();
+        // The camera moved: whatever the preview was pointing at has moved too.
+        if (this.bhPreview) this.bhPreview.classList.remove('visible');
         this.activeRemnants.forEach(rem => {
             const M = 0.95 * rem.currentDepth;
             const dx = (this.cameraX - rem.initCameraX);
@@ -305,28 +326,81 @@ class WindowManagerClass {
         });
     }
 
+    // The camera travels on a critically damped spring: no overshoot, and a
+    // new target mid-flight keeps the current velocity.
     animateCameraTo(targetX, targetY) {
         if (this.isMobile()) return;
-        // Simple spring or ease animation to center camera
-        const startX = this.cameraX;
-        const startY = this.cameraY;
-        const startTime = performance.now();
-        const duration = 500; // ms
-
-        const animate = (time) => {
-            let p = (time - startTime) / duration;
-            if (p > 1) p = 1;
-            // ease-out cubic
-            const ease = 1 - Math.pow(1 - p, 3);
-
-            this.cameraX = startX + (targetX - startX) * ease;
-            this.cameraY = startY + (targetY - startY) * ease;
-
+        if (this.physics.reduced.matches) {
+            this.cameraX = targetX; this.cameraY = targetY;
             this.applyCameraTransform();
+            return;
+        }
+        this.camTarget = { x: targetX, y: targetY };
+        this.physics.start();
+    }
 
-            if (p < 1) requestAnimationFrame(animate);
-        };
-        requestAnimationFrame(animate);
+    stopCamera() {
+        this.camTarget = null;
+        this.camVX = this.camVY = 0;
+    }
+
+    // One tick of camera motion; true while it is still moving.
+    stepCamera(dt) {
+        if (this.isMobile() || this.isPanning) return false;
+        if (this.camTarget) {
+            const w = 11;   // rad/s
+            const dx = this.camTarget.x - this.cameraX, dy = this.camTarget.y - this.cameraY;
+            this.camVX += (w * w * dx - 2 * w * this.camVX) * dt;
+            this.camVY += (w * w * dy - 2 * w * this.camVY) * dt;
+            this.cameraX += this.camVX * dt;
+            this.cameraY += this.camVY * dt;
+            if (Math.hypot(dx, dy) < 0.5 && Math.hypot(this.camVX, this.camVY) < 6) {
+                this.cameraX = this.camTarget.x; this.cameraY = this.camTarget.y;
+                this.stopCamera();
+            }
+            this.applyCameraTransform();
+            return true;
+        }
+        const speed = Math.hypot(this.camVX, this.camVY);
+        if (speed < 8) { this.camVX = this.camVY = 0; return false; }
+        const f = Math.exp(-4.5 * dt);
+        this.camVX *= f; this.camVY *= f;
+        this.cameraX += this.camVX * dt;
+        this.cameraY += this.camVY * dt;
+        this.applyCameraTransform();
+        return true;
+    }
+
+    // Black holes as the physics sees them.
+    holeList() {
+        const list = [];
+        this.holes.forEach(h => { if (h.members.length) list.push(h); });
+        return list;
+    }
+
+    // A hole weighs what fell into it: a window's mass is its area.
+    holeMass(h) {
+        let m = 0;
+        h.members.forEach(id => { const b = this.physics.get(id); if (b) m += this.physics.mass(b); });
+        return Math.max(0.5, Math.min(36, m));
+    }
+
+    // Bigger windows leave bigger holes, with a longer reach.
+    syncHole(h) {
+        h.mass = this.holeMass(h);
+        // A Calculator's hole is under 1×, Minesweeper on hard about 1.7×,
+        // and a hole fed several windows passes 2× and keeps growing to 3.3×.
+        h.scale = 0.3 + 0.5 * Math.sqrt(h.mass);
+        h.el.style.setProperty('--bh-scale', h.scale.toFixed(3));
+        h.el.dataset.count = h.members.length;
+    }
+
+    // Two windows met: a soft thud, louder for harder hits.
+    bump(speed) {
+        const now = performance.now();
+        if (now - this.lastBump < 70) return;
+        this.lastBump = now;
+        if (window.AudioMng) AudioMng.play('bump', Math.min(1, speed / 1400));
     }
 
     create(options) {
@@ -388,7 +462,6 @@ class WindowManagerClass {
             const targetCameraX = (window.innerWidth / 2) - (left + width / 2) * this.cameraZ;
             const targetCameraY = (window.innerHeight / 2) - (top + height / 2) * this.cameraZ;
             this.animateCameraTo(targetCameraX, targetCameraY);
-            this.pushWindowsOut('none', {x: left, y: top, w: width, h: height});
         }
 
         const winEl = document.createElement('div');
@@ -460,6 +533,12 @@ class WindowManagerClass {
         };
 
         this.windows.set(id, winObj);
+        this.physics.add(id, winEl);
+        // Arriving displaces whatever is in the way, and nudges the rest.
+        if (!this.isMobile()) {
+            this.physics.pin(id, 500);
+            this.physics.impulse(left + width / 2, top + height / 2, 140, id, 900);
+        }
         this.setupInteractions(winObj);
 
         // Wait for next frame so animation plays
@@ -499,7 +578,9 @@ class WindowManagerClass {
 
             isDragging = true;
             document.body.classList.add('is-dragging');
+            win.el.classList.add('is-held');
             this.focus(win.id);
+            this.physics.grab(win.id, (e.clientX - this.cameraX) / this.cameraZ, (e.clientY - this.cameraY) / this.cameraZ);
 
             startClientX = e.clientX;
             startClientY = e.clientY;
@@ -523,15 +604,14 @@ class WindowManagerClass {
             const newX = startWinX + deltaX;
             const newY = startWinY + deltaY;
 
-            win.el.dataset.x = newX;
-            win.el.dataset.y = newY;
-            win.el.style.left = newX + 'px';
-            win.el.style.top = newY + 'px';
+            this.physics.dragTo(win.id, newX, newY);
         };
 
         const onMouseUp = () => {
             if (isDragging) {
                 isDragging = false;
+                win.el.classList.remove('is-held');
+                this.physics.release(win.id);
                 document.body.classList.remove('is-dragging');
                 document.body.style.cursor = 'default';
             }
@@ -581,6 +661,8 @@ class WindowManagerClass {
 
         if (this.isMobile()) {
             if (win.cleanup) win.cleanup();
+            this.leaveHole(id);
+            this.physics.remove(id);
             win.el.remove();
             this.windows.delete(id);
             if (win.appId && !Array.from(this.windows.values()).some(w => w.appId === win.appId)) {
@@ -594,34 +676,44 @@ class WindowManagerClass {
         }
 
         if (win.cleanup) win.cleanup();
+        this.leaveHole(id);
 
-        // Physics and visuals chain
+        const body = this.physics.get(id);
+        if (body) { body.ghost = true; body.held = false; body.asleep = true; }
+
+        // The star collapses…
+        win.el.classList.remove('is-held');
         win.el.style.animation = 'none';
-        win.el.style.transition = 'all 0.5s cubic-bezier(1, 0, 0.5, 1)';
+        win.el.style.transition = 'transform 0.5s cubic-bezier(1, 0, 0.5, 1), opacity 0.5s cubic-bezier(1, 0, 0.5, 1)';
         win.el.style.transform = 'scale(0)';
         win.el.style.opacity = '0';
         win.el.style.pointerEvents = 'none';
 
         const box = { x: parseFloat(win.el.dataset.x), y: parseFloat(win.el.dataset.y), w: parseFloat(win.el.dataset.w), h: parseFloat(win.el.dataset.h) };
-        this.pullWindowsIn(id, box);
+        const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+        const energy = Math.sqrt(box.w * box.h / 1e5);   // bigger windows, bigger novae
+        this.physics.impulse(cx, cy, -190 * energy, id);
 
         setTimeout(() => {
             if (window.AudioMng) AudioMng.play('explode'); // subtle pop
 
+            // …and goes nova: a flash, and a shock front that reaches the
+            // neighbours in the order of their distance.
             const explosion = document.createElement('div');
             explosion.className = 'nova-explosion';
-            explosion.style.left = (box.x + box.w / 2) + 'px';
-            explosion.style.top = (box.y + box.h / 2) + 'px';
+            explosion.style.left = cx + 'px';
+            explosion.style.top = cy + 'px';
+            explosion.innerHTML = '<i class="nova-explosion__core"></i><i class="nova-explosion__front"></i><i class="nova-explosion__front nova-explosion__front--late"></i>';
             this.container.appendChild(explosion);
 
-            this.pushWindowsOut(id, box);
+            this.physics.shock(cx, cy, 1500 * energy, id);
 
             // Spawn persistent wrapper immediately as explosion flashes
             const remContainer = document.createElement('div');
             remContainer.className = 'nova-remnant-wrap';
             remContainer.style.position = 'absolute';
-            remContainer.style.left = (box.x + box.w / 2) + 'px';
-            remContainer.style.top = (box.y + box.h / 2) + 'px';
+            remContainer.style.left = cx + 'px';
+            remContainer.style.top = cy + 'px';
 
             const remnant = document.createElement('div');
             remnant.className = 'nova-remnant';
@@ -650,7 +742,7 @@ class WindowManagerClass {
                 rem.targetDepth = 1 - Math.max(0, Math.min(1, op));
             });
 
-            setTimeout(() => { explosion.remove(); }, 500);
+            setTimeout(() => { explosion.remove(); }, 1200);
         }, 400);
 
         setTimeout(() => {
@@ -658,6 +750,7 @@ class WindowManagerClass {
                 win.el.parentNode.removeChild(win.el);
             }
             this.windows.delete(id);
+            this.physics.remove(id);
 
             if (win.appId) {
                 let hasMore = false;
@@ -678,73 +771,159 @@ class WindowManagerClass {
         }
     }
 
+    // The window `targetId` now occupies `box` (it appeared, grew or came
+    // back): it holds its ground while the contact solver moves the others.
     pushWindowsOut(targetId, box) {
-        this.windows.forEach((win, id) => {
-            if (id === targetId || win.el.dataset.minimized === 'true') return;
-            const wx = parseFloat(win.el.dataset.x);
-            const wy = parseFloat(win.el.dataset.y);
-            const ww = parseFloat(win.el.dataset.w);
-            const wh = parseFloat(win.el.dataset.h);
-
-            // Bounding box collision check
-            if (wx < box.x + box.w && wx + ww > box.x && wy < box.y + box.h && wy + wh > box.y) {
-                const distL = Math.abs(wx + ww - box.x);
-                const distR = Math.abs(wx - (box.x + box.w));
-                const distT = Math.abs(wy + wh - box.y);
-                const distB = Math.abs(wy - (box.y + box.h));
-
-                const min = Math.min(distL, distR, distT, distB);
-
-                let newX = wx, newY = wy;
-                if (min === distL) newX = box.x - ww - 20;
-                else if (min === distR) newX = box.x + box.w + 20;
-                else if (min === distT) newY = box.y - wh - 20;
-                else if (min === distB) newY = box.y + box.h + 20;
-
-                win.el.style.transition = 'all 0.5s var(--ease-spring)';
-                win.el.dataset.x = newX;
-                win.el.dataset.y = newY;
-                win.el.style.left = newX + 'px';
-                win.el.style.top = newY + 'px';
-                setTimeout(() => { win.el.style.transition = ''; }, 500);
-            }
-        });
+        if (this.isMobile()) return;
+        this.physics.resync(targetId);
+        this.physics.pin(targetId);
     }
 
+    // Something at the centre of `box` collapsed: the neighbours lurch inward.
     pullWindowsIn(targetId, box) {
-        const centerX = box.x + box.w / 2;
-        const centerY = box.y + box.h / 2;
-
-        this.windows.forEach((win, id) => {
-            if (id === targetId || win.el.dataset.minimized === 'true') return;
-            const wx = parseFloat(win.el.dataset.x);
-            const wy = parseFloat(win.el.dataset.y);
-
-            const dx = centerX - (wx + parseFloat(win.el.dataset.w)/2);
-            const dy = centerY - (wy + parseFloat(win.el.dataset.h)/2);
-            const dist = Math.sqrt(dx*dx + dy*dy);
-
-            if (dist > 0 && dist < 1200) {
-                const pullFactor = Math.max(0.1, 1 - dist/1200) * 0.4;
-                const newX = wx + dx * pullFactor;
-                const newY = wy + dy * pullFactor;
-
-                win.el.style.transition = 'all 0.6s var(--ease-spring)';
-                win.el.dataset.x = newX;
-                win.el.dataset.y = newY;
-                win.el.style.left = newX + 'px';
-                win.el.style.top = newY + 'px';
-                setTimeout(() => { win.el.style.transition = ''; }, 600);
-            }
-        });
+        if (this.isMobile()) return;
+        this.physics.impulse(box.x + box.w / 2, box.y + box.h / 2, -260, targetId);
     }
 
-    minimize(id) {
+    // A black hole as it would be photographed: the accretion disc seen at a
+    // slant, its far half passing behind the shadow and its near half in
+    // front, with the far side's light bent up over the top. The disc is
+    // loose matter, not a surface: each band is a ring of clumps, and inner
+    // bands orbit faster (period ∝ r^1.5).
+    blackHoleMarkup() {
+        const uid = 'bh' + (++this.holeCounter);
+        const T = r => (3.6 * Math.pow(r / 39, 1.5)).toFixed(2);
+        // radius, stroke width, opacity, clumps (dash pattern over a path length of 100)
+        const bands = [
+            [39, 3.2, 1, '2 5 7 4 1 6 9 7 3 6 5 4 2 8 6 5 1 9 4 6'],
+            [48, 3.6, 1, '6 5 2 7 9 6 1 5 4 8 7 6 3 9 5 7 2 8'],
+            [58, 4, 0.9, '3 8 8 7 2 9 5 8 6 9 1 7 9 8 4 6'],
+            [68, 4.4, 0.75, '7 9 2 10 5 9 9 10 3 9 6 11 1 9'],
+            [78, 4.8, 0.55, '4 12 9 11 2 13 7 12 5 11 3 11'],
+            [88, 5.2, 0.38, '8 14 3 15 6 14 2 13 9 16']
+        ];
+        const band = ([r, w, o, dash], i) =>
+            `<circle class="bh-flow" cx="100" cy="100" r="${r}" pathLength="100" stroke="url(#${uid}-disc)" stroke-width="${w}" opacity="${o}" stroke-dasharray="${dash}" style="animation-duration:${T(r)}s;animation-delay:-${(i * 2.7 + 1).toFixed(1)}s"/>`;
+        const disc = bands.map(band).join('');
+        const tilt = 'rotate(-14 100 100) translate(0 64) scale(1 0.36)';
+        return `
+        <svg class="bh" viewBox="0 0 200 200" aria-hidden="true">
+          <defs>
+            <linearGradient id="${uid}-disc" gradientUnits="userSpaceOnUse" x1="10" y1="100" x2="190" y2="100">
+              <stop offset="0" stop-color="var(--nova-bh-glare)"/>
+              <stop offset="0.3" stop-color="var(--nova-bh-hot)"/>
+              <stop offset="0.62" stop-color="var(--nova-bh-warm)"/>
+              <stop offset="1" stop-color="var(--nova-bh-deep)"/>
+            </linearGradient>
+            <radialGradient id="${uid}-glow">
+              <stop offset="0.2" stop-color="var(--nova-bh-warm)" stop-opacity="0.3"/>
+              <stop offset="1" stop-color="var(--nova-bh-deep)" stop-opacity="0"/>
+            </radialGradient>
+            <clipPath id="${uid}-far"><rect x="0" y="0" width="200" height="100"/></clipPath>
+            <clipPath id="${uid}-near"><rect x="0" y="100" width="200" height="100"/></clipPath>
+            <clipPath id="${uid}-over"><rect x="0" y="0" width="200" height="104"/></clipPath>
+          </defs>
+          <ellipse cx="100" cy="100" rx="96" ry="44" transform="rotate(-14 100 100)" fill="url(#${uid}-glow)"/>
+          <g transform="${tilt}"><g clip-path="url(#${uid}-far)">${disc}</g></g>
+          <g clip-path="url(#${uid}-over)" transform="rotate(-14 100 100)">
+            <circle class="bh-flow" cx="100" cy="100" r="29" pathLength="100" stroke="url(#${uid}-disc)" stroke-width="3" opacity="0.7" stroke-dasharray="5 6 2 7 8 6 3 8 6 7 1 6 9 7 4 5" style="animation-duration:7s"/>
+          </g>
+          <circle class="bh-shadow" cx="100" cy="100" r="21"/>
+          <circle class="bh-photon" cx="100" cy="100" r="22.5" pathLength="100" stroke="url(#${uid}-disc)" stroke-dasharray="1.2 1.6" />
+          <g transform="${tilt}"><g clip-path="url(#${uid}-near)">${disc}</g></g>
+        </svg>`;
+    }
+
+    makeHole(x, y) {
+        const el = document.createElement('div');
+        el.className = 'nova-blackhole-container';
+        const hue = Math.floor(Math.random() * 360);
+        el.dataset.hue = hue; // the disc's colour, reused by the End of times view
+        el.style.setProperty('--bh-hue', hue + 'deg');
+        el.innerHTML = this.blackHoleMarkup();
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        el.style.pointerEvents = 'auto';
+        el.style.cursor = 'pointer';
+
+        const hole = { el, x, y, hue, mass: 1, members: [] };
+        // A click frees whatever fell in last.
+        el.onclick = () => { if (hole.members.length) this.restore(hole.members[hole.members.length - 1]); };
+        // The preview sits by the pointer. It is placed on entering as well
+        // as on moving: when the desktop is panned, a hole can slide under a
+        // pointer that never moved, and the preview used to show wherever it
+        // had last been.
+        const place = (e) => {
+            this.bhPreview.style.left = (e.clientX + 15) + 'px';
+            this.bhPreview.style.top = (e.clientY + 15) + 'px';
+        };
+        el.onmouseenter = (e) => {
+            this.bhPreview.innerHTML = hole.members.map(id => {
+                const w = this.windows.get(id);
+                return w && window.Icons ? Icons.get(w.appId) : '';
+            }).join('');
+            place(e);
+            this.bhPreview.classList.add('visible');
+        };
+        // moving again after a pan hid it brings it back
+        el.onmousemove = (e) => { if (this.bhPreview.classList.contains('visible')) place(e); else el.onmouseenter(e); };
+        el.onmouseleave = () => {
+            this.bhPreview.classList.remove('visible');
+        };
+
+        this.container.appendChild(el);
+        this.holes.set(el, hole);
+        return hole;
+    }
+
+    // Takes a window out of the hole that holds it; an empty hole evaporates.
+    leaveHole(id) {
+        const el = this.activeBlackHoles.get(id);
+        if (!el) return null;
+        this.activeBlackHoles.delete(id);
+        const hole = this.holes.get(el);
+        if (!hole) return null;
+        hole.members = hole.members.filter(m => m !== id);
+        if (hole.members.length) {
+            this.syncHole(hole);
+        } else {
+            el.style.opacity = '0';
+            el.style.pointerEvents = 'none';
+            this.holes.delete(el);
+            setTimeout(() => { if (el.parentNode) el.remove(); }, 500);
+        }
+        if (window.NovaStarfield) NovaStarfield.touch();
+        return hole;
+    }
+
+    // A moving window strayed inside a hole's capture radius.
+    swallow(id, hole) {
+        if (this.isMobile()) return;
+        const win = this.windows.get(id);
+        if (!win || win.el.dataset.minimized === 'true' || !this.holes.has(hole.el)) return;
+        this.minimize(id, hole);
+    }
+
+    minimize(id, into) {
         if (this.isMobile()) return;
         const win = this.windows.get(id);
         if (!win) return;
 
         if (window.AudioMng) AudioMng.play('collapse');
+
+        const box = {
+            x: parseFloat(win.el.dataset.x),
+            y: parseFloat(win.el.dataset.y),
+            w: parseFloat(win.el.dataset.w),
+            h: parseFloat(win.el.dataset.h)
+        };
+
+        const body = this.physics.get(id);
+        if (body) {
+            body.ghost = true; body.held = false; body.asleep = true;
+            body.vx = body.vy = 0;
+        }
+        win.el.classList.remove('is-held');
 
         // Capture current state to avoid snapping back to hidden styles when animation is removed
         const computed = window.getComputedStyle(win.el);
@@ -754,79 +933,41 @@ class WindowManagerClass {
         win.el.style.animation = 'none';
         win.el.style.transform = transform;
         win.el.style.opacity = opacity;
+        // Falling into another hole, the window spirals down to that point.
+        if (into) win.el.style.transformOrigin = `${into.x - box.x}px ${into.y - box.y}px`;
 
         void win.el.offsetHeight; // Force reflow
 
-        win.el.style.transition = 'all 0.5s cubic-bezier(1, 0, 0.5, 1)';
-        win.el.style.transform = 'scale(0)';
+        win.el.style.transition = 'transform 0.5s cubic-bezier(1, 0, 0.5, 1), opacity 0.5s cubic-bezier(1, 0, 0.5, 1)';
+        win.el.style.transform = into ? 'scale(0) rotate(120deg)' : 'scale(0)';
         win.el.style.opacity = '0';
         win.el.style.pointerEvents = 'none';
         win.el.dataset.minimized = 'true';
         this.releaseFocus(id);
         Bus.emit('window:minimized', id);
 
-        const box = {
-            x: parseFloat(win.el.dataset.x),
-            y: parseFloat(win.el.dataset.y),
-            w: parseFloat(win.el.dataset.w),
-            h: parseFloat(win.el.dataset.h)
-        };
-        this.pullWindowsIn(id, box);
+        const cx = into ? into.x : box.x + box.w / 2;
+        const cy = into ? into.y : box.y + box.h / 2;
+        this.physics.impulse(cx, cy, into ? -120 : -260, id);
 
-        const bh = document.createElement('div');
-        bh.className = 'nova-blackhole-container';
-
-        const hue = Math.floor(Math.random() * 360);
-        bh.dataset.hue = hue; // the disc's colour, reused by the End of times view
-        const gradId = 'discGrad-' + id;
-
-        bh.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" style="width:100%; height:100%; filter: hue-rotate(${hue}deg);">
-          <defs>
-            <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" style="stop-color:#b32400;stop-opacity:1" />
-              <stop offset="50%" style="stop-color:#ff6600;stop-opacity:1" />
-              <stop offset="100%" style="stop-color:#ffcc66;stop-opacity:1" />
-            </linearGradient>
-          </defs>
-
-          <g class="rotating-disc" style="animation-delay: -${Math.random()*180}s">
-            <circle class="inflow" cx="100" cy="100" r="90" stroke-width="7" opacity="0.6" style="animation-duration: 25s; animation-delay: -${Math.random()*25}s; stroke: url(#${gradId});"/>
-            <circle class="inflow" cx="100" cy="100" r="80" stroke-width="6.5" opacity="0.7" style="animation-duration: 22s; animation-delay: -${Math.random()*22}s; stroke: url(#${gradId});"/>
-            <circle class="inflow" cx="100" cy="100" r="70" stroke-width="6" opacity="0.8" style="animation-duration: 19s; animation-delay: -${Math.random()*19}s; stroke: url(#${gradId});"/>
-            <circle class="inflow" cx="100" cy="100" r="60" stroke-width="5.5" opacity="0.9" style="animation-duration: 16s; animation-delay: -${Math.random()*16}s; stroke: url(#${gradId});"/>
-            <circle class="inflow" cx="100" cy="100" r="50" stroke-width="5" style="animation-duration: 13s; animation-delay: -${Math.random()*13}s; stroke: url(#${gradId});"/>
-            <circle class="inflow" cx="100" cy="100" r="40" stroke-width="4.5" style="animation-duration: 10s; animation-delay: -${Math.random()*10}s; stroke: url(#${gradId});"/>
-            <circle class="inflow" cx="100" cy="100" r="30" stroke-width="4" style="animation-duration: 7s; animation-delay: -${Math.random()*7}s; stroke: url(#${gradId});"/>
-            <circle class="inflow" cx="100" cy="100" r="20" stroke-width="3.5" style="animation-duration: 5s; animation-delay: -${Math.random()*5}s; stroke: url(#${gradId});"/>
-          </g>
-
-          <circle class="central-mass" cx="100" cy="100" r="16" />
-          <circle cx="100" cy="100" r="17" fill="none" stroke="#fff1cc" stroke-width="0.75" opacity="0.3"/>
-        </svg>
-        `;
-        bh.style.left = (box.x + box.w / 2) + 'px';
-        bh.style.top = (box.y + box.h / 2) + 'px';
-        bh.style.pointerEvents = 'auto';
-        bh.style.cursor = 'pointer';
-        bh.onclick = () => this.restore(id);
-
-        // Hover Previews
-        bh.onmouseenter = () => {
-            const iconHtml = window.Icons ? Icons.get(win.appId) : '';
-            this.bhPreview.innerHTML = iconHtml;
-            this.bhPreview.classList.add('visible');
-        };
-        bh.onmousemove = (e) => {
-            this.bhPreview.style.left = (e.clientX + 15) + 'px';
-            this.bhPreview.style.top = (e.clientY + 15) + 'px';
-        };
-        bh.onmouseleave = () => {
-            this.bhPreview.classList.remove('visible');
-        };
-
-        this.container.appendChild(bh);
-        this.activeBlackHoles.set(id, bh);
+        const hole = into || this.makeHole(cx, cy);
+        hole.members.push(id);
+        this.activeBlackHoles.set(id, hole.el);
+        this.syncHole(hole);
+        if (into) {
+            // The hole swallowed mass: it rings.
+            hole.el.classList.remove('is-fed');
+            void hole.el.offsetWidth;
+            hole.el.classList.add('is-fed');
+            // Once inside, the window sits at the singularity.
+            setTimeout(() => {
+                if (win.el.dataset.minimized !== 'true' || !body) return;
+                body.x = hole.x - body.w / 2; body.y = hole.y - body.h / 2;
+                this.physics.draw(body);
+                win.el.style.transformOrigin = '';
+            }, 520);
+        }
+        if (window.NovaStarfield) NovaStarfield.touch();
 
         if (window.ShelfInstance) window.ShelfInstance.render();
     }
@@ -848,28 +989,47 @@ class WindowManagerClass {
         if (this.bhPreview) this.bhPreview.classList.remove('visible');
 
         win.el.style.animation = 'none';
-        win.el.style.transition = 'all 0.5s var(--ease-spring)';
+        win.el.style.transformOrigin = '';
+        win.el.style.transition = 'transform 0.5s var(--ease-spring), opacity 0.5s var(--ease-spring)';
         win.el.style.transform = 'scale(1)';
         win.el.style.opacity = '1';
         win.el.style.pointerEvents = 'auto';
         win.el.dataset.minimized = 'false';
         Bus.emit('window:restored', id);
 
-        const box = {
-            x: parseFloat(win.el.dataset.x),
-            y: parseFloat(win.el.dataset.y),
-            w: parseFloat(win.el.dataset.w),
-            h: parseFloat(win.el.dataset.h)
-        };
-
-        const bh = this.activeBlackHoles.get(id);
-        if (bh) {
-            bh.style.opacity = '0';
-            setTimeout(() => { if (bh.parentNode) bh.remove(); }, 500);
-            this.activeBlackHoles.delete(id);
+        const hole = this.leaveHole(id);
+        const body = this.physics.get(id);
+        if (body) {
+            body.ghost = false;
+            const cx = body.x + body.w / 2, cy = body.y + body.h / 2;
+            if (hole && hole.members.length && !this.physics.reduced.matches) {
+                // The hole keeps others: this one is thrown clear of it.
+                // Of sixteen headings, take the one with the most open space.
+                const reach = Math.hypot(body.w, body.h) / 2 + 150;
+                const spin = Math.random() * Math.PI * 2;
+                let a = spin, best = -Infinity;
+                for (let i = 0; i < 16; i++) {
+                    const t = spin + i * Math.PI / 8;
+                    const ex = cx + Math.cos(t) * reach, ey = cy + Math.sin(t) * reach;
+                    let room = Infinity;
+                    this.physics.bodies.forEach(o => {
+                        if (o === body || o.ghost) return;
+                        const dx = Math.max(o.x - ex, 0, ex - (o.x + o.w));
+                        const dy = Math.max(o.y - ey, 0, ey - (o.y + o.h));
+                        room = Math.min(room, Math.hypot(dx, dy));
+                    });
+                    if (room > best) { best = room; a = t; }
+                }
+                const v = reach * NovaPhysicsClass.K.drag * 1.3;   // drag plus dry friction to overcome
+                body.vx = Math.cos(a) * v; body.vy = Math.sin(a) * v;
+                body.freeUntil = performance.now() + 3000;
+                this.physics.wakeAll();
+            } else {
+                this.physics.pin(id);
+                this.physics.impulse(cx, cy, 160, id, 900);
+            }
         }
 
-        this.pushWindowsOut(id, box);
         this.focus(id);
     }
 

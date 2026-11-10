@@ -279,11 +279,23 @@ Apps.register({
       }
     };
 
+    // The key or swipe that starts a game only starts it: the same press
+    // must not also shift, cycle or drop the first column.
+    const wakes = () => {
+      if (state !== 'ready') {
+        return false;
+      }
+      begin();
+      return true;
+    };
+
     const move = direction => {
       if ((pauseController && pauseController.isPaused()) || state === 'gameover' || state === 'resolving') {
         return;
       }
-      begin();
+      if (wakes()) {
+        return;
+      }
       if (active && canPlace(active, active.row, active.col + direction)) {
         active.col += direction;
         playSound('click');
@@ -295,7 +307,9 @@ Apps.register({
       if ((pauseController && pauseController.isPaused()) || state === 'gameover' || state === 'resolving') {
         return;
       }
-      begin();
+      if (wakes()) {
+        return;
+      }
       if (active && !active.magic) {
         active.colors = [active.colors[1], active.colors[2], active.colors[0]];
         playSound('click');
@@ -495,7 +509,9 @@ Apps.register({
       if ((pauseController && pauseController.isPaused()) || state === 'gameover' || state === 'resolving') {
         return;
       }
-      begin();
+      if (wakes()) {
+        return;
+      }
       if (!active) {
         return;
       }

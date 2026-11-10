@@ -80,7 +80,7 @@ class AudioManager {
         return this.muted;
     }
 
-    play(type) {
+    play(type, level = 1) {
         if (this.muted) return;
         this.init();
         if (!this.context || !this.limiter) return;
@@ -151,6 +151,17 @@ class AudioManager {
                 gain.gain.linearRampToValueAtTime(0, now + 0.1);
                 osc.start(now);
                 osc.stop(now + 0.1);
+            } else if (type === 'bump') {
+                // Two windows touching: a short low thud, scaled by impact.
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(110 + 50 * level, now);
+                osc.frequency.exponentialRampToValueAtTime(48, now + 0.09);
+                gain.gain.setValueAtTime(0, now);
+                gain.gain.linearRampToValueAtTime(0.03 + 0.1 * level, now + 0.006);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+                gain.gain.linearRampToValueAtTime(0, now + 0.13);
+                osc.start(now);
+                osc.stop(now + 0.14);
             } else if (type === 'collapse') {
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(400, now);

@@ -16,6 +16,24 @@ class Shelf {
         Bus.on('app:launching', (appId) => this.render());
         Bus.on('app:closed', (appId) => this.render());
         window.ShelfInstance = this;
+        this.initSwell();
+    }
+
+    // Marks near the pointer swell, falling off as a bell curve with distance.
+    initSwell() {
+        const fine = window.matchMedia('(hover: hover) and (pointer: fine)');
+        const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
+        const clear = () => this.container.querySelectorAll('.shelf-item').forEach(el => el.style.removeProperty('--mag'));
+        this.container.addEventListener('mousemove', (e) => {
+            if (this.mobileQuery.matches || !fine.matches || calm.matches) return;
+            this.container.querySelectorAll('.shelf-item').forEach(el => {
+                const r = el.getBoundingClientRect();
+                // Measured from the slot, which the swell itself does not move.
+                const d = (e.clientX - (r.left + r.width / 2)) / 62;
+                el.style.setProperty('--mag', Math.exp(-d * d).toFixed(3));
+            });
+        });
+        this.container.addEventListener('mouseleave', clear);
     }
 
     syncFade() {
@@ -51,7 +69,9 @@ class Shelf {
                 if (Apps.isRunning(app.id)) el.classList.add('is-running');
 
                 el.innerHTML = Icons.get(app.iconId);
-                el.title = app.name;
+                el.dataset.label = app.name;
+                el.setAttribute('role', 'button');
+                el.setAttribute('aria-label', app.name);
 
                 el.onclick = () => {
                     if (!Apps.isRunning(app.id)) {

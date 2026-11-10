@@ -13,7 +13,7 @@ Abandoning traditional rigid window boundaries and the standard "dock and top-ba
 ### 🌌 Infinite Space Canvas
 - **Limitless Desktop:** No more window clustering. Click and drag globally on the desktop to pan your workspace around infinitely.
 - **Mac-Native Controls:** Panning and pinch-to-zoom is supported natively through smooth trackpad gestures.
-- **Cosmic Layout & Interactive Physics:** The environment feels alive with gravity and mass. Apps deploy via organic chaotic scattering, and manipulate their surroundings dynamically. Maximizing a window aggressively pushes its neighbors out of bounds, while closing/minimizing creates a "black hole" effect that slides surrounding apps together to swiftly reclaim space.
+- **Rigid-Body Desktop:** Windows are bodies with mass (their area). They can be shoved, coast a short way, collide and trade momentum. Closing one sets off a nova whose shock front reaches the neighbours at finite speed; minimizing one leaves a black hole that bends the path of passing windows, swallows those that stray too close, and lenses the starlight behind it. The engine lives in `js/core/physics.js`; the sky in `js/core/starfield.js`.
 
 ### 🎨 Premium "Nova" Aesthetic
 - **Fluid & Responsive Elements:** A mesmerizing animated mesh background dynamically shifts under heavily frosted glass overlays.

@@ -78,9 +78,11 @@ Apps.register({
                     <h2>Multitasking & Physics</h2>
                     <p>Windows in Nova OS are more than static boxes; they are physical entities in a zero-gravity environment.</p>
                     <ul>
-                        <li><b>Collision Engine:</b> Moving or resizing a window will automatically "push" neighboring windows out of the way to prevent overlap.</li>
-                        <li><b>Attraction:</b> When you close or minimize a window, a local "vacuum" is created, pulling nearby windows in to fill the void.</li>
-                        <li><b>Remnants:</b> Closing a window leaves a "Remnant" (a colored nebula) at its coordinates. Minimizing a window creates a **Black Hole**, which you can hover over to see a preview of the app within.</li>
+                        <li><b>Mass & Momentum:</b> A window weighs as much as its area. Shove one and it coasts a short way; hit another and they trade momentum, so a small window bounces off a large one that barely moves. Windows never overlap.</li>
+                        <li><b>Novae:</b> Closing a window collapses it, pulling the neighbours in; then it bursts, and the shock front reaches near windows before far ones. A "Remnant" (a colored nebula) stays behind.</li>
+                        <li><b>Black Holes:</b> Minimizing a window leaves a <b>Black Hole</b>, as large and as strong as the window was; hover to see what it holds, click to bring it back. Its gravity bends the path of any window pushed past, and one that strays too close is swallowed: the hole grows, and a click frees whatever fell in last.</li>
+                        <li><b>Starlight:</b> At night the stars behind a black hole are bent around it. Pan the desktop slowly past one and watch.</li>
+                        <li><b>Inertia:</b> Let go of the desktop mid-drag and it keeps gliding.</li>
                     </ul>
                 `
             },

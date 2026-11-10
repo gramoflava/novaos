@@ -10,25 +10,27 @@
 // asteroids bounce off windows and fall into black holes. Remnants of closed
 // windows are scenery and do nothing.
 //
-// Finding rocks: every rock off screen has a marker on the screen edge (bigger
-// and brighter when close), and rocks that stray too far are steered back.
-// A wave ends when no rocks are left; a short calm follows, then the next wave
-// is announced with its size and enters from the edges.
+// Numbers are fixed, whatever the zoom. Wave n brings 5 + n rocks: n + 1 large,
+// two medium, two small — six in the first wave. They enter from about a
+// thousand pixels out and are steered back if they stray past 1700.
 //
-// Black holes: touching one ends the ship. After End of times has played once,
-// the secret Phantoms mode is on for good: once the hole's pull beats the
-// engine there is no way back. At that moment the ship is lost and a new one
-// appears; where the old one was, a phantom stays — seen from outside, a falling ship never quite reaches
-// the horizon: it slows, flattens along it, reddens and fades exponentially.
-// Either way, that moment may start End of times (js/core/horizon.js): the
-// chance is n/8 for the n-th fall, counted across games and visits, and the
-// count resets when it plays.
+// Worlds: each game lays out a small system on open desktop. The home world
+// sits a short flight from the ship; three more — a small bare one, a ringed
+// giant, one with a single moon — lie a few thousand pixels out in different
+// directions and are found by flying there. Windows pass over them untouched;
+// the game treats them as solid. Each pulls in proportion to its size, its
+// moons keep Keplerian orbits, shots stop on it and the ship breaks on it. A
+// rock that strikes one burns up there — cover for the pilot — but the third
+// strike leaves a planet barren, and the third on a moon shatters it into
+// small rocks. Finding a world pays once; clearing a wave with the home world
+// still alive pays every time.
 class AsteroidsGame {
     constructor() {
         this.code = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a'];
         this.codePos = 0;
         this.state = 'off'; // off | play | dead | over
         this.keys = new Set();
+        this.worlds = [];
 
         this.onCodeKey = this.onCodeKey.bind(this);
         this.onKeyDown = this.onKeyDown.bind(this);
@@ -57,6 +59,13 @@ class AsteroidsGame {
             windowPull: 3,        // × window area / (d² + 80²)
             holePull: 3.6e6,      // / (d² + 40²)
             holeRadius: 24,       // event horizon for the ship
+            worldR: 62,           // the home planet
+            worldPull: 1.2e6,     // for the home planet, / (d² + 40²); scales with r²; sets the moons' periods
+            worldHits: 3,         // rock strikes a planet or a moon survives, less one
+            worldBonus: 50,       // per wave cleared with the home planet alive
+            findBonus: 100,       // for each world discovered
+            rockEntry: 950,       // px from the ship where rocks appear
+            rockLeash: 1700,      // px: past this a rock is steered back
             pullCap: 900,
             lives: 3
         };
@@ -130,6 +139,7 @@ class AsteroidsGame {
         this.readColors();
 
         this.rocks = [];
+        this.worlds = [];
         const spot = this.clearSpot();
         this.ship = this.newShip(spot.x, spot.y);
         this.bullets = [];
@@ -138,6 +148,7 @@ class AsteroidsGame {
         this.phantoms = [];
         asteroidRuns.set(this, { score: 0, points: 0, report: startScoreRun('asteroids') });
         this.exploring = false;
+        this.worlds = this.makeWorlds();
         try { localStorage.setItem('novaos_asteroids_seen', '1'); } catch (_e) { }
         this.lives = T.lives;
         this.wave = 0;
@@ -177,6 +188,7 @@ class AsteroidsGame {
         [this.canvas, this.hud, this.banner].forEach(el => el && el.remove());
         this.canvas = this.hud = this.banner = null;
         this.keys.clear();
+        this.worlds = [];
         this.state = 'off';
     }
 
@@ -256,7 +268,7 @@ class AsteroidsGame {
 
     holes() {
         const list = [];
-        WindowManager.activeBlackHoles.forEach(bh => {
+        new Set(WindowManager.activeBlackHoles.values()).forEach(bh => {
             if (bh.style.opacity === '0') return;
             list.push({ x: parseFloat(bh.style.left), y: parseFloat(bh.style.top), hue: parseFloat(bh.dataset.hue) || 0 });
         });
@@ -266,43 +278,116 @@ class AsteroidsGame {
     nextWave() {
         this.wave++;
         this.waveSpeed = 1 + (this.wave - 1) * 0.12;
-        // The wave fills the view: zoomed out, the same density needs more rocks.
-        this.waveArea = this.areaFactor();
-        const count = Math.round((3 + this.wave) * this.waveArea);
-        for (let i = 0; i < count; i++) this.spawnRock(0);
-        this.showBanner(`Wave ${this.wave} · ${count} incoming`);
+        // n + 1 large, two medium, two small: a first wave of six.
+        const sizes = [...Array(this.wave + 1).fill(0), 1, 1, 2, 2];
+        sizes.forEach(size => this.spawnRock(size));
+        this.showBanner(`Wave ${this.wave} · ${sizes.length} incoming`);
     }
 
     // All rocks gone: say so, give the player a breath, then the next wave.
     clearWave() {
         this.waveBreak = 2.6;
-        this.showBanner(`Wave ${this.wave} cleared`);
+        const home = this.worlds[0];
+        const safe = home && !home.barren;
+        if (safe) this.award(AsteroidsGame.T.worldBonus);
+        this.showBanner(safe ? `Wave ${this.wave} cleared · home world safe` : `Wave ${this.wave} cleared`);
         if (window.AudioMng) AudioMng.play('win');
     }
 
-    // Visible world area relative to a 1440×900 view at 100% zoom (never < 1).
-    areaFactor() {
-        const v = this.view();
-        return Math.max(1, (v.w * v.h) / (1440 * 900));
+    // The system: the home world a short flight from the ship, the others
+    // further out in different directions, all on open desktop.
+    makeWorlds() {
+        const T = AsteroidsGame.T;
+        const rects = this.windowRects(), holes = this.holes();
+        const s = this.ship;
+        const worlds = [];
+        const place = (kind, dist, around) => {
+            const room = Math.max(kind.r, ...kind.moons.map(m => m[0])) + 40;
+            const free = (x, y) => !rects.some(r => this.circleRect(x, y, room, r))
+                && !holes.some(h => Math.hypot(h.x - x, h.y - y) < room + 200)
+                && !worlds.some(w => Math.hypot(w.x - x, w.y - y) < room + 500);
+            for (let ring = 0; ring < 40; ring++) {
+                for (let j = 0; j < 12; j++) {
+                    // nearest to the wanted heading first, then fanning out
+                    const a = around + (j % 2 ? 1 : -1) * Math.ceil(j / 2) * Math.PI / 9, d = dist + ring * 110;
+                    const x = s.x + Math.cos(a) * d, y = s.y + Math.sin(a) * d;
+                    if (!free(x, y)) continue;
+                    const gm = T.worldPull * Math.pow(kind.r / T.worldR, 2);
+                    const world = {
+                        x, y, r: kind.r, name: kind.name, tint: kind.tint, ring: !!kind.ring, gm,
+                        hits: 0, barren: false, flash: 0, rot: Math.random() * 6.28, found: false,
+                        moons: kind.moons.map(([orbit, r]) => ({ orbit, r, ang: Math.random() * 6.28, w: Math.sqrt(gm / (orbit * orbit * orbit)), hits: 0, x: 0, y: 0 }))
+                    };
+                    this.placeMoons(world, 0);
+                    worlds.push(world);
+                    return;
+                }
+            }
+        };
+        const K = AsteroidsGame.WORLDS;
+        const heading = Math.random() * Math.PI * 2;
+        place(K[0], 430, heading);
+        if (worlds[0]) worlds[0].found = true;
+        // the rest: a third of a turn apart, each further than the last, in random order
+        const rest = K.slice(1).sort(() => Math.random() - 0.5);
+        rest.forEach((kind, i) => place(kind, 1900 + i * 1000 + Math.random() * 500, heading + Math.PI + (i - 1) * Math.PI * 2 / 3 + (Math.random() - 0.5) * 0.5));
+        return worlds;
     }
 
-    // Zooming out mid-wave tops the field up to the same density.
-    topUpForZoom() {
-        const f = this.areaFactor();
-        if (f > this.waveArea * 1.15) {
-            const extra = Math.round((3 + this.wave) * (f - this.waveArea));
-            for (let i = 0; i < extra; i++) this.spawnRock(0);
-            this.waveArea = f;
+    placeMoons(world, dt) {
+        world.moons.forEach(m => {
+            m.ang += m.w * dt;
+            m.x = world.x + Math.cos(m.ang) * m.orbit;
+            m.y = world.y + Math.sin(m.ang) * m.orbit;
+        });
+    }
+
+    // Planets and moons as circles, for everything that can hit them.
+    worldBodies() {
+        const list = [];
+        this.worlds.forEach(w => { list.push(w); w.moons.forEach(m => list.push(m)); });
+        return list;
+    }
+
+    // A rock struck the planet or a moon. The rock is gone either way.
+    strike(body, k) {
+        const T = AsteroidsGame.T;
+        const w = this.worlds.find(o => o === body || o.moons.includes(body));
+        const a = Math.atan2(k.y - body.y, k.x - body.x);
+        const ix = body.x + Math.cos(a) * body.r, iy = body.y + Math.sin(a) * body.r;
+        this.sparks(ix, iy, 12 + k.size * 3, this.colors.danger);
+        if (window.AudioMng) AudioMng.play('explode');
+        if (body === w) {
+            w.flash = 1;
+            if (w.barren) return;
+            w.scars = w.scars || [];
+            w.scars.push({ a: a - w.rot, d: 0.45 + Math.random() * 0.4, r: 5 + (2 - k.size) * 3 });
+            if (++w.hits >= T.worldHits) {
+                w.barren = true;
+                this.sparks(w.x, w.y, 40, this.colors.alt);
+                this.showBanner(w === this.worlds[0] ? 'Home world scorched' : `${w.name} scorched`);
+            }
+            return;
+        }
+        if (++body.hits >= T.worldHits) {
+            w.moons = w.moons.filter(m => m !== body);
+            this.sparks(body.x, body.y, 26, this.colors.secondary);
+            // What is left of it keeps the moon's orbital motion.
+            const vx = -Math.sin(body.ang) * body.w * body.orbit, vy = Math.cos(body.ang) * body.w * body.orbit;
+            for (let i = 0; i < 3; i++) {
+                const b = Math.random() * Math.PI * 2, sp = 30 + Math.random() * 50;
+                this.spawnRock(T.sizes.length - 1, body.x, body.y, vx + Math.cos(b) * sp, vy + Math.sin(b) * sp);
+            }
+            this.showBanner('Moon shattered');
         }
     }
 
-    // A rock enters from just outside the view, heading roughly at the ship.
+    // A rock enters from a fixed distance, heading roughly at the ship.
     spawnRock(size, x, y, vx, vy) {
         const T = AsteroidsGame.T;
         const r = T.sizes[size];
         if (x === undefined) {
-            const v = this.view();
-            const reach = Math.hypot(v.w, v.h) * 0.62;
+            const reach = T.rockEntry + Math.random() * 250;
             const ang = Math.random() * Math.PI * 2;
             x = this.ship.x + Math.cos(ang) * reach;
             y = this.ship.y + Math.sin(ang) * reach;
@@ -338,6 +423,13 @@ class AsteroidsGame {
             const a = Math.min(T.pullCap, T.holePull / (d2 + 1600));
             ax += dx / d * a; ay += dy / d * a;
         });
+        this.worlds.forEach(w => {
+            const dx = w.x - x, dy = w.y - y;
+            const d2 = dx * dx + dy * dy;
+            const d = Math.sqrt(d2) || 1;
+            const a = Math.min(T.pullCap, w.gm / (d2 + 1600));
+            ax += dx / d * a; ay += dy / d * a;
+        });
         return { ax, ay };
     }
 
@@ -362,8 +454,23 @@ class AsteroidsGame {
         const rects = this.windowRects();
         const holes = this.holes();
         const s = this.ship;
+        const bodies = this.worldBodies();
+        const view = this.view();
+        this.worlds.forEach(w => {
+            this.placeMoons(w, dt);
+            w.rot += 0.05 * dt;
+            w.flash = Math.max(0, w.flash - dt * 2.5);
+            // A world is found once it is properly in view.
+            if (!w.found && this.state === 'play'
+                && w.x > view.x + w.r && w.x < view.x + view.w - w.r && w.y > view.y + w.r && w.y < view.y + view.h - w.r) {
+                w.found = true;
+                this.award(T.findBonus);
+                this.showBanner(`Discovered ${w.name}`);
+                if (window.AudioMng) AudioMng.play('expand');
+            }
+        });
 
-        if ((this.colorTimer -= dt) <= 0) { this.readColors(); this.topUpForZoom(); this.colorTimer = 0.5; }
+        if ((this.colorTimer -= dt) <= 0) { this.readColors(); this.colorTimer = 0.5; }
 
         // Ship
         if (this.state === 'play') {
@@ -403,6 +510,7 @@ class AsteroidsGame {
             if (s.safe <= 0) {
                 if (rects.some(r => this.circleRect(s.x, s.y, T.shipR, r))) this.crash('window');
                 else if (this.rocks.some(k => Math.hypot(k.x - s.x, k.y - s.y) < k.r * 0.86 + T.shipR)) this.crash('rock');
+                else if (bodies.some(o => Math.hypot(o.x - s.x, o.y - s.y) < o.r + T.shipR)) this.crash('world');
                 else {
                     const reach = this.phantomsOn() ? this.noReturn() : T.holeRadius;
                     const lost = holes.find(h => Math.hypot(h.x - s.x, h.y - s.y) < reach);
@@ -420,7 +528,8 @@ class AsteroidsGame {
             b.x += b.vx * dt; b.y += b.vy * dt;
             b.life -= dt;
             if (b.life <= 0) return false;
-            if (rects.some(r => this.circleRect(b.x, b.y, 2, r)) || holes.some(h => Math.hypot(h.x - b.x, h.y - b.y) < 20)) {
+            if (rects.some(r => this.circleRect(b.x, b.y, 2, r)) || holes.some(h => Math.hypot(h.x - b.x, h.y - b.y) < 20)
+                || bodies.some(o => Math.hypot(o.x - b.x, o.y - b.y) < o.r)) {
                 this.sparks(b.x, b.y, 4, this.colors.secondary);
                 return false;
             }
@@ -435,9 +544,7 @@ class AsteroidsGame {
         });
 
         // Rocks: fall toward holes, bounce off windows, and stay near the ship.
-        const v = this.view();
-        const diag = Math.hypot(v.w, v.h);
-        const leash = diag * 1.1;
+        const leash = T.rockLeash;
         for (let i = this.rocks.length - 1; i >= 0; i--) {
             const k = this.rocks[i];
             const g = this.pull(k.x, k.y, rects, holes);
@@ -445,6 +552,12 @@ class AsteroidsGame {
             k.x += k.vx * dt; k.y += k.vy * dt;
             k.rot += k.spin * dt;
             rects.forEach(r => this.bounce(k, r));
+            const struck = bodies.find(o => Math.hypot(o.x - k.x, o.y - k.y) < o.r + k.r * 0.7);
+            if (struck) {
+                this.rocks.splice(i, 1);
+                this.strike(struck, k);
+                continue;
+            }
             if (holes.some(h => Math.hypot(h.x - k.x, h.y - k.y) < 26 + k.r * 0.3)) {
                 this.sparks(k.x, k.y, 10, this.colors.alt);
                 // No points: they would grow with the number of minimised windows.
@@ -454,7 +567,7 @@ class AsteroidsGame {
             // Past the leash, the rock is turned gently back toward the ship.
             // Way past it (after a big zoom change), it simply re-enters.
             const dx = s.x - k.x, dy = s.y - k.y, dist = Math.hypot(dx, dy);
-            if (dist > diag * 3) {
+            if (dist > leash * 2.2) {
                 this.rocks.splice(i, 1);
                 this.spawnRock(k.size);
             } else if (dist > leash) {
@@ -542,12 +655,10 @@ class AsteroidsGame {
         if (window.AudioMng) AudioMng.play('flag_off');
     }
 
-    // A wave holds more rocks on a bigger or zoomed-out view (same density),
-    // so each rock is worth proportionally less: every wave is worth the same
-    // on every screen. Rounded down to tens, as the scoreboard expects.
+    // Rounded down to tens, as the scoreboard expects.
     award(points) {
         const run = asteroidRuns.get(this);
-        run.points += points / (this.waveArea || 1);
+        run.points += points;
         run.score = Math.floor(run.points / 10) * 10;
     }
 
@@ -559,7 +670,7 @@ class AsteroidsGame {
         this.lives--;
         this.state = 'dead';
         this.keys.clear();
-        this.showBanner(cause === 'hole' ? 'Swallowed' : cause === 'window' ? 'Hit a window' : 'Hit');
+        this.showBanner(cause === 'hole' ? 'Swallowed' : cause === 'window' ? 'Hit a window' : cause === 'world' ? 'Crashed at home' : 'Hit');
         setTimeout(() => {
             if (this.state !== 'dead') return;
             if (this.lives > 0) this.respawn();
@@ -579,6 +690,7 @@ class AsteroidsGame {
             if (rects.some(r => this.circleRect(x, y, 140, r))) return false;
             if (holes.some(h => Math.hypot(h.x - x, h.y - y) < 260)) return false;
             if (this.rocks.some(k => Math.hypot(k.x - x, k.y - y) < k.r + 120)) return false;
+            if (this.worlds.some(w => Math.hypot(w.x - x, w.y - y) < w.r + 240)) return false;
             const g = this.pull(x, y, rects, holes);
             return Math.hypot(g.ax, g.ay) < 30;
         };
@@ -770,6 +882,8 @@ class AsteroidsGame {
             ctx.globalAlpha = 1;
         }
 
+        this.worlds.forEach(w => this.drawWorld(w, px));
+
         // Rocks
         ctx.lineJoin = 'round';
         this.rocks.forEach(k => {
@@ -846,10 +960,132 @@ class AsteroidsGame {
         this.drawMarkers();
     }
 
+    // The home world, in the game's own line style: a tinted disc under a
+    // thin atmosphere, cloud bands that turn with it, a lit limb, and three
+    // arcs around it for the strikes it can still take. Barren, it is a grey
+    // cratered ball with no air.
+    drawWorld(w, px) {
+        const v = this.view(), reach = w.r * 2 + 280;
+        if (w.x < v.x - reach || w.x > v.x + v.w + reach || w.y < v.y - reach || w.y > v.y + v.h + reach) return;
+        const ctx = this.ctx, c = this.colors;
+        const tint = w.tint || c.accent;
+        // a ring, seen at a slant: the far half goes behind the planet
+        const ringHalf = (from, to) => {
+            if (!w.ring) return;
+            ctx.save();
+            ctx.translate(w.x, w.y); ctx.rotate(-0.38);
+            ctx.strokeStyle = w.barren ? c.secondary : tint;
+            [[1.55, 0.5], [1.78, 0.75], [1.98, 0.35]].forEach(([k, a]) => {
+                ctx.globalAlpha = a;
+                ctx.lineWidth = 2.5 * px;
+                ctx.beginPath(); ctx.ellipse(0, 0, w.r * k, w.r * k * 0.3, 0, from, to); ctx.stroke();
+            });
+            ctx.restore();
+        };
+        ctx.save();
+        ctx.lineCap = 'round';
+
+        // orbits
+        ctx.strokeStyle = c.secondary;
+        ctx.lineWidth = px;
+        ctx.setLineDash([2, 9]);
+        w.moons.forEach(m => {
+            ctx.globalAlpha = 0.28;
+            ctx.beginPath(); ctx.arc(w.x, w.y, m.orbit, 0, Math.PI * 2); ctx.stroke();
+        });
+        ctx.setLineDash([]);
+
+        if (!w.barren) {
+            const air = ctx.createRadialGradient(w.x, w.y, w.r * 0.9, w.x, w.y, w.r * 1.5);
+            air.addColorStop(0, tint); air.addColorStop(1, 'transparent');
+            ctx.globalAlpha = 0.28;
+            ctx.fillStyle = air;
+            ctx.beginPath(); ctx.arc(w.x, w.y, w.r * 1.5, 0, Math.PI * 2); ctx.fill();
+        }
+
+        ringHalf(Math.PI, Math.PI * 2);
+
+        // body
+        ctx.globalAlpha = w.barren ? 0.1 : 0.24;
+        ctx.fillStyle = w.barren ? c.text : tint;
+        ctx.beginPath(); ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2); ctx.fill();
+
+        ctx.save();
+        ctx.beginPath(); ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2); ctx.clip();
+        ctx.translate(w.x, w.y);
+        if (!w.barren) {
+            // cloud bands: the planet is tilted, so they read as shallow arcs
+            ctx.rotate(-0.38);
+            ctx.strokeStyle = c.text;
+            ctx.lineWidth = 1.25 * px;
+            [-0.58, -0.22, 0.16, 0.5].forEach((lat, i) => {
+                const y = lat * w.r, half = Math.sqrt(1 - lat * lat) * w.r;
+                const drift = Math.sin(w.rot * 2 + i * 1.7) * 0.25;
+                ctx.globalAlpha = 0.22;
+                ctx.beginPath();
+                ctx.ellipse(0, y, half, w.r * 0.11, 0, Math.PI * (0.08 + drift * 0.2), Math.PI * (0.92 + drift * 0.2));
+                ctx.stroke();
+            });
+            ctx.rotate(0.38);
+        }
+        // scars turn with the surface
+        (w.scars || []).forEach(sc => {
+            const a = sc.a + w.rot;
+            ctx.globalAlpha = w.barren ? 0.5 : 0.75;
+            ctx.strokeStyle = w.barren ? c.secondary : c.danger;
+            ctx.lineWidth = 1.25 * px;
+            ctx.beginPath(); ctx.arc(Math.cos(a) * w.r * sc.d, Math.sin(a) * w.r * sc.d, sc.r, 0, Math.PI * 2); ctx.stroke();
+        });
+        // night side
+        const shade = ctx.createLinearGradient(-w.r, -w.r, w.r, w.r);
+        shade.addColorStop(0.35, 'transparent'); shade.addColorStop(1, '#000');
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = shade;
+        ctx.fillRect(-w.r, -w.r, w.r * 2, w.r * 2);
+        if (w.flash > 0) {
+            ctx.globalAlpha = w.flash * 0.45;
+            ctx.fillStyle = c.danger;
+            ctx.fillRect(-w.r, -w.r, w.r * 2, w.r * 2);
+        }
+        ctx.restore();
+
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = w.barren ? c.secondary : c.text;
+        ctx.lineWidth = 1.75 * px;
+        ctx.beginPath(); ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2); ctx.stroke();
+        ringHalf(0, Math.PI);
+
+        // strikes left
+        if (!w.barren) {
+            const left = AsteroidsGame.T.worldHits - w.hits;
+            ctx.strokeStyle = left === 1 ? c.danger : tint;
+            ctx.lineWidth = 2 * px;
+            for (let i = 0; i < left; i++) {
+                const a0 = -Math.PI / 2 + (i - left / 2) * 0.34 + 0.05;
+                ctx.globalAlpha = 0.9;
+                ctx.beginPath(); ctx.arc(w.x, w.y, w.r + 9, a0, a0 + 0.24); ctx.stroke();
+            }
+        }
+
+        // moons: lit from the same side as the planet
+        w.moons.forEach(m => {
+            ctx.globalAlpha = 0.16 + 0.1 * m.hits;
+            ctx.fillStyle = m.hits ? c.danger : c.text;
+            ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2); ctx.fill();
+            ctx.globalAlpha = 1;
+            ctx.strokeStyle = c.secondary;
+            ctx.lineWidth = 1.5 * px;
+            ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, Math.PI * 2); ctx.stroke();
+        });
+        ctx.restore();
+        ctx.globalAlpha = 1;
+    }
+
     // Off-screen rocks: a diamond on the screen edge pointing at each one.
     // Closer rocks get bigger, brighter diamonds; the last two pulse.
+    // Every world found so far, when out of view, gets a ring in its colour.
     drawMarkers() {
-        if (!this.rocks.length) return;
+        if (!this.rocks.length && !this.worlds.length) return;
         const ctx = this.ctx, d = this.dpr, Z = WindowManager.cameraZ;
         const W = window.innerWidth, H = window.innerHeight;
         const top = 132, bottom = H - 104, left = 22, right = W - 22; // clear of HUD and shelf
@@ -876,6 +1112,18 @@ class AsteroidsGame {
             ctx.closePath();
             ctx.fill();
         });
+        this.worlds.forEach((w, i) => {
+            if (!w.found) return;
+            const sx = WindowManager.cameraX + w.x * Z, sy = WindowManager.cameraY + w.y * Z, m = w.r * Z;
+            if (sx > -m && sx < W + m && sy > -m && sy < H + m) return;
+            const dx = sx - cx, dy = sy - cy;
+            const t = Math.min((dx > 0 ? (right - cx) / dx : dx < 0 ? (left - cx) / dx : Infinity),
+                               (dy > 0 ? (bottom - cy) / dy : dy < 0 ? (top - cy) / dy : Infinity));
+            ctx.globalAlpha = i === 0 ? 0.85 : 0.6;
+            ctx.strokeStyle = w.barren ? this.colors.secondary : (w.tint || this.colors.accent);
+            ctx.lineWidth = 1.75;
+            ctx.beginPath(); ctx.arc(cx + dx * t, cy + dy * t, i === 0 ? 5.5 : 4, 0, Math.PI * 2); ctx.stroke();
+        });
         ctx.globalAlpha = 1;
     }
 
@@ -901,6 +1149,15 @@ class AsteroidsGame {
         this.banner.classList.add('is-shown');
     }
 }
+
+// The system. The first is home and takes the theme's accent; the others keep
+// fixed colours. moons: [orbit radius, moon radius].
+AsteroidsGame.WORLDS = [
+    { name: 'Home', r: 62, tint: null, moons: [[112, 13], [176, 8]] },
+    { name: 'Ember', r: 38, tint: '#fb7185', moons: [] },
+    { name: 'Halo', r: 92, tint: '#fbbf24', ring: true, moons: [[236, 11], [292, 8], [340, 6]] },
+    { name: 'Tide', r: 52, tint: '#22d3ee', moons: [[98, 10]] }
+];
 
 window.NovaAsteroids = new AsteroidsGame();
 

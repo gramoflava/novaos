@@ -20,8 +20,10 @@
     isolation: isolate;
     box-shadow: var(--shadow-md), var(--glass-edge);
     overflow: hidden;
-    will-change: transform, width, height, top, left;
-    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+    will-change: transform, top, left;
+    transition:
+        box-shadow var(--dur-slow) var(--ease-smooth),
+        border-color var(--dur-slow) var(--ease-smooth);
     opacity: 0;
     transform: scale(0.95);
     animation: windowOpen 0.4s var(--ease-spring) forwards;
@@ -68,10 +70,19 @@ body.is-dragging { user-select: none; -webkit-user-select: none; }
 body.is-dragging .window-content { pointer-events: none; }
 
 .nova-window.is-active {
-    box-shadow: var(--shadow-lg), var(--glass-edge);
+    box-shadow:
+        var(--shadow-lg),
+        var(--glass-edge),
+        0 0 48px color-mix(in srgb, var(--accent) 12%, transparent);
     border-color: var(--line-strong);
     z-index: 150 !important;
 }
+
+/* Windows out of focus step back: quieter title, quieter controls. */
+.nova-window:not(.is-active) .window-title { color: var(--text-secondary); }
+.nova-window:not(.is-active) .window-title-mark,
+.nova-window:not(.is-active) .window-controls { opacity: 0.62; }
+.nova-window:not(.is-active):hover .window-controls { opacity: 1; }
 
 /* ==========================================================================
    Window Titlebar
@@ -84,6 +95,8 @@ body.is-dragging .window-content { pointer-events: none; }
     padding: 0 10px;
     user-select: none;
     border-bottom: 1px solid var(--line);
+    /* light catching the top of the pane */
+    background: linear-gradient(180deg, color-mix(in srgb, white 7%, transparent), transparent);
     cursor: grab;
     flex-shrink: 0;
 }
@@ -95,6 +108,7 @@ body.is-dragging .window-content { pointer-events: none; }
 .window-controls {
     display: flex;
     gap: var(--space-1);
+    transition: opacity var(--dur-base) var(--ease-smooth);
 }
 
 .window-btn {
@@ -160,6 +174,8 @@ body.is-dragging .window-content { pointer-events: none; }
     flex-grow: 1;
     text-align: center;
     pointer-events: none;
+    letter-spacing: 0.01em;
+    transition: color var(--dur-base) var(--ease-smooth);
 }
 
 .window-title-mark {
@@ -167,6 +183,7 @@ body.is-dragging .window-content { pointer-events: none; }
     width: 18px;
     height: 18px;
     margin-right: 2px;
+    transition: opacity var(--dur-base) var(--ease-smooth);
 }
 
 .window-title-mark .app-mark {
@@ -199,30 +216,58 @@ body.is-dragging .window-content { pointer-events: none; }
 /* ==========================================================================
    Black Hole Preview Hover
    ========================================================================== */
+/* What a black hole holds: one mark per swallowed window. */
 .bh-preview {
     position: fixed;
-    width: 36px;
+    display: flex;
+    gap: var(--space-1);
     height: 36px;
     pointer-events: none;
     z-index: 10000;
     opacity: 0;
-    transition: opacity 0.2s;
+    scale: 0.92;
+    transition: opacity var(--dur-base) var(--ease-smooth), scale var(--dur-base) var(--ease-spring);
     background: var(--glass);
-    backdrop-filter: blur(var(--blur-panel));
+    backdrop-filter: blur(var(--blur-panel)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--blur-panel)) saturate(180%);
     border-radius: var(--radius-md);
     padding: 6px;
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--line);
+    box-shadow: var(--shadow-md), var(--glass-edge);
+    border: 1px solid var(--line-strong);
     color: var(--text);
 }
 
 .bh-preview.visible {
     opacity: 1;
+    scale: 1;
 }
 
 .bh-preview svg {
-    width: 100%;
-    height: 100%;
+    width: 24px;
+    height: 24px;
+}
+
+/* Markers at the screen edge for windows out of view. */
+.window-indicators {
+    position: absolute;
+    inset: 0;
+    z-index: 8000;
+    pointer-events: none;
+}
+
+.window-indicator {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    translate: -50% -50%;
+    border-radius: var(--radius-pill);
+    background: var(--text);
+    box-shadow: 0 0 12px var(--text), 0 0 3px var(--text);
+}
+
+.window-indicator--game {
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent), 0 0 3px var(--accent);
 }
 
 @media (max-width: 640px) {

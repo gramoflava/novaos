@@ -99,6 +99,17 @@ Apps.register({
       jumpVelocityMax: -0.705,
       releasedJumpVelocity: -0.34
     };
+    // The Moon pulls less. A real sixth of Earth's gravity would turn every
+    // jump into a four-second flight, so the lunar route settles for 70%:
+    // jumps reach the same height but hang about a fifth longer, and the
+    // obstacles stand a little further apart to match. Ducking in the air
+    // still drops at the full rate — that is the suit's thruster.
+    const LUNAR_GRAVITY = 0.7;
+    const gravityScale = () => (theme === 'lunar' ? LUNAR_GRAVITY : 1);
+    // Same apex under weaker gravity: v² = 2gh, so v scales with √g.
+    const jumpScale = () => Math.sqrt(gravityScale());
+    const MILESTONE = 100;      // the score blinks and chimes, as in the original
+    const NIGHT_EVERY = 700;    // Dino: day and night trade places
     const canvas = document.getElementById(`nr-canvas-${winId}`);
     const ctx = canvas.getContext('2d');
     const themeSelect = document.getElementById(`nr-theme-${winId}`);
@@ -119,8 +130,6 @@ Apps.register({
     // The far ridge keeps its own counter. Deriving it from ridgeScroll (which
     // wraps every tile) made it jump by half a tile at each wrap.
     let farRidgeScroll = 0;
-    let lunarGroundScroll = 0;
-    let classicGroundScroll = 0;
     let cloudScroll = 0;
     let obstacles = [];
     let recentObstacleKinds = [];
@@ -129,6 +138,10 @@ Apps.register({
     let jumpHeld = false;
     let scorePromptOpen = false;
     let endedAt = 0;
+    let dust = [];
+    let lastMilestone = 0;
+    let nightBlend = 0;         // Dino: 0 → 1 as the scene swaps day for night (or back), eased
+    let terrainScroll = 0;      // ground detail, moving at the obstacles' speed
     const RETRY_DELAY = 600; // ms after a crash before Space or a tap restarts
     let pauseController = null;
     const player = {
@@ -320,6 +333,8 @@ Apps.register({
       speed = RUNNER_CONFIG.startSpeed;
       distanceUntilSpawn = 320;
       obstacles = [];
+      dust = [];
+      lastMilestone = 0;
       recentObstacleKinds = [];
       downPressed = false;
       jumpHeld = false;
@@ -353,7 +368,11 @@ Apps.register({
         begin();
         return;
       }
-      begin();
+      // The press that starts a run only starts it; the next one jumps.
+      if (state === 'ready') {
+        begin();
+        return;
+      }
       if (player.grounded) {
         player.ducking = false;
         player.grounded = false;
@@ -361,11 +380,27 @@ Apps.register({
         const speedProgress =
           (speed - RUNNER_CONFIG.startSpeed) / (RUNNER_CONFIG.maxSpeed - RUNNER_CONFIG.startSpeed);
         player.vy =
-          RUNNER_CONFIG.jumpVelocityMin +
-          (RUNNER_CONFIG.jumpVelocityMax - RUNNER_CONFIG.jumpVelocityMin) * speedProgress;
+          (RUNNER_CONFIG.jumpVelocityMin +
+            (RUNNER_CONFIG.jumpVelocityMax - RUNNER_CONFIG.jumpVelocityMin) * speedProgress) *
+          jumpScale();
+        kickDust(4, 0.05);
         if (window.AudioMng) {
           window.AudioMng.play('click');
         }
+      }
+    };
+
+    // Grit thrown up by the boots (or claws). With no air on the Moon it does
+    // not billow: every grain flies its own little parabola and lands.
+    const kickDust = (count, power) => {
+      for (let i = 0; i < count; i++) {
+        dust.push({
+          x: PLAYER_X + 10 + Math.random() * 26,
+          y: GROUND - 1,
+          vx: (Math.random() - 0.35) * power * 2.4,
+          vy: -(0.4 + Math.random() * 0.6) * power * 3,
+          size: Math.random() < 0.3 ? 2 : 1
+        });
       }
     };
 
@@ -504,8 +539,10 @@ Apps.register({
       recentObstacleKinds = [...recentObstacleKinds, spec.kind].slice(-2);
 
       const chromeSpeedUnits = speed / 0.06;
+      // Longer flights need more room to land before the next obstacle.
       const minGap = Math.round(
-        obstacle.w * chromeSpeedUnits + spec.minGap * RUNNER_CONFIG.gapCoefficient
+        (obstacle.w * chromeSpeedUnits + spec.minGap * RUNNER_CONFIG.gapCoefficient) /
+          Math.sqrt(gravityScale())
       );
       const maxGap = Math.round(minGap * RUNNER_CONFIG.maxGapCoefficient);
       distanceUntilSpawn =
@@ -612,9 +649,8 @@ Apps.register({
       starScroll = (starScroll + worldStep * 0.015) % WIDTH;
       ridgeScroll = (ridgeScroll + worldStep * 0.025) % RIDGE_TILE_WIDTH;
       farRidgeScroll = (farRidgeScroll + worldStep * 0.025 * 0.52) % RIDGE_TILE_WIDTH;
-      lunarGroundScroll = (lunarGroundScroll + worldStep * 0.34) % 54;
-      classicGroundScroll = (classicGroundScroll + worldStep) % 34;
       cloudScroll = (cloudScroll + worldStep * 0.045) % (WIDTH + 160);
+      terrainScroll = (terrainScroll + worldStep) % 7680;
       score = Math.floor(distanceRan * RUNNER_CONFIG.scoreCoefficient);
       speed = Math.min(RUNNER_CONFIG.maxSpeed, speed + RUNNER_CONFIG.acceleration * delta);
       scoreNode.textContent = score;
@@ -624,14 +660,17 @@ Apps.register({
         if (
           !jumpHeld &&
           rise >= RUNNER_CONFIG.minJumpRise &&
-          player.vy < RUNNER_CONFIG.releasedJumpVelocity
+          player.vy < RUNNER_CONFIG.releasedJumpVelocity * jumpScale()
         ) {
-          player.vy = RUNNER_CONFIG.releasedJumpVelocity;
+          player.vy = RUNNER_CONFIG.releasedJumpVelocity * jumpScale();
         }
         player.vy +=
-          (player.fastFalling ? RUNNER_CONFIG.fastFallGravity : RUNNER_CONFIG.gravity) * delta;
+          (player.fastFalling
+            ? RUNNER_CONFIG.fastFallGravity
+            : RUNNER_CONFIG.gravity * gravityScale()) * delta;
         player.y += player.vy * delta;
         if (player.y >= GROUND - 48) {
+          kickDust(theme === 'lunar' ? 7 : 3, Math.min(0.09, 0.03 + player.vy * 0.07));
           player.y = GROUND - 48;
           player.vy = 0;
           player.grounded = true;
@@ -640,6 +679,27 @@ Apps.register({
         }
       } else {
         player.ducking = downPressed;
+      }
+
+      // Dust: ballistic, carried back with the ground as the runner moves on.
+      const dustGravity = RUNNER_CONFIG.gravity * gravityScale() * 0.35;
+      dust.forEach(grain => {
+        grain.vy += dustGravity * delta;
+        grain.x += (grain.vx - speed) * delta;
+        grain.y += grain.vy * delta;
+      });
+      dust = dust.filter(grain => grain.y < GROUND && grain.x > -4);
+
+      const milestone = Math.floor(score / MILESTONE);
+      if (milestone > lastMilestone) {
+        lastMilestone = milestone;
+        if (window.AudioMng) {
+          window.AudioMng.play('flag_on');
+        }
+        scoreNode.animate(
+          [{ opacity: 1 }, { opacity: 0.15 }, { opacity: 1 }, { opacity: 0.15 }, { opacity: 1 }],
+          { duration: 640 }
+        );
       }
 
       distanceUntilSpawn -= speed * delta;
@@ -664,80 +724,251 @@ Apps.register({
       }
     };
 
-    const drawLunarBackground = () => {
-      const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT);
-      if (palette.dark) {
-        sky.addColorStop(0, '#030712');
-        sky.addColorStop(0.58, '#111827');
-        sky.addColorStop(1, '#21162f');
-      } else {
-        sky.addColorStop(0, '#0f1d3d');
-        sky.addColorStop(0.58, '#536a9d');
-        sky.addColorStop(1, '#eeeaff');
+    // Home, hanging over the ridge in the same big pixels as everything else:
+    // a blue disc, some land and cloud, and its night side turned away from
+    // the Sun. From the Moon the Earth never moves across the sky.
+    const EARTH = [
+      '....bbbb....',
+      '..bbwwbbbb..',
+      '.bbggbbbwbd.',
+      '.bgggbbbbdd.',
+      'bbggbbwwbddd',
+      'bbbgbbbbbddd',
+      'bwwbbbggbddd',
+      'bbbbbgggbddd',
+      '.bbbbbgbddd.',
+      '.bwwbbbbddd.',
+      '..bbbbbddd..',
+      '....bbdd....'
+    ];
+    const drawEarth = () => {
+      const size = 3;
+      const x0 = WIDTH - 118;
+      const y0 = 26;
+      const colors = palette.dark
+        ? { b: '#3b82f6', g: '#34d399', w: '#e2e8f0', d: '#172554' }
+        : { b: '#60a5fa', g: '#6ee7b7', w: '#f8fafc', d: '#3b5ea8' };
+      ctx.globalAlpha = palette.dark ? 0.9 : 0.85;
+      EARTH.forEach((row, r) => {
+        for (let c = 0; c < row.length; c++) {
+          const color = colors[row[c]];
+          if (color) {
+            ctx.fillStyle = color;
+            ctx.fillRect(x0 + c * size, y0 + r * size, size, size);
+          }
+        }
+      });
+      ctx.globalAlpha = 1;
+    };
+
+    const drawDust = () => {
+      ctx.fillStyle =
+        theme === 'lunar' ? (palette.dark ? '#aab3c8' : '#dfe4f6') : desert.ink;
+      ctx.globalAlpha = theme === 'lunar' ? 0.8 : 0.55;
+      dust.forEach(grain => {
+        ctx.fillRect(Math.round(grain.x), Math.round(grain.y), grain.size, grain.size);
+      });
+      ctx.globalAlpha = 1;
+    };
+
+    // '#rrggbb' between two colours.
+    const mix = (a, b, t) => {
+      const pa = parseInt(a.slice(1), 16);
+      const pb = parseInt(b.slice(1), 16);
+      const ch = shift => {
+        const x = (pa >> shift) & 255;
+        const y = (pb >> shift) & 255;
+        return Math.round(x + (y - x) * t);
+      };
+      return `rgb(${ch(16)}, ${ch(8)}, ${ch(0)})`;
+    };
+
+    // A ridge line as lit and shaded faces. The Sun stands low on the left:
+    // slopes that climb toward the right face it and catch the light, slopes
+    // that fall away are in shadow, and every crest gets a bright cap. With no
+    // air there is no haze — far ridges are only smaller and slower.
+    const RIDGE_STEP = 4;
+    const RIDGE_COLUMNS = RIDGE_TILE_WIDTH / RIDGE_STEP;
+    const ridgeAt = index => {
+      const wrapped = ((index % RIDGE_COLUMNS) + RIDGE_COLUMNS) % RIDGE_COLUMNS;
+      const position = (wrapped * RIDGE_STEP) / RIDGE_COLUMN_WIDTH;
+      const left = RIDGE_HEIGHTS[Math.floor(position) % RIDGE_HEIGHTS.length];
+      const right = RIDGE_HEIGHTS[(Math.floor(position) + 1) % RIDGE_HEIGHTS.length];
+      return left + (right - left) * (position - Math.floor(position));
+    };
+    const drawRidge = (scroll, scale, offset, colors) => {
+      const first = Math.floor(scroll / RIDGE_STEP);
+      const shift = scroll % RIDGE_STEP;
+      for (let column = -1; column <= WIDTH / RIDGE_STEP + 1; column++) {
+        const index = first + column + offset;
+        const height = Math.round((ridgeAt(index) * scale) / 3) * 3;
+        const next = Math.round((ridgeAt(index + 1) * scale) / 3) * 3;
+        const x = Math.round(column * RIDGE_STEP - shift);
+        const climbing = next >= height;
+        ctx.fillStyle = climbing ? colors.lit : colors.shade;
+        ctx.fillRect(x, GROUND - height, RIDGE_STEP, height);
+        ctx.fillStyle = climbing ? colors.crest : colors.lit;
+        ctx.fillRect(x, GROUND - height, RIDGE_STEP, 3);
       }
+    };
+
+    // Things lying on the ground, repeated every 640 px of travel.
+    const GROUND_DETAIL = Array.from({ length: 34 }, (_, index) => ({
+      x: (index * 197 + 23) % 640,
+      y: 8 + ((index * 53) % 38),
+      kind: index % 7 === 0 ? 'crater' : index % 3 === 0 ? 'stone' : 'speck'
+    }));
+
+    const drawLunarBackground = () => {
+      // The lunar sky is black at noon. The light theme only softens it.
+      const sky = ctx.createLinearGradient(0, 0, 0, GROUND);
+      sky.addColorStop(0, palette.dark ? '#01020a' : '#0a1030');
+      sky.addColorStop(1, palette.dark ? '#0c1226' : '#27356a');
       ctx.fillStyle = sky;
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-      stars.forEach(star => {
-        const x = (star.x - starScroll + WIDTH) % WIDTH;
-        const y = 18 + star.yRatio * Math.max(80, GROUND - 72);
-        ctx.globalAlpha = palette.dark ? 0.76 : 0.82;
-        ctx.fillStyle = star.size === 2 ? palette.cyan : '#f8fafc';
-        ctx.fillRect(x, y, star.size, star.size);
+      stars.forEach((star, index) => {
+        const x = (star.x - starScroll * (star.size === 2 ? 1.6 : 1) + WIDTH * 2) % WIDTH;
+        const y = 14 + star.yRatio * Math.max(80, GROUND - 96);
+        ctx.globalAlpha = index % 4 === 0 ? 0.95 : 0.55;
+        ctx.fillStyle = index % 9 === 0 ? palette.cyan : index % 11 === 0 ? '#fde68a' : '#f8fafc';
+        ctx.fillRect(Math.round(x), Math.round(y), star.size, star.size);
       });
       ctx.globalAlpha = 1;
+      drawEarth();
 
-      const drawRidgeLayer = (scroll, heightScale, fillStyle) => {
-        ctx.fillStyle = fillStyle;
-        const firstRidgeTileX = -scroll - RIDGE_TILE_WIDTH;
-        for (
-          let tileX = firstRidgeTileX;
-          tileX < WIDTH + RIDGE_TILE_WIDTH;
-          tileX += RIDGE_TILE_WIDTH
-        ) {
-          RIDGE_HEIGHTS.forEach((ridgeHeight, index) => {
-            const height = Math.round(ridgeHeight * heightScale);
-            const x = Math.round(tileX + index * RIDGE_COLUMN_WIDTH);
-            ctx.fillRect(x, GROUND - height, RIDGE_COLUMN_WIDTH + 1, height);
-          });
-        }
-      };
+      drawRidge(farRidgeScroll, 0.62, 47, palette.dark
+        ? { lit: '#262b45', shade: '#171b30', crest: '#3d4468' }
+        : { lit: '#46528a', shade: '#313c6e', crest: '#6672ad' });
+      drawRidge(ridgeScroll, 1, 0, palette.dark
+        ? { lit: '#3a3f5c', shade: '#1f2238', crest: '#8089ad' }
+        : { lit: '#6f7aa8', shade: '#434c7c', crest: '#b3bcdf' });
 
-      drawRidgeLayer(
-        (farRidgeScroll + RIDGE_TILE_WIDTH * 0.37) % RIDGE_TILE_WIDTH,
-        0.78,
-        palette.dark ? 'rgba(56, 189, 248, 0.11)' : 'rgba(30, 64, 175, 0.16)'
-      );
-      drawRidgeLayer(
-        ridgeScroll,
-        1,
-        palette.dark ? 'rgba(167, 139, 250, 0.27)' : 'rgba(76, 64, 168, 0.31)'
-      );
-
-      ctx.fillStyle = palette.dark ? '#22263a' : '#d8dbe5';
+      // Regolith: a sunlit lip, then grey dust darkening toward the viewer.
+      const soil = ctx.createLinearGradient(0, GROUND, 0, HEIGHT);
+      soil.addColorStop(0, palette.dark ? '#4a4f66' : '#8f97b8');
+      soil.addColorStop(1, palette.dark ? '#22253a' : '#5b6388');
+      ctx.fillStyle = soil;
       ctx.fillRect(0, GROUND, WIDTH, HEIGHT - GROUND);
-      ctx.strokeStyle = palette.dark ? 'rgba(255,255,255,0.18)' : 'rgba(15,23,42,0.18)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(0, GROUND);
-      ctx.lineTo(WIDTH, GROUND);
-      ctx.stroke();
+      ctx.fillStyle = palette.dark ? '#aab3cf' : '#dfe4f6';
+      ctx.fillRect(0, GROUND, WIDTH, 2);
 
-      ctx.strokeStyle = palette.dark ? 'rgba(255,255,255,0.10)' : 'rgba(15,23,42,0.10)';
-      ctx.lineWidth = 1;
-      for (let x = -lunarGroundScroll; x < WIDTH; x += 54) {
-        ctx.beginPath();
-        ctx.moveTo(x, GROUND + 22);
-        ctx.lineTo(x + 18, GROUND + 20);
-        ctx.stroke();
+      GROUND_DETAIL.forEach(item => {
+        const x = Math.round(((item.x - terrainScroll) % 640 + 640) % 640);
+        const y = GROUND + item.y;
+        if (item.kind === 'crater') {
+          ctx.fillStyle = palette.dark ? '#191b2c' : '#4a527a';
+          ctx.fillRect(x, y, 16, 3);
+          ctx.fillRect(x + 3, y + 3, 10, 2);
+          ctx.fillStyle = palette.dark ? '#8088a6' : '#c5cbe6';
+          ctx.fillRect(x + 2, y - 1, 12, 1);
+        } else if (item.kind === 'stone') {
+          ctx.fillStyle = palette.dark ? '#8088a6' : '#c5cbe6';
+          ctx.fillRect(x, y, 4, 2);
+          ctx.fillStyle = palette.dark ? '#191b2c' : '#4a527a';
+          ctx.fillRect(x + 1, y + 2, 5, 1);
+        } else {
+          ctx.fillStyle = palette.dark ? 'rgba(170,179,207,0.35)' : 'rgba(223,228,246,0.5)';
+          ctx.fillRect(x, y, 2, 1);
+        }
+      });
+    };
+
+    // ── Dino: mesa country ──────────────────────────────────────────────────
+    // Two palettes, day and night; the scene sits between them. The site's
+    // theme picks where it starts, and every 700 points it crosses over.
+    const DESERT = {
+      day: {
+        skyTop: '#f2c9a0', skyBottom: '#fdf0dc', disc: '#fff3c4', glow: '#f8b84e',
+        far: '#e6b48a', near: '#cf8f63', nearShade: '#b87a52',
+        sand: '#efd3a4', sandShade: '#d8b67f', ink: '#3a2c26', cloud: '#fff8ec'
+      },
+      night: {
+        skyTop: '#090b1f', skyBottom: '#2b2145', disc: '#e8ecf8', glow: '#6b6fa8',
+        far: '#2a2648', near: '#1c1a35', nearShade: '#131228',
+        sand: '#24213f', sandShade: '#17152c', ink: '#ece7f7', cloud: '#3b3760'
+      }
+    };
+    let desert = DESERT.day;
+    let desertNight = 0;
+    const readDesert = () => {
+      // 0 = full day, 1 = full night
+      desertNight = palette.dark ? 1 - nightBlend : nightBlend;
+      const scene = {};
+      Object.keys(DESERT.day).forEach(key => {
+        scene[key] = mix(DESERT.day[key], DESERT.night[key], desertNight);
+      });
+      desert = scene;
+    };
+
+    // Flat-topped buttes, as heights of 16 px columns.
+    const MESA = [
+      0, 0, 18, 18, 18, 0, 0, 0, 34, 34, 34, 34, 26, 26, 0, 0, 0, 0, 12, 12, 46, 46, 46, 30, 30, 0,
+      0, 0, 0, 22, 22, 22, 22, 0, 0, 40, 40, 28, 0, 0
+    ];
+    const MESA_WIDTH = MESA.length * 16;
+    const drawMesas = (scroll, scale, lift, face, shade) => {
+      for (let tileX = -(scroll % MESA_WIDTH) - MESA_WIDTH; tileX < WIDTH; tileX += MESA_WIDTH) {
+        MESA.forEach((height, index) => {
+          if (!height) {
+            return;
+          }
+          const h = Math.round(height * scale) + lift;
+          const x = Math.round(tileX + index * 16);
+          ctx.fillStyle = face;
+          ctx.fillRect(x, GROUND - h, 16, h);
+          // the right-hand end of each butte falls into shadow
+          if ((MESA[(index + 1) % MESA.length] || 0) < height) {
+            ctx.fillStyle = shade;
+            ctx.fillRect(x + 11, GROUND - h, 5, h);
+          }
+        });
+      }
+    };
+
+    const drawDisc = (cx, cy, radius, color) => {
+      ctx.fillStyle = color;
+      for (let row = -radius; row < radius; row += 2) {
+        const half = Math.round(Math.sqrt(radius * radius - (row + 1) * (row + 1)) / 2) * 2;
+        ctx.fillRect(cx - half, cy + row, half * 2, 2);
       }
     };
 
     const drawClassicBackground = () => {
-      ctx.fillStyle = palette.dark ? '#111318' : '#f7f7f5';
+      readDesert();
+      const sky = ctx.createLinearGradient(0, 0, 0, GROUND);
+      sky.addColorStop(0, desert.skyTop);
+      sky.addColorStop(1, desert.skyBottom);
+      ctx.fillStyle = sky;
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-      ctx.fillStyle = palette.dark ? 'rgba(226, 232, 240, 0.20)' : 'rgba(71, 85, 105, 0.22)';
+      // stars come out as the light goes
+      if (desertNight > 0.05) {
+        ctx.fillStyle = '#f8fafc';
+        stars.forEach((star, index) => {
+          ctx.globalAlpha = desertNight * (index % 3 === 0 ? 0.9 : 0.5);
+          ctx.fillRect(star.x, Math.round(12 + star.yRatio * Math.max(70, GROUND - 120)), star.size, star.size);
+        });
+        ctx.globalAlpha = 1;
+      }
+
+      // The Sun sets as the Moon comes up in the same quarter of the sky.
+      const discX = WIDTH - 104;
+      const sunY = 58 + desertNight * (GROUND - 40);
+      const moonY = 58 + (1 - desertNight) * (GROUND - 40);
+      if (sunY < GROUND) {
+        ctx.globalAlpha = 0.28;
+        drawDisc(discX, sunY, 26, DESERT.day.glow);
+        ctx.globalAlpha = 1;
+        drawDisc(discX, sunY, 18, DESERT.day.disc);
+      }
+      if (moonY < GROUND) {
+        drawDisc(discX, moonY, 16, DESERT.night.disc);
+        drawDisc(discX + 8, moonY - 4, 13, desert.skyTop);     // the dark limb: a crescent
+      }
+
+      ctx.fillStyle = desert.cloud;
+      ctx.globalAlpha = 0.85 - desertNight * 0.3;
       clouds.forEach(cloud => {
         const x = ((cloud.x - cloudScroll + WIDTH + 160) % (WIDTH + 160)) - 80;
         const y = 26 + cloud.yRatio * Math.max(70, GROUND - 150);
@@ -746,19 +977,36 @@ Apps.register({
         ctx.fillRect(Math.round(x + 4 * scale), Math.round(y + 3 * scale), 30 * scale, 4 * scale);
         ctx.fillRect(Math.round(x), Math.round(y + 7 * scale), 42 * scale, 3 * scale);
       });
+      ctx.globalAlpha = 1;
 
-      ctx.strokeStyle = palette.text;
-      ctx.globalAlpha = 0.72;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(0, GROUND);
-      ctx.lineTo(WIDTH, GROUND);
-      ctx.stroke();
+      drawMesas(terrainScroll * 0.06 + 210, 0.9, 6, desert.far, desert.far);
+      drawMesas(terrainScroll * 0.14, 1.5, 0, desert.near, desert.nearShade);
 
-      for (let x = -classicGroundScroll; x < WIDTH; x += 34) {
-        ctx.fillRect(x, GROUND + 8 + ((x / 34) % 2) * 4, 3, 1);
-        ctx.fillRect(x + 12, GROUND + 15, 6, 1);
-      }
+      // sand, with the classic's single ground line on top
+      const sand = ctx.createLinearGradient(0, GROUND, 0, HEIGHT);
+      sand.addColorStop(0, desert.sand);
+      sand.addColorStop(1, desert.sandShade);
+      ctx.fillStyle = sand;
+      ctx.fillRect(0, GROUND, WIDTH, HEIGHT - GROUND);
+      ctx.fillStyle = desert.ink;
+      ctx.globalAlpha = 0.8;
+      ctx.fillRect(0, GROUND, WIDTH, 2);
+
+      ctx.globalAlpha = 0.5;
+      GROUND_DETAIL.forEach(item => {
+        const x = Math.round(((item.x - terrainScroll) % 640 + 640) % 640);
+        const y = GROUND + item.y;
+        if (item.kind === 'crater') {
+          // a tuft of dry grass
+          ctx.fillRect(x, y - 4, 1, 4);
+          ctx.fillRect(x + 2, y - 6, 1, 6);
+          ctx.fillRect(x + 4, y - 3, 1, 3);
+        } else if (item.kind === 'stone') {
+          ctx.fillRect(x, y, 5, 1);
+        } else {
+          ctx.fillRect(x, y, 2, 1);
+        }
+      });
       ctx.globalAlpha = 1;
     };
 
@@ -812,9 +1060,11 @@ Apps.register({
       const sprite = player.ducking ? dinoDuckSprites[frame] : dinoRunSprites[frame];
       const y = player.ducking ? GROUND - sprite.length * 3 : player.y;
 
-      ctx.fillStyle = palette.dark ? 'rgba(255, 255, 255, 0.14)' : 'rgba(15, 23, 42, 0.14)';
-      ctx.fillRect(PLAYER_X + 2, GROUND + 3, 52, 3);
-      drawPixelSprite(sprite, { O: palette.text }, PLAYER_X - 6, y);
+      ctx.fillStyle = desert.ink;
+      ctx.globalAlpha = 0.18;
+      ctx.fillRect(PLAYER_X + 2, GROUND + 4, 52, 3);
+      ctx.globalAlpha = 1;
+      drawPixelSprite(sprite, { O: desert.ink }, PLAYER_X - 6, y);
     };
 
     const drawObstacle = (obstacle, now) => {
@@ -837,13 +1087,19 @@ Apps.register({
       } else if (obstacle.type === 'moonrock') {
         for (let index = 0; index < obstacle.count; index++) {
           const x = index * (obstacle.unitW + obstacle.spacing);
-          ctx.fillStyle = palette.dark ? '#7f8ba5' : '#7c8799';
+          // lit from the left, like the ridges: bright faces, a dark lee side
+          ctx.fillStyle = palette.dark ? '#8a93b3' : '#aab3d6';
           ctx.fillRect(x + 3, 12, obstacle.unitW - 3, obstacle.h - 12);
           ctx.fillRect(x + 6, 6, obstacle.unitW - 9, obstacle.h - 6);
           ctx.fillRect(x + 12, 0, 9, obstacle.h);
-          ctx.fillStyle = palette.dark ? '#4b5563' : '#c2c8d2';
-          ctx.fillRect(x + 12, 6, 6, 6);
-          ctx.fillRect(x + 6, 18, 6, 6);
+          ctx.fillStyle = palette.dark ? '#d5dbf0' : '#eef1fb';
+          ctx.fillRect(x + 12, 0, 6, 3);
+          ctx.fillRect(x + 6, 6, 6, 3);
+          ctx.fillRect(x + 3, 12, 3, 3);
+          ctx.fillStyle = palette.dark ? '#2c3048' : '#4a5380';
+          ctx.fillRect(x + 18, 3, 3, obstacle.h - 3);
+          ctx.fillRect(x + obstacle.unitW - 3, 15, 3, obstacle.h - 15);
+          ctx.fillRect(x + 9, 18, 6, 6);
         }
       } else if (obstacle.type === 'saucer') {
         drawPixelSprite(
@@ -866,7 +1122,7 @@ Apps.register({
           0
         );
       } else if (obstacle.type === 'cactus') {
-        ctx.fillStyle = palette.text;
+        ctx.fillStyle = desert.ink;
         for (let index = 0; index < obstacle.count; index++) {
           const x = index * obstacle.unitW;
           const trunkX = obstacle.variant === 'large' ? 9 : 6;
@@ -883,7 +1139,7 @@ Apps.register({
           }
         }
       } else if (obstacle.type === 'bird') {
-        ctx.fillStyle = palette.text;
+        ctx.fillStyle = desert.ink;
         const flap = Math.floor(now / 100) % 2;
         ctx.fillRect(13, 7, 22, 11);
         ctx.fillRect(33, 10, 10, 5);
@@ -902,10 +1158,13 @@ Apps.register({
         return;
       }
 
-      ctx.fillStyle = palette.dark ? 'rgba(5, 8, 18, 0.54)' : 'rgba(247, 249, 255, 0.62)';
+      // The veil and its text follow the scene, not the site's theme: the
+      // lunar sky is always dark, the desert may be either.
+      const sceneDark = theme === 'lunar' || desertNight > 0.5;
+      ctx.fillStyle = sceneDark ? 'rgba(4, 6, 16, 0.56)' : 'rgba(255, 246, 232, 0.6)';
       ctx.fillRect(0, 0, WIDTH, HEIGHT);
       ctx.textAlign = 'center';
-      ctx.fillStyle = palette.text;
+      ctx.fillStyle = sceneDark ? '#eef1fa' : '#2f2521';
       ctx.font = '600 18px Inter, sans-serif';
       ctx.fillText(
         state === 'gameover'
@@ -916,7 +1175,7 @@ Apps.register({
         WIDTH / 2,
         HEIGHT * 0.42
       );
-      ctx.fillStyle = palette.muted;
+      ctx.fillStyle = sceneDark ? 'rgba(238, 241, 250, 0.68)' : 'rgba(47, 37, 33, 0.66)';
       ctx.font = '500 12px Inter, sans-serif';
       ctx.fillText(
         state === 'gameover' ? `Score ${score} · Space or tap to retry` : 'Space or tap to run',
@@ -926,6 +1185,13 @@ Apps.register({
     };
 
     const draw = now => {
+      // A crash jolts the picture for a quarter of a second.
+      const sinceCrash = state === 'gameover' ? now - endedAt : Infinity;
+      const jolt = sinceCrash < 250 ? 4 * (1 - sinceCrash / 250) : 0;
+      ctx.save();
+      if (jolt > 0) {
+        ctx.translate(Math.round(Math.sin(now / 13) * jolt), Math.round(Math.cos(now / 17) * jolt));
+      }
       if (theme === 'lunar') {
         drawLunarBackground();
         drawAstronaut(now);
@@ -934,7 +1200,16 @@ Apps.register({
         drawDino(now);
       }
       obstacles.forEach(obstacle => drawObstacle(obstacle, now));
+      drawDust();
+      ctx.restore();
       drawOverlay();
+
+      // Dino: every 700 points day and night trade places.
+      const swap = theme === 'classic' && Math.floor(score / NIGHT_EVERY) % 2 === 1 ? 1 : 0;
+      nightBlend += (swap - nightBlend) * 0.03;
+      if (Math.abs(swap - nightBlend) < 0.004) {
+        nightBlend = swap;
+      }
     };
 
     const frame = now => {
