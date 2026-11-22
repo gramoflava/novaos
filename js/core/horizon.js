@@ -506,13 +506,14 @@ class Horizon {
         // The GPU shades at display resolution (with a pixel-budget cap).
         // The CPU fallback changes quality slowly, not every frame: this avoids
         // repeatedly reallocating buffers and making detail visibly breathe.
+        const ly = this.ly !== undefined ? this.ly : -9;
+        const discAlive = 1 - this.s(ly, 7, 9.5);
         let outside = null;
         if (fall < 1) {
             const lw = this.rays.gpu ? W : Math.round(this.lw), lh = Math.round(lw * H / W);
             const x = this.logR1(t), lr = this.logRate(t);
             const rho = 0.376 * Math.pow(0.1 / 0.376, this.s(t, P.geomEnd, P.hoverEnd));
             const t0 = performance.now();
-            const ly = this.ly !== undefined ? this.ly : -9;
             const logG = Math.min(30, this.shiftNow(t));
             const img = this.rays.render(lw, lh, {
                 logR1: x, logG, rho, fall,
@@ -523,7 +524,7 @@ class Horizon {
                 // ~10⁷–10⁹ yr; stars dim out over ~10¹¹–10¹⁵ yr (the longest-
                 // lived red dwarfs reach ~10¹³–10¹⁴), so a few remain to redden
                 // in the fall
-                discAlive: 1 - this.s(ly, 7, 9.5),
+                discAlive,
                 starsAlive: 1 - this.s(ly, 11, 15.5)
             }, t);
             outside = img;
@@ -544,7 +545,6 @@ class Horizon {
         // along the fall — the line of sight — and squeezes it across, so
         // the hull closes in around the pilot.
         const tide = h.tide || 0;
-        const discAlive = 1 - this.s(ly, 7, 9.5);
         ctx.save();
         if (tide > 0) {
             const k = 1 - 0.15 * tide;
