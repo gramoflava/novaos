@@ -20,7 +20,7 @@
     isolation: isolate;
     box-shadow: var(--shadow-md), var(--glass-edge);
     overflow: hidden;
-    will-change: transform, top, left;
+    will-change: transform, translate, rotate;
     transition:
         box-shadow var(--dur-slow) var(--ease-smooth),
         border-color var(--dur-slow) var(--ease-smooth),

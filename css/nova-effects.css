@@ -33,6 +33,30 @@
 }
 
 .nova-blackhole-container:hover .bh { scale: 1.1; }
+.nova-blackhole-container.is-pulling .bh {
+  scale: 1.14;
+  filter: hue-rotate(var(--bh-hue)) brightness(1.22);
+}
+
+/* Brief glass-rim contact ripple when two windows collide. */
+.nova-impact-spark {
+  --spark-scale: 1;
+  position: absolute;
+  z-index: 200;
+  width: 28px;
+  height: 28px;
+  translate: -50% -50%;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid color-mix(in srgb, var(--accent) 65%, white);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 55%, transparent);
+  pointer-events: none;
+  animation: nova-impact 340ms var(--ease-out) forwards;
+}
+
+@keyframes nova-impact {
+  0%   { transform: scale(0.25); opacity: 0.9; }
+  100% { transform: scale(calc(1.9 * var(--spark-scale))); opacity: 0; }
+}
 
 /* One band of the disc. The path is 100 long, so sliding the dashes by 100
    brings every clump back to where it started. */

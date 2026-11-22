@@ -118,6 +118,7 @@ class NovaStarfieldClass {
         const wm = window.WindowManager;
         const camX = wm && !wm.isMobile() ? wm.cameraX : 0;
         const camY = wm && !wm.isMobile() ? wm.cameraY : 0;
+        const camZ = wm && !wm.isMobile() ? wm.cameraZ : 1;
         const t = still ? 0 : now / 1000;
         const lenses = this.lenses();
 
@@ -146,27 +147,47 @@ class NovaStarfieldClass {
             if (x < 0) x += W;
             if (y < 0) y += H;
 
+            // Subtle radial depth parallax when pinching to zoom.
+            if (camZ !== 1) {
+                const zScale = 1 + (camZ - 1) * s.depth * 0.45;
+                x = W / 2 + (x - W / 2) * zScale;
+                y = H / 2 + (y - H / 2) * zScale;
+            }
+
             let alpha = s.alpha * (1 - s.twinkle * (0.5 + 0.5 * Math.sin(t * s.rate + s.phase)));
             let size = s.size;
 
-            for (const L of lenses) {
-                const dx = x - L.x, dy = y - L.y;
-                const r = Math.hypot(dx, dy);
-                if (r > 6 * L.e) continue;
-                const u = Math.max(0.02, r / L.e);
-                const root = Math.sqrt(u * u + 4);
-                const mu = Math.min(4, (u * u + 2) / (u * root));   // total magnification
-                const r1 = L.e * (u + root) / 2;                    // primary image
-                const nx = r ? dx / r : 1, ny = r ? dy / r : 0;
-                // Secondary image: opposite side, inside the ring, fainter.
-                if (u < 2.2) {
-                    const r2 = L.e * (root - u) / 2;
-                    this.dot(L.x - nx * r2, L.y - ny * r2, size * 0.9, Math.min(1, alpha * (mu - 1) * 0.5), s.tint);
+            // Multi-lens deflection: sum gravitational bends across all nearby
+            // holes so binary black holes blend smoothly without a hard seam.
+            if (lenses.length) {
+                let shiftX = 0, shiftY = 0;
+                let domU = Infinity, domLens = null, domNx = 1, domNy = 0, domMu = 1;
+                for (const L of lenses) {
+                    const dx = x - L.x, dy = y - L.y;
+                    const r = Math.hypot(dx, dy);
+                    if (r > 6 * L.e) continue;
+                    const u = Math.max(0.02, r / L.e);
+                    const root = Math.sqrt(u * u + 4);
+                    const mu = Math.min(4, (u * u + 2) / (u * root));
+                    const r1 = L.e * (u + root) / 2;
+                    const nx = r ? dx / r : 1, ny = r ? dy / r : 0;
+                    const dr = r1 - r;
+                    shiftX += nx * dr;
+                    shiftY += ny * dr;
+                    if (u < domU) {
+                        domU = u; domLens = L; domNx = nx; domNy = ny; domMu = mu;
+                    }
                 }
-                x = L.x + nx * r1; y = L.y + ny * r1;
-                alpha = Math.min(1, alpha * (0.5 + 0.5 * mu));
-                size *= Math.min(1.7, 0.8 + 0.2 * mu);
-                break;
+                if (domLens) {
+                    if (domU < 2.2) {
+                        const r2 = domLens.e * (Math.sqrt(domU * domU + 4) - domU) / 2;
+                        this.dot(domLens.x - domNx * r2, domLens.y - domNy * r2, size * 0.9, Math.min(1, alpha * (domMu - 1) * 0.5), s.tint);
+                    }
+                    x += shiftX;
+                    y += shiftY;
+                    alpha = Math.min(1, alpha * (0.5 + 0.5 * domMu));
+                    size *= Math.min(1.7, 0.8 + 0.2 * domMu);
+                }
             }
             this.dot(x, y, size, Math.min(1, alpha), s.tint);
         }

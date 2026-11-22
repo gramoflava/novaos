@@ -15,10 +15,13 @@ class NovaPhysicsClass {
         this.holes = () => [];      // set by the window manager: [{ x, y, mass, id }]
         this.onCapture = null;      // (bodyId, hole) => void
         this.onImpact = null;       // (speed, x, y) => void
+        this.onHolePull = null;     // (activeHoleSet) => void
+        this.onDraw = null;         // () => void (called when any body moved)
         this.camera = null;         // set by the window manager
         this.raf = 0;
         this.last = 0;
         this.acc = 0;
+        this.pullingHoles = new Set();
         this.reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
     }
 
@@ -28,12 +31,13 @@ class NovaPhysicsClass {
             id, el,
             x: parseFloat(el.dataset.x), y: parseFloat(el.dataset.y),
             w: parseFloat(el.dataset.w), h: parseFloat(el.dataset.h),
-            vx: 0, vy: 0,
+            vx: 0, vy: 0, ax: 0, ay: 0,
+            theta: 0, omega: 0,
             held: false, grabX: 0, grabY: 0,
             ghost: false,            // closing or minimised: no collisions
             pinnedUntil: 0,          // immovable until then (restore, resize)
             asleep: true,
-            shownX: null, shownY: null
+            shownX: null, shownY: null, shownTheta: 0
         };
         this.bodies.set(id, b);
         return b;
@@ -159,8 +163,14 @@ class NovaPhysicsClass {
         if (steps === 8) this.acc = 0;
 
         let busy = this.waves.length > 0;
-        this.bodies.forEach(b => { this.draw(b); if (!b.asleep) busy = true; });
+        let moved = false;
+        this.bodies.forEach(b => {
+            if (this.draw(b)) moved = true;
+            if (!b.asleep) busy = true;
+        });
+        if (this.onHolePull) this.onHolePull(this.pullingHoles);
         if (this.camera && this.camera.step(Math.min(0.05, steps * K.dt || K.dt))) busy = true;
+        if (moved && this.onDraw) this.onDraw();
 
         this.raf = busy ? requestAnimationFrame(t => this.frame(t)) : 0;
     }
@@ -168,8 +178,10 @@ class NovaPhysicsClass {
     step(dt, now) {
         const K = NovaPhysicsClass.K;
         const holes = this.holes();
+        const reduced = this.reduced.matches;
         const list = [];
         this.bodies.forEach(b => { if (!b.ghost) list.push(b); });
+        this.pullingHoles.clear();
 
         // Shock fronts.
         for (let i = this.waves.length - 1; i >= 0; i--) {
@@ -183,6 +195,10 @@ class NovaPhysicsClass {
                 wv.hit.add(b.id);
                 const dv = wv.strength / this.mass(b) / (1 + d / 320);
                 b.vx += dx / d * dv; b.vy += dy / d * dv;
+                if (!reduced) {
+                    const spin = ((dx * dy >= 0 ? 1 : -1) * Math.min(1.4, dv / 700));
+                    b.omega += spin;
+                }
                 b.asleep = false;
             }
             if (wv.r > K.shockReach) this.waves.splice(i, 1);
@@ -193,7 +209,20 @@ class NovaPhysicsClass {
             const pinned = now < b.pinnedUntil;
 
             if (b.held) {
-                b.x = b.targetX ?? b.x; b.y = b.targetY ?? b.y;
+                const tx = b.targetX ?? b.x, ty = b.targetY ?? b.y;
+                const dx = tx - b.x, dy = ty - b.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist > K.heldStepMax) {
+                    b.x += dx / dist * K.heldStepMax;
+                    b.y += dy / dist * K.heldStepMax;
+                } else {
+                    b.x = tx; b.y = ty;
+                }
+                // Off-center drag acceleration creates a subtle physical swing.
+                if (!reduced) {
+                    const torque = (b.grabX * b.ay - b.grabY * b.ax) * K.dragTorque;
+                    b.omega += Math.max(-14, Math.min(14, torque)) * dt;
+                }
                 // The hand stopped: the velocity estimate decays with it.
                 if (now - b.holdT > 60) { b.vx *= 0.8; b.vy *= 0.8; b.ax = b.ay = 0; }
             } else if (pinned) {
@@ -209,10 +238,12 @@ class NovaPhysicsClass {
                         const r2 = dx * dx + dy * dy;
                         if (r2 > K.gravityReach * K.gravityReach) continue;
                         const r = Math.sqrt(r2);
-                        if (r < K.captureRadius * Math.sqrt(h.mass) && this.onCapture) {
+                        const capR = K.captureRadius * Math.sqrt(h.mass);
+                        if (r < capR && this.onCapture) {
                             this.onCapture(b.id, h);
                             break;
                         }
+                        if (r < capR * 3.8) this.pullingHoles.add(h);
                         const a = K.GM * h.mass / (r2 + K.soft * K.soft);
                         b.vx += dx / r * a * dt; b.vy += dy / r * a * dt;
                     }
@@ -226,6 +257,16 @@ class NovaPhysicsClass {
                 f *= v > 0 ? Math.max(0, v - K.friction * dt) / v : 0;
                 b.vx *= f; b.vy *= f;
                 b.x += b.vx * dt; b.y += b.vy * dt;
+            }
+
+            // Attitude spring: windows gently right themselves to 0 rad.
+            if (reduced) {
+                b.theta = 0; b.omega = 0;
+            } else if (b.theta !== 0 || b.omega !== 0) {
+                b.omega += (-K.rotK * b.theta - K.rotDamp * b.omega) * dt;
+                b.theta += b.omega * dt;
+                if (b.theta > K.maxTilt) { b.theta = K.maxTilt; b.omega = Math.min(0, b.omega); }
+                else if (b.theta < -K.maxTilt) { b.theta = -K.maxTilt; b.omega = Math.max(0, b.omega); }
             }
         }
 
@@ -247,8 +288,10 @@ class NovaPhysicsClass {
         for (const b of list) {
             if (b.asleep || b.held) continue;
             const still = Math.hypot(b.vx, b.vy) < K.sleepSpeed;
-            if (still && !touching && now >= b.pinnedUntil) {
+            const level = Math.abs(b.theta) < 0.001 && Math.abs(b.omega) < 0.01;
+            if (still && level && !touching && now >= b.pinnedUntil) {
                 b.vx = b.vy = 0;
+                b.theta = b.omega = 0;
                 b.asleep = true;
             }
         }
@@ -279,15 +322,27 @@ class NovaPhysicsClass {
             a.vx -= j * ima * nx; a.vy -= j * ima * ny;
             b.vx += j * imb * nx; b.vy += j * imb * ny;
 
-            const px = nx ? 0 : (Math.max(a.x, b.x) + Math.min(a.x + a.w, b.x + b.w)) / 2;
-            const py = ny ? 0 : (Math.max(a.y, b.y) + Math.min(a.y + a.h, b.y + b.h)) / 2;
+            const px = nx ? (nx > 0 ? a.x + a.w : a.x) : (Math.max(a.x, b.x) + Math.min(a.x + a.w, b.x + b.w)) / 2;
+            const py = ny ? (ny > 0 ? a.y + a.h : a.y) : (Math.max(a.y, b.y) + Math.min(a.y + a.h, b.y + b.h)) / 2;
+
+            // Off-center hits impart a gentle twist.
+            if (!this.reduced.matches) {
+                const arx = px - (a.x + a.w / 2), ary = py - (a.y + a.h / 2);
+                const brx = px - (b.x + b.w / 2), bry = py - (b.y + b.h / 2);
+                const ta = -(arx * ny - ary * nx) * j * ima * K.hitTorque;
+                const tb = (brx * ny - bry * nx) * j * imb * K.hitTorque;
+                a.omega += Math.max(-2.5, Math.min(2.5, ta));
+                b.omega += Math.max(-2.5, Math.min(2.5, tb));
+            }
+
             if (first && this.onImpact && -vn > K.restThreshold) {
-                this.onImpact(-vn, px || (nx > 0 ? a.x + a.w : a.x), py || (ny > 0 ? a.y + a.h : a.y));
+                this.onImpact(-vn, px, py);
             }
         }
 
-        // Ease the overlap out instead of teleporting.
-        const corr = Math.min(pen, Math.max(pen * K.unstick, 0.4)) / im;
+        // Ease the overlap out instead of teleporting; firmer when actively shoved.
+        const unstick = (a.held || b.held) ? K.heldUnstick : K.unstick;
+        const corr = Math.min(pen, Math.max(pen * unstick, 0.4)) / im;
         a.x -= corr * ima * nx; a.y -= corr * ima * ny;
         b.x += corr * imb * nx; b.y += corr * imb * ny;
         a.asleep = false; b.asleep = false;
@@ -295,12 +350,22 @@ class NovaPhysicsClass {
     }
 
     draw(b) {
-        if (b.x !== b.shownX || b.y !== b.shownY) {
-            b.shownX = b.x; b.shownY = b.y;
-            b.el.dataset.x = b.x; b.el.dataset.y = b.y;
-            b.el.style.left = b.x + 'px';
-            b.el.style.top = b.y + 'px';
+        const theta = Math.abs(b.theta) > 0.0004 ? b.theta : 0;
+        const posChanged = b.x !== b.shownX || b.y !== b.shownY;
+        const rotChanged = theta !== b.shownTheta;
+        if (posChanged || rotChanged) {
+            if (posChanged) {
+                b.shownX = b.x; b.shownY = b.y;
+                b.el.dataset.x = b.x; b.el.dataset.y = b.y;
+                b.el.style.translate = `${b.x}px ${b.y}px`;
+            }
+            if (rotChanged) {
+                b.shownTheta = theta;
+                b.el.style.rotate = theta ? `${theta.toFixed(4)}rad` : '';
+            }
+            return posChanged;
         }
+        return false;
     }
 }
 
@@ -313,6 +378,13 @@ NovaPhysicsClass.K = {
     restThreshold: 60,      // px/s: slower contacts don't bounce
     gap: 14,                // px of air kept between windows
     unstick: 0.09,          // share of an overlap eased out per step
+    heldUnstick: 0.45,      // firmer separation when a held window shoves another
+    heldStepMax: 42,        // max world px per 1/120s substep while held (prevents tunneling)
+    rotK: 34,               // 1/s²: attitude restoring spring
+    rotDamp: 10.5,          // 1/s: attitude damping
+    maxTilt: 0.085,         // rad (~4.9°): cap on window tilt
+    dragTorque: 1.4e-6,     // off-center drag leverage -> angular acceleration
+    hitTorque: 3.5e-5,      // off-center collision leverage -> angular velocity
     maxSpeed: 2400,
     sleepSpeed: 5,
     GM: 0.8e7,              // px³/s² per unit of hole mass

@@ -23,10 +23,14 @@ class WindowManagerClass {
         // Camera motion: a fling after a pan, or a spring toward a target.
         this.camVX = 0;
         this.camVY = 0;
+        this.camVZ = 0;
         this.camTarget = null;
         this.shakeMag = 0;
         this.shakeX = 0;
         this.shakeY = 0;
+        this.overlayRaf = 0;
+        this.overlayLast = 0;
+        this.shownIndicatorsKey = '';
 
         // Off-screen indicators
         this.indicatorsContainer = document.createElement('div');
@@ -47,11 +51,14 @@ class WindowManagerClass {
         this.physics.camera = { step: (dt) => this.stepCamera(dt) };
         this.physics.holes = () => this.holeList();
         this.physics.onCapture = (id, hole) => this.swallow(id, hole);
-        this.physics.onImpact = (speed) => this.bump(speed);
+        this.physics.onImpact = (speed, x, y) => this.bump(speed, x, y);
+        this.physics.onHolePull = (active) => this.syncHolePull(active);
+        this.physics.onDraw = () => this.scheduleOverlayTick();
         this.lastBump = 0;
 
         this.initCanvasControls();
-        this.startIndicatorsLoop();
+        window.addEventListener('resize', () => this.scheduleOverlayTick());
+        this.scheduleOverlayTick();
         this.mobileQuery.addEventListener('change', () => {
             this.stopCamera();
             if (this.isMobile()) {
@@ -71,109 +78,121 @@ class WindowManagerClass {
         return this.mobileQuery.matches;
     }
 
-    // Runs every frame, so it must not touch the DOM unless something changed:
-    // rebuilding the markers each frame kept style and layout busy forever and
-    // made clicks and drags stutter.
-    startIndicatorsLoop() {
-        let shownKey = '';
-        let lastLoop = performance.now();
-        const loop = (now) => {
-            const dt = Math.min(0.05, Math.max(0.001, (now - lastLoop) / 1000));
-            lastLoop = now;
-            if (this.isMobile()) {
-                if (shownKey) { this.indicatorsContainer.replaceChildren(); shownKey = ''; }
-                requestAnimationFrame(loop);
-                return;
+    // On-demand overlay loop: runs only while windows, camera, or remnants are
+    // actively changing, so a settled desktop runs zero animation frames.
+    scheduleOverlayTick() {
+        if (this.overlayRaf) return;
+        this.overlayLast = performance.now();
+        this.overlayRaf = requestAnimationFrame((now) => this.tickOverlays(now));
+    }
+
+    tickOverlays(now) {
+        this.overlayRaf = 0;
+        const dt = Math.min(0.05, Math.max(0.001, (now - this.overlayLast) / 1000));
+        this.overlayLast = now;
+
+        if (this.isMobile()) {
+            if (this.shownIndicatorsKey) {
+                this.indicatorsContainer.replaceChildren();
+                this.shownIndicatorsKey = '';
             }
-            const markers = [];
+            return;
+        }
 
-            const vW = window.innerWidth;
-            const vH = window.innerHeight;
+        const markers = [];
+        const vW = window.innerWidth;
+        const vH = window.innerHeight;
 
-            this.windows.forEach(w => {
-                const wx = parseFloat(w.el.dataset.x);
-                const wy = parseFloat(w.el.dataset.y);
-                const ww = parseFloat(w.el.style.width);
-                const wh = parseFloat(w.el.style.height);
+        this.windows.forEach(w => {
+            if (w.el.dataset.minimized === 'true') return;
+            const wx = parseFloat(w.el.dataset.x);
+            const wy = parseFloat(w.el.dataset.y);
+            const ww = parseFloat(w.el.dataset.w);
+            const wh = parseFloat(w.el.dataset.h);
 
-                const screenX = this.cameraX + wx * this.cameraZ;
-                const screenY = this.cameraY + wy * this.cameraZ;
-                const screenW = ww * this.cameraZ;
-                const screenH = wh * this.cameraZ;
+            const screenX = this.cameraX + wx * this.cameraZ;
+            const screenY = this.cameraY + wy * this.cameraZ;
+            const screenW = ww * this.cameraZ;
+            const screenH = wh * this.cameraZ;
 
-                // Check if completely off-screen
-                if (screenX + screenW < 0 || screenX > vW || screenY + screenH < 0 || screenY > vH) {
-                    const centerX = screenX + screenW/2;
-                    const centerY = screenY + screenH/2;
-                    const scX = vW / 2;
-                    const scY = vH / 2;
-                    const dx = centerX - scX;
-                    const dy = centerY - scY;
+            // Check if completely off-screen
+            if (screenX + screenW < 0 || screenX > vW || screenY + screenH < 0 || screenY > vH) {
+                const centerX = screenX + screenW / 2;
+                const centerY = screenY + screenH / 2;
+                const scX = vW / 2;
+                const scY = vH / 2;
+                const dx = centerX - scX;
+                const dy = centerY - scY;
 
-                    let edgeX = scX;
-                    let edgeY = scY;
-                    const slope = dy / dx;
-                    // Hug the screen edge, clear of the island and shelf outlines.
-                    const E = 7;
-                    const maxDX = vW/2 - E;
-                    const maxDY = vH/2 - E;
+                let edgeX = scX;
+                let edgeY = scY;
+                const slope = dy / (dx || 1e-6);
+                // Hug the screen edge, clear of the island and shelf outlines.
+                const E = 7;
+                const maxDX = vW / 2 - E;
+                const maxDY = vH / 2 - E;
 
-                    if (Math.abs(slope) < maxDY / maxDX) {
-                        edgeX = dx > 0 ? vW - E : E;
-                        edgeY = scY + (edgeX - scX) * slope;
-                    } else {
-                        edgeY = dy > 0 ? vH - E : E;
-                        edgeX = scX + (edgeY - scY) / slope;
-                    }
-
-                    const game = w.appId === 'game2048' || w.appId === 'minesweeper' || w.appId === 'colorlines' || w.appId === 'columns' || w.appId === 'wordl' || w.appId === 'novarun';
-                    markers.push({ x: Math.round(edgeX), y: Math.round(edgeY), game });
+                if (Math.abs(slope) < maxDY / maxDX) {
+                    edgeX = dx > 0 ? vW - E : E;
+                    edgeY = scY + (edgeX - scX) * slope;
+                } else {
+                    edgeY = dy > 0 ? vH - E : E;
+                    edgeX = scX + (edgeY - scY) / slope;
                 }
-            });
 
-            const key = markers.map(m => `${m.x},${m.y},${m.game ? 1 : 0}`).join(';');
-            if (key !== shownKey) {
-                shownKey = key;
-                this.indicatorsContainer.replaceChildren(...markers.map(({ x, y, game }) => {
-                    const ind = document.createElement('div');
-                    ind.className = game ? 'window-indicator window-indicator--game' : 'window-indicator';
-                    ind.style.left = x + 'px';
-                    ind.style.top = y + 'px';
-                    return ind;
-                }));
+                const game = w.appId === 'game2048' || w.appId === 'minesweeper' || w.appId === 'colorlines' || w.appId === 'columns' || w.appId === 'wordl' || w.appId === 'novarun';
+                markers.push({ x: Math.round(edgeX), y: Math.round(edgeY), game });
             }
+        });
 
-            // Animate remnants (framerate-independent exponential smoothing)
-            const remEase = 1 - Math.exp(-1.2 * dt);
-            this.activeRemnants.forEach(rem => {
-                // Ease toward the target, then settle exactly so the writes stop.
+        const key = markers.map(m => `${m.x},${m.y},${m.game ? 1 : 0}`).join(';');
+        if (key !== this.shownIndicatorsKey) {
+            this.shownIndicatorsKey = key;
+            this.indicatorsContainer.replaceChildren(...markers.map(({ x, y, game }) => {
+                const ind = document.createElement('div');
+                ind.className = game ? 'window-indicator window-indicator--game' : 'window-indicator';
+                ind.style.left = x + 'px';
+                ind.style.top = y + 'px';
+                return ind;
+            }));
+        }
+
+        // Animate remnants (framerate-independent exponential smoothing)
+        const remEase = 1 - Math.exp(-1.2 * dt);
+        let remnantsBusy = false;
+        this.activeRemnants.forEach(rem => {
+            if (rem.currentDepth !== rem.targetDepth || rem.currentOpacity !== rem.targetOpacity) {
                 rem.currentDepth += (rem.targetDepth - rem.currentDepth) * remEase;
                 rem.currentOpacity += (rem.targetOpacity - rem.currentOpacity) * remEase;
                 if (Math.abs(rem.targetDepth - rem.currentDepth) < 0.001) rem.currentDepth = rem.targetDepth;
                 if (Math.abs(rem.targetOpacity - rem.currentOpacity) < 0.001) rem.currentOpacity = rem.targetOpacity;
-
-                const opacity = String(Math.max(0, rem.currentOpacity));
-                if (rem.shownOpacity !== opacity) { rem.el.style.opacity = opacity; rem.shownOpacity = opacity; }
-
-                const M = 0.95 * rem.currentDepth;
-                const dx = (this.cameraX - rem.initCameraX);
-                const dy = (this.cameraY - rem.initCameraY);
-
-                const offsetX = -M * dx / this.cameraZ;
-                const offsetY = -M * dy / this.cameraZ;
-
-                const transform = `translate3d(${offsetX.toFixed(1)}px, ${offsetY.toFixed(1)}px, 0) scale(${(1 - rem.currentDepth * 0.3).toFixed(4)})`;
-                if (rem.shownTransform !== transform) { rem.el.style.transform = transform; rem.shownTransform = transform; }
-
-                if (rem.targetOpacity <= 0 && rem.currentOpacity <= 0.01) {
-                    if (rem.el.parentNode) rem.el.remove();
-                    this.activeRemnants.delete(rem);
+                if (rem.currentDepth !== rem.targetDepth || rem.currentOpacity !== rem.targetOpacity) {
+                    remnantsBusy = true;
                 }
-            });
+            }
 
-            requestAnimationFrame(loop);
-        };
-        requestAnimationFrame(loop);
+            const opacity = String(Math.max(0, rem.currentOpacity));
+            if (rem.shownOpacity !== opacity) { rem.el.style.opacity = opacity; rem.shownOpacity = opacity; }
+
+            const M = 0.95 * rem.currentDepth;
+            const dx = (this.cameraX - rem.initCameraX);
+            const dy = (this.cameraY - rem.initCameraY);
+
+            const offsetX = -M * dx / this.cameraZ;
+            const offsetY = -M * dy / this.cameraZ;
+
+            const transform = `translate3d(${offsetX.toFixed(1)}px, ${offsetY.toFixed(1)}px, 0) scale(${(1 - rem.currentDepth * 0.3).toFixed(4)})`;
+            if (rem.shownTransform !== transform) { rem.el.style.transform = transform; rem.shownTransform = transform; }
+
+            if (rem.targetOpacity <= 0 && rem.currentOpacity <= 0.01) {
+                if (rem.el.parentNode) rem.el.remove();
+                this.activeRemnants.delete(rem);
+            }
+        });
+
+        if (remnantsBusy) {
+            this.overlayRaf = requestAnimationFrame((t) => this.tickOverlays(t));
+        }
     }
 
     initCanvasControls() {
@@ -284,10 +303,9 @@ class WindowManagerClass {
             stopGlide();
 
             if (e.ctrlKey) {
-                // Pinch to zoom towards cursor
+                // Exponential pinch-to-zoom towards cursor for uniform speed across scales
                 const oldZ = this.cameraZ;
-                this.cameraZ -= e.deltaY * 0.01;
-                this.cameraZ = Math.max(0.2, Math.min(this.cameraZ, 3));
+                this.cameraZ = Math.max(0.2, Math.min(this.cameraZ * Math.exp(-e.deltaY * 0.008), 3));
 
                 // Maintain cursor world position
                 const worldX = (e.clientX - this.cameraX) / oldZ;
@@ -331,24 +349,27 @@ class WindowManagerClass {
 
             rem.el.style.transform = `translate3d(${offsetX}px, ${offsetY}px, 0) scale(${1 - rem.currentDepth * 0.3})`;
         });
+        this.scheduleOverlayTick();
     }
 
     // The camera travels on a critically damped spring: no overshoot, and a
     // new target mid-flight keeps the current velocity.
-    animateCameraTo(targetX, targetY) {
+    animateCameraTo(targetX, targetY, targetZ = null) {
         if (this.isMobile()) return;
+        const z = targetZ == null ? null : Math.max(0.2, Math.min(targetZ, 3));
         if (this.physics.reduced.matches) {
             this.cameraX = targetX; this.cameraY = targetY;
+            if (z != null) this.cameraZ = z;
             this.applyCameraTransform();
             return;
         }
-        this.camTarget = { x: targetX, y: targetY };
+        this.camTarget = { x: targetX, y: targetY, z };
         this.physics.start();
     }
 
     stopCamera() {
         this.camTarget = null;
-        this.camVX = this.camVY = 0;
+        this.camVX = this.camVY = this.camVZ = 0;
     }
 
     shake(intensity = 0.5) {
@@ -386,8 +407,18 @@ class WindowManagerClass {
             this.camVY += (w * w * dy - 2 * w * this.camVY) * dt;
             this.cameraX += this.camVX * dt;
             this.cameraY += this.camVY * dt;
-            if (Math.hypot(dx, dy) < 0.5 && Math.hypot(this.camVX, this.camVY) < 6) {
+
+            let zSettled = true;
+            if (this.camTarget.z != null) {
+                const dz = this.camTarget.z - this.cameraZ;
+                this.camVZ += (w * w * dz - 2 * w * this.camVZ) * dt;
+                this.cameraZ = Math.max(0.2, Math.min(3, this.cameraZ + this.camVZ * dt));
+                zSettled = Math.abs(dz) < 0.002 && Math.abs(this.camVZ) < 0.01;
+            }
+
+            if (Math.hypot(dx, dy) < 0.5 && Math.hypot(this.camVX, this.camVY) < 6 && zSettled) {
                 this.cameraX = this.camTarget.x; this.cameraY = this.camTarget.y;
+                if (this.camTarget.z != null) this.cameraZ = this.camTarget.z;
                 this.stopCamera();
             }
             this.applyCameraTransform();
@@ -431,12 +462,28 @@ class WindowManagerClass {
         h.el.dataset.count = h.members.length;
     }
 
-    // Two windows met: a soft thud, louder for harder hits.
-    bump(speed) {
+    syncHolePull(activeSet) {
+        this.holes.forEach(h => {
+            h.el.classList.toggle('is-pulling', activeSet.has(h));
+        });
+    }
+
+    // Two windows met: a soft thud and a subtle contact spark scaled by impact.
+    bump(speed, x, y) {
         const now = performance.now();
         if (now - this.lastBump < 70) return;
         this.lastBump = now;
-        if (window.AudioMng) AudioMng.play('bump', Math.min(1, speed / 1400));
+        const level = Math.min(1, speed / 1400);
+        if (window.AudioMng) AudioMng.play('bump', level);
+        if (x != null && y != null && !this.isMobile() && !this.physics.reduced.matches) {
+            const spark = document.createElement('div');
+            spark.className = 'nova-impact-spark';
+            spark.style.left = x + 'px';
+            spark.style.top = y + 'px';
+            spark.style.setProperty('--spark-scale', (0.65 + level * 0.95).toFixed(2));
+            this.container.appendChild(spark);
+            setTimeout(() => spark.remove(), 360);
+        }
     }
 
     create(options) {
@@ -506,9 +553,11 @@ class WindowManagerClass {
         winEl.style.width = width + 'px';
         winEl.style.height = height + 'px';
 
-        // Use left and top so it survives CSS scale animation
-        winEl.style.left = left + 'px';
-        winEl.style.top = top + 'px';
+        // Position via standalone translate so physics runs on the GPU compositor
+        // while staying independent of transform: scale() open/close animations.
+        winEl.style.left = '0px';
+        winEl.style.top = '0px';
+        winEl.style.translate = `${left}px ${top}px`;
 
         // Custom attribute to track actual logical coords
         winEl.dataset.x = left;
@@ -777,6 +826,7 @@ class WindowManagerClass {
                 rem.targetOpacity = op;
                 rem.targetDepth = 1 - Math.max(0, Math.min(1, op));
             });
+            this.scheduleOverlayTick();
 
             setTimeout(() => { explosion.remove(); }, 1200);
         }, 400);
@@ -787,6 +837,7 @@ class WindowManagerClass {
             }
             this.windows.delete(id);
             this.physics.remove(id);
+            this.scheduleOverlayTick();
 
             if (win.appId) {
                 let hasMore = false;
@@ -1004,6 +1055,7 @@ class WindowManagerClass {
             }, 520);
         }
         if (window.NovaStarfield) NovaStarfield.touch();
+        this.scheduleOverlayTick();
 
         if (window.ShelfInstance) window.ShelfInstance.render();
     }
@@ -1066,6 +1118,7 @@ class WindowManagerClass {
             }
         }
 
+        this.scheduleOverlayTick();
         this.focus(id);
     }
 
