@@ -126,7 +126,7 @@ Do not restyle shared components; scope site CSS to site classes (an `#id button
 
 ## Favicons
 
-Site root: `favicon.svg` (mark verbatim), `favicon.ico` (one 32 px frame), `apple-touch-icon.png` (180, opaque, full-bleed — transparent corners get a light plate in Safari). Head: the three lines in Install.
+Site root: `favicon.svg` (full-bleed square mark, no `rx` — transparent corners trigger Safari's dark-mode light plate), `favicon.ico` (one 32 px opaque full-bleed frame), `apple-touch-icon.png` (180, opaque, full-bleed). Head: the three lines in Install.
 
 ```sh
 ./favicons.sh marks/<site>.svg ../<site> [--manifest]   # --manifest: android-chrome 192/512, installable sites only
