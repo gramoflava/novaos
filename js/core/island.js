@@ -24,6 +24,34 @@ class Island {
             this.syncMute(AudioMng.muted);
             this.muteBtn.onclick = () => this.syncMute(AudioMng.toggleMute());
         }
+
+        // Spatial recovery: clicking the brand recenters the canvas; a quiet
+        // zoom pill appears only when zoomed away from 100%.
+        this.recenterBtn = document.getElementById('btn-recenter');
+        if (this.recenterBtn) {
+            this.recenterBtn.onclick = () => {
+                if (window.WindowManager && !WindowManager.isMobile()) {
+                    WindowManager.recenter();
+                }
+            };
+        }
+
+        this.zoomBtn = document.getElementById('btn-zoom-reset');
+        if (this.zoomBtn) {
+            this.zoomBtn.onclick = () => {
+                if (window.WindowManager && !WindowManager.isMobile()) {
+                    WindowManager.resetZoom();
+                }
+            };
+            Bus.on('camera:zoom', (z) => {
+                const off = Math.abs(z - 1) >= 0.015;
+                this.zoomBtn.hidden = !off;
+                if (off) {
+                    const pct = Math.round(z * 100) + '%';
+                    if (this.zoomBtn.textContent !== pct) this.zoomBtn.textContent = pct;
+                }
+            });
+        }
     }
 
     syncMute(isMuted) {

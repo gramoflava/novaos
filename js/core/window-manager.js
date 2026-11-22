@@ -31,6 +31,7 @@ class WindowManagerClass {
         this.overlayRaf = 0;
         this.overlayLast = 0;
         this.shownIndicatorsKey = '';
+        this.lastEmittedZ = 1;
 
         // Off-screen indicators
         this.indicatorsContainer = document.createElement('div');
@@ -102,6 +103,22 @@ class WindowManagerClass {
         const markers = [];
         const vW = window.innerWidth;
         const vH = window.innerHeight;
+        const projectEdge = (centerX, centerY) => {
+            const scX = vW / 2;
+            const scY = vH / 2;
+            const dx = centerX - scX;
+            const dy = centerY - scY;
+            const slope = dy / (dx || 1e-6);
+            const E = 16;
+            const maxDX = vW / 2 - E;
+            const maxDY = vH / 2 - E;
+            if (Math.abs(slope) < maxDY / maxDX) {
+                const edgeX = dx > 0 ? vW - E : E;
+                return { x: Math.round(edgeX), y: Math.round(scY + (edgeX - scX) * slope) };
+            }
+            const edgeY = dy > 0 ? vH - E : E;
+            return { x: Math.round(scX + (edgeY - scY) / slope), y: Math.round(edgeY) };
+        };
 
         this.windows.forEach(w => {
             if (w.el.dataset.minimized === 'true') return;
@@ -117,42 +134,76 @@ class WindowManagerClass {
 
             // Check if completely off-screen
             if (screenX + screenW < 0 || screenX > vW || screenY + screenH < 0 || screenY > vH) {
-                const centerX = screenX + screenW / 2;
-                const centerY = screenY + screenH / 2;
-                const scX = vW / 2;
-                const scY = vH / 2;
-                const dx = centerX - scX;
-                const dy = centerY - scY;
-
-                let edgeX = scX;
-                let edgeY = scY;
-                const slope = dy / (dx || 1e-6);
-                // Hug the screen edge, clear of the island and shelf outlines.
-                const E = 7;
-                const maxDX = vW / 2 - E;
-                const maxDY = vH / 2 - E;
-
-                if (Math.abs(slope) < maxDY / maxDX) {
-                    edgeX = dx > 0 ? vW - E : E;
-                    edgeY = scY + (edgeX - scX) * slope;
-                } else {
-                    edgeY = dy > 0 ? vH - E : E;
-                    edgeX = scX + (edgeY - scY) / slope;
-                }
-
-                const game = w.appId === 'game2048' || w.appId === 'minesweeper' || w.appId === 'colorlines' || w.appId === 'columns' || w.appId === 'wordl' || w.appId === 'novarun';
-                markers.push({ x: Math.round(edgeX), y: Math.round(edgeY), game });
+                const pos = projectEdge(screenX + screenW / 2, screenY + screenH / 2);
+                const app = w.appId && window.Apps ? Apps.get(w.appId) : null;
+                markers.push({
+                    kind: 'win',
+                    id: w.id,
+                    appId: w.appId || '',
+                    label: w.title || (app ? app.name : 'Window'),
+                    x: pos.x,
+                    y: pos.y
+                });
             }
         });
 
-        const key = markers.map(m => `${m.x},${m.y},${m.game ? 1 : 0}`).join(';');
+        this.holes.forEach(h => {
+            if (!h.members.length) return;
+            const screenX = this.cameraX + h.x * this.cameraZ;
+            const screenY = this.cameraY + h.y * this.cameraZ;
+            const pad = 40 * this.cameraZ;
+            if (screenX + pad < 0 || screenX - pad > vW || screenY + pad < 0 || screenY - pad > vH) {
+                const pos = projectEdge(screenX, screenY);
+                const topId = h.members[h.members.length - 1];
+                const topWin = this.windows.get(topId);
+                const topLabel = topWin && topWin.title ? topWin.title : 'Minimized';
+                const extra = h.members.length > 1 ? ` +${h.members.length - 1}` : '';
+                markers.push({
+                    kind: 'hole',
+                    worldX: h.x,
+                    worldY: h.y,
+                    hue: h.hue,
+                    label: topLabel + extra,
+                    x: pos.x,
+                    y: pos.y
+                });
+            }
+        });
+
+        const key = markers.map(m => `${m.kind}:${m.id || m.worldX},${m.x},${m.y},${m.appId || m.hue},${m.label}`).join(';');
         if (key !== this.shownIndicatorsKey) {
             this.shownIndicatorsKey = key;
-            this.indicatorsContainer.replaceChildren(...markers.map(({ x, y, game }) => {
-                const ind = document.createElement('div');
-                ind.className = game ? 'window-indicator window-indicator--game' : 'window-indicator';
-                ind.style.left = x + 'px';
-                ind.style.top = y + 'px';
+            this.indicatorsContainer.replaceChildren(...markers.map(m => {
+                const ind = document.createElement('button');
+                ind.type = 'button';
+                if (m.kind === 'hole') {
+                    ind.className = 'window-indicator window-indicator--hole';
+                    ind.style.setProperty('--bh-hue', m.hue + 'deg');
+                    ind.onclick = (e) => {
+                        e.stopPropagation();
+                        const tx = window.innerWidth / 2 - m.worldX * this.cameraZ;
+                        const ty = window.innerHeight / 2 - m.worldY * this.cameraZ;
+                        this.animateCameraTo(tx, ty);
+                    };
+                } else {
+                    const markClass = m.appId ? ` app-mark--${m.appId}` : '';
+                    ind.className = `window-indicator${markClass}`;
+                    ind.onclick = (e) => {
+                        e.stopPropagation();
+                        const win = this.windows.get(m.id);
+                        if (!win) return;
+                        const cx = parseFloat(win.el.dataset.x) + parseFloat(win.el.dataset.w) / 2;
+                        const cy = parseFloat(win.el.dataset.y) + parseFloat(win.el.dataset.h) / 2;
+                        const tx = window.innerWidth / 2 - cx * this.cameraZ;
+                        const ty = window.innerHeight / 2 - cy * this.cameraZ;
+                        this.animateCameraTo(tx, ty);
+                        this.focus(m.id);
+                    };
+                }
+                ind.style.left = m.x + 'px';
+                ind.style.top = m.y + 'px';
+                ind.title = m.label;
+                ind.setAttribute('aria-label', `Jump to ${m.label}`);
                 return ind;
             }));
         }
@@ -200,9 +251,10 @@ class WindowManagerClass {
         // We bind to document body but only initiate if the target isn't an interactive window element
         document.body.addEventListener('mousedown', (e) => {
             if (this.isMobile()) return;
-            // Ignore if clicking on UI elements like island, shelf, or interactive window parts
+            // Ignore if clicking on UI elements like island, shelf, indicators, or interactive window parts
             if (e.target.closest('#nova-island-container') ||
                 e.target.closest('#nova-shelf-container') ||
+                e.target.closest('.window-indicator') ||
                 e.target.closest('.nova-window')) {
                 return;
             }
@@ -327,9 +379,17 @@ class WindowManagerClass {
         if (this.isMobile()) {
             this.container.style.transform = 'none';
             if (this.backgroundLayer) this.backgroundLayer.style.transform = 'none';
+            if (this.lastEmittedZ !== 1) {
+                this.lastEmittedZ = 1;
+                if (window.Bus) Bus.emit('camera:zoom', 1);
+            }
             return;
         }
         this.container.style.transform = `translate3d(${this.cameraX + this.shakeX}px, ${this.cameraY + this.shakeY}px, 0) scale(${this.cameraZ})`;
+        if (Math.abs(this.cameraZ - this.lastEmittedZ) >= 0.004) {
+            this.lastEmittedZ = this.cameraZ;
+            if (window.Bus) Bus.emit('camera:zoom', this.cameraZ);
+        }
         if (this.backgroundLayer) {
             // The nebula is far away: it leans with the camera but never
             // leaves, however far the desktop is panned.
@@ -370,6 +430,38 @@ class WindowManagerClass {
     stopCamera() {
         this.camTarget = null;
         this.camVX = this.camVY = this.camVZ = 0;
+    }
+
+    resetZoom() {
+        if (this.isMobile()) return;
+        const cx = window.innerWidth / 2;
+        const cy = window.innerHeight / 2;
+        const worldX = (cx - this.cameraX) / this.cameraZ;
+        const worldY = (cy - this.cameraY) / this.cameraZ;
+        this.animateCameraTo(cx - worldX, cy - worldY, 1);
+    }
+
+    recenter() {
+        if (this.isMobile()) return;
+        const active = this.activeWindowId && this.windows.get(this.activeWindowId);
+        if (active && active.el.dataset.minimized !== 'true') {
+            const cx = parseFloat(active.el.dataset.x) + parseFloat(active.el.dataset.w) / 2;
+            const cy = parseFloat(active.el.dataset.y) + parseFloat(active.el.dataset.h) / 2;
+            this.animateCameraTo(window.innerWidth / 2 - cx, window.innerHeight / 2 - cy, 1);
+            return;
+        }
+        let sumX = 0, sumY = 0, count = 0;
+        this.windows.forEach(w => {
+            if (w.el.dataset.minimized === 'true') return;
+            sumX += parseFloat(w.el.dataset.x) + parseFloat(w.el.dataset.w) / 2;
+            sumY += parseFloat(w.el.dataset.y) + parseFloat(w.el.dataset.h) / 2;
+            count++;
+        });
+        if (count > 0) {
+            this.animateCameraTo(window.innerWidth / 2 - sumX / count, window.innerHeight / 2 - sumY / count, 1);
+        } else {
+            this.animateCameraTo(0, 0, 1);
+        }
     }
 
     shake(intensity = 0.5) {
@@ -613,6 +705,7 @@ class WindowManagerClass {
             id,
             el: winEl,
             appId: options.appId,
+            title: options.title || '',
             titlebar,
             content
         };
@@ -945,10 +1038,16 @@ class WindowManagerClass {
             this.bhPreview.style.top = (e.clientY + 15) + 'px';
         };
         el.onmouseenter = (e) => {
-            this.bhPreview.innerHTML = hole.members.map(id => {
+            const lastIdx = hole.members.length - 1;
+            const marks = hole.members.map((id, idx) => {
                 const w = this.windows.get(id);
-                return w && window.Icons ? Icons.get(w.appId) : '';
+                const svg = w && window.Icons ? Icons.get(w.appId) : '';
+                return `<span class="bh-preview__mark${idx === lastIdx ? ' is-next' : ''}">${svg}</span>`;
             }).join('');
+            const topWin = hole.members.length ? this.windows.get(hole.members[lastIdx]) : null;
+            const label = topWin && topWin.title ? this.escapeTitle(topWin.title) : '';
+            const extra = hole.members.length > 1 ? ` +${hole.members.length - 1}` : '';
+            this.bhPreview.innerHTML = marks + (label ? `<span class="bh-preview__label">${label}${extra}</span>` : '');
             place(e);
             this.bhPreview.classList.add('visible');
         };

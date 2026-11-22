@@ -20,20 +20,35 @@ class Shelf {
     }
 
     // Marks near the pointer swell, falling off as a bell curve with distance.
+    // Item centers are cached on enter/render/resize to avoid per-mousemove layout reads.
+    cacheCenters() {
+        this.itemCenters = Array.from(this.container.querySelectorAll('.shelf-item')).map(el => {
+            const r = el.getBoundingClientRect();
+            return { el, cx: r.left + r.width / 2 };
+        });
+    }
+
     initSwell() {
         const fine = window.matchMedia('(hover: hover) and (pointer: fine)');
         const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
+        this.itemCenters = [];
         const clear = () => this.container.querySelectorAll('.shelf-item').forEach(el => el.style.removeProperty('--mag'));
+        this.container.addEventListener('mouseenter', () => {
+            if (this.mobileQuery.matches || !fine.matches || calm.matches) return;
+            this.cacheCenters();
+        });
         this.container.addEventListener('mousemove', (e) => {
             if (this.mobileQuery.matches || !fine.matches || calm.matches) return;
-            this.container.querySelectorAll('.shelf-item').forEach(el => {
-                const r = el.getBoundingClientRect();
+            if (!this.itemCenters.length) this.cacheCenters();
+            for (let i = 0; i < this.itemCenters.length; i++) {
+                const item = this.itemCenters[i];
                 // Measured from the slot, which the swell itself does not move.
-                const d = (e.clientX - (r.left + r.width / 2)) / 62;
-                el.style.setProperty('--mag', Math.exp(-d * d).toFixed(3));
-            });
+                const d = (e.clientX - item.cx) / 62;
+                item.el.style.setProperty('--mag', Math.exp(-d * d).toFixed(3));
+            }
         });
         this.container.addEventListener('mouseleave', clear);
+        window.addEventListener('resize', () => { this.itemCenters = []; });
     }
 
     syncFade() {
@@ -127,6 +142,7 @@ class Shelf {
             }
         });
 
+        this.itemCenters = [];
         requestAnimationFrame(() => this.syncFade());
     }
 }

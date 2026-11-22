@@ -63,11 +63,14 @@
         <div id="nova-island-container">
             <div id="nova-island" class="nova-island">
                 <div class="island-left">
-                    <img class="island-mark" src="design_handbook/assets/nova-emblem.svg" alt="">
-                    <span id="island-app-name" class="island-app-name">Nova</span>
+                    <button type="button" class="island-brand" id="btn-recenter" title="Recenter workspace" aria-label="Recenter workspace">
+                        <img class="island-mark" src="design_handbook/assets/nova-emblem.svg" alt="">
+                        <span id="island-app-name" class="island-app-name">Nova</span>
+                    </button>
                 </div>
                 <div class="island-center">
                     <span id="island-clock" class="island-clock">---</span>
+                    <button type="button" class="island-zoom" id="btn-zoom-reset" hidden title="Reset zoom to 100%" aria-label="Reset zoom to 100%">100%</button>
                 </div>
                 <div class="island-right">
                     <button class="island-btn" id="btn-mute" aria-label="Audio Toggle">

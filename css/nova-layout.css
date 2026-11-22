@@ -59,6 +59,74 @@
     gap: 12px;
 }
 
+.island-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: 32px;
+    padding: 0 var(--space-2) 0 var(--space-1);
+    margin-left: calc(-1 * var(--space-1));
+    background: none;
+    border: none;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+    transition:
+        background var(--dur-base) var(--ease-smooth),
+        transform var(--dur-fast) var(--ease-out);
+}
+
+.island-brand:hover {
+    background: var(--glass-hover);
+}
+
+.island-brand:active {
+    transform: scale(0.96);
+}
+
+.island-brand:focus-visible,
+.island-zoom:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--accent-ring);
+}
+
+.island-zoom {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 26px;
+    padding: 0 var(--space-2);
+    background: var(--surface-sunk);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-pill);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    font-weight: var(--weight-medium);
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition:
+        color var(--dur-base) var(--ease-smooth),
+        background var(--dur-base) var(--ease-smooth),
+        border-color var(--dur-base) var(--ease-smooth),
+        transform var(--dur-fast) var(--ease-out);
+}
+
+.island-zoom[hidden] {
+    display: none;
+}
+
+.island-zoom:hover {
+    color: var(--text);
+    background: var(--glass-hover);
+    border-color: var(--line-strong);
+}
+
+.island-zoom:active {
+    transform: scale(0.94);
+}
+
 .island-mark {
     width: 24px;
     height: 24px;
@@ -749,6 +817,19 @@
     .island-left {
         min-width: 0;
         flex: 1;
+    }
+
+    .island-brand {
+        max-width: 100%;
+        cursor: default;
+    }
+
+    .island-brand:hover {
+        background: none;
+    }
+
+    .island-brand:active {
+        transform: none;
     }
 
     .island-app-name {

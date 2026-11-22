@@ -166,6 +166,19 @@
   animation: fade-pulse-remnant 8s infinite alternate var(--ease-smooth);
 }
 
+/* On the light star-chart sky, remnants read as subtle ink washes. */
+html.theme-light .nova-remnant {
+  mix-blend-mode: multiply;
+  filter: saturate(0.85) brightness(0.68);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not(.theme-dark) .nova-remnant {
+    mix-blend-mode: multiply;
+    filter: saturate(0.85) brightness(0.68);
+  }
+}
+
 .nova-remnant::before {
   content: '';
   position: absolute;
