@@ -129,6 +129,10 @@ class NovaEffectsClass {
      * @param {number} intensity - 0 to 1 intensity factor.
      */
     shake(intensity = 0.5) {
+        if (window.WindowManager && typeof WindowManager.shake === 'function') {
+            WindowManager.shake(intensity);
+            return;
+        }
         if (!this.canvasContainer) this.init();
         const duration = 500;
         const magnitude = intensity * 20;
@@ -161,18 +165,21 @@ class NovaEffectsClass {
             ...options
         };
 
+        let lastTick = performance.now();
         const tick = (now) => {
             if (!this.celebrationActive) return;
+            const dt = Math.min(0.05, Math.max(0.001, (now - lastTick) / 1000));
+            lastTick = now;
 
             // Breathing: modulate emission intensity
             const breathing = (Math.sin(now / 400) + 1) / 2;
-            const emissionRate = 0.5 + breathing * 1.5;
+            const emissionRate = (0.5 + breathing * 1.5) * (dt * 60);
 
             if (Math.random() < emissionRate) {
                 this._spawnCelebrationParticle();
             }
 
-            this._updateParticles(now);
+            this._updateParticles(now, dt);
             this.rafId = requestAnimationFrame(tick);
         };
 
@@ -239,9 +246,11 @@ class NovaEffectsClass {
         this.particles.add(p);
     }
 
-    _updateParticles(now) {
+    _updateParticles(now, dt = 1 / 60) {
+        const frameScale = dt * 60;
+        const drag = Math.exp(-1.2 * dt);
         for (const p of this.particles) {
-            p.life -= p.decay;
+            p.life -= p.decay * frameScale;
 
             if (p.life <= 0) {
                 p.el.remove();
@@ -252,22 +261,21 @@ class NovaEffectsClass {
             // Physics logic: Orbital movement
             // Angular velocity (spin) is faster when closer to the center
             const orbitalSpeedFactor = 1 / (1 + p.radius * 0.01);
-            p.angle += p.angularVelocity * orbitalSpeedFactor;
+            p.angle += p.angularVelocity * orbitalSpeedFactor * frameScale;
 
             // Radial velocity (expansion)
-            const drag = 0.98;
             p.radialVelocity *= drag;
-            p.radius += p.radialVelocity;
+            p.radius += p.radialVelocity * frameScale;
 
-            // Compute Cartesian coordinates
-            const currentX = p.baseX + Math.cos(p.angle) * p.radius;
-            const currentY = p.baseY + Math.sin(p.angle) * p.radius;
+            // Offset directly from baseX/baseY (which equals initial left/top) without layout reads
+            const dx = Math.cos(p.angle) * p.radius;
+            const dy = Math.sin(p.angle) * p.radius;
 
             // Blinking
             const blink = (Math.sin(now / p.blinkFreq) + 1) / 2;
             const finalOpacity = p.life * (0.4 + blink * 0.6);
 
-            p.el.style.transform = `translate3d(${currentX - p.el.offsetLeft}px, ${currentY - p.el.offsetTop}px, 0) scale(${p.life})`;
+            p.el.style.transform = `translate3d(${dx}px, ${dy}px, 0) scale(${p.life})`;
             p.el.style.opacity = finalOpacity;
         }
     }

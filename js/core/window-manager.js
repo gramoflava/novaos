@@ -24,6 +24,9 @@ class WindowManagerClass {
         this.camVX = 0;
         this.camVY = 0;
         this.camTarget = null;
+        this.shakeMag = 0;
+        this.shakeX = 0;
+        this.shakeY = 0;
 
         // Off-screen indicators
         this.indicatorsContainer = document.createElement('div');
@@ -73,7 +76,10 @@ class WindowManagerClass {
     // made clicks and drags stutter.
     startIndicatorsLoop() {
         let shownKey = '';
-        const loop = () => {
+        let lastLoop = performance.now();
+        const loop = (now) => {
+            const dt = Math.min(0.05, Math.max(0.001, (now - lastLoop) / 1000));
+            lastLoop = now;
             if (this.isMobile()) {
                 if (shownKey) { this.indicatorsContainer.replaceChildren(); shownKey = ''; }
                 requestAnimationFrame(loop);
@@ -137,11 +143,12 @@ class WindowManagerClass {
                 }));
             }
 
-            // Animate remnants
+            // Animate remnants (framerate-independent exponential smoothing)
+            const remEase = 1 - Math.exp(-1.2 * dt);
             this.activeRemnants.forEach(rem => {
                 // Ease toward the target, then settle exactly so the writes stop.
-                rem.currentDepth += (rem.targetDepth - rem.currentDepth) * 0.02;
-                rem.currentOpacity += (rem.targetOpacity - rem.currentOpacity) * 0.02;
+                rem.currentDepth += (rem.targetDepth - rem.currentDepth) * remEase;
+                rem.currentOpacity += (rem.targetOpacity - rem.currentOpacity) * remEase;
                 if (Math.abs(rem.targetDepth - rem.currentDepth) < 0.001) rem.currentDepth = rem.targetDepth;
                 if (Math.abs(rem.targetOpacity - rem.currentOpacity) < 0.001) rem.currentOpacity = rem.targetOpacity;
 
@@ -304,7 +311,7 @@ class WindowManagerClass {
             if (this.backgroundLayer) this.backgroundLayer.style.transform = 'none';
             return;
         }
-        this.container.style.transform = `translate3d(${this.cameraX}px, ${this.cameraY}px, 0) scale(${this.cameraZ})`;
+        this.container.style.transform = `translate3d(${this.cameraX + this.shakeX}px, ${this.cameraY + this.shakeY}px, 0) scale(${this.cameraZ})`;
         if (this.backgroundLayer) {
             // The nebula is far away: it leans with the camera but never
             // leaves, however far the desktop is panned.
@@ -344,9 +351,34 @@ class WindowManagerClass {
         this.camVX = this.camVY = 0;
     }
 
+    shake(intensity = 0.5) {
+        if (this.isMobile() || this.physics.reduced.matches) return;
+        this.shakeMag = Math.max(this.shakeMag, intensity * 18);
+        this.physics.start();
+    }
+
     // One tick of camera motion; true while it is still moving.
     stepCamera(dt) {
-        if (this.isMobile() || this.isPanning) return false;
+        if (this.isMobile()) return false;
+        let moving = false;
+
+        if (this.shakeMag > 0.25) {
+            const a = Math.random() * Math.PI * 2;
+            this.shakeX = Math.cos(a) * this.shakeMag;
+            this.shakeY = Math.sin(a) * this.shakeMag;
+            this.shakeMag *= Math.exp(-9 * dt);
+            moving = true;
+        } else if (this.shakeMag > 0 || this.shakeX || this.shakeY) {
+            this.shakeMag = 0;
+            this.shakeX = 0;
+            this.shakeY = 0;
+            this.applyCameraTransform();
+        }
+
+        if (this.isPanning) {
+            if (moving) this.applyCameraTransform();
+            return moving;
+        }
         if (this.camTarget) {
             const w = 11;   // rad/s
             const dx = this.camTarget.x - this.cameraX, dy = this.camTarget.y - this.cameraY;
@@ -362,13 +394,17 @@ class WindowManagerClass {
             return true;
         }
         const speed = Math.hypot(this.camVX, this.camVY);
-        if (speed < 8) { this.camVX = this.camVY = 0; return false; }
-        const f = Math.exp(-4.5 * dt);
-        this.camVX *= f; this.camVY *= f;
-        this.cameraX += this.camVX * dt;
-        this.cameraY += this.camVY * dt;
-        this.applyCameraTransform();
-        return true;
+        if (speed >= 8) {
+            const f = Math.exp(-4.5 * dt);
+            this.camVX *= f; this.camVY *= f;
+            this.cameraX += this.camVX * dt;
+            this.cameraY += this.camVY * dt;
+            moving = true;
+        } else if (speed > 0) {
+            this.camVX = this.camVY = 0;
+        }
+        if (moving) this.applyCameraTransform();
+        return moving;
     }
 
     // Black holes as the physics sees them.

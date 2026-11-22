@@ -23,7 +23,8 @@
     will-change: transform, top, left;
     transition:
         box-shadow var(--dur-slow) var(--ease-smooth),
-        border-color var(--dur-slow) var(--ease-smooth);
+        border-color var(--dur-slow) var(--ease-smooth),
+        scale var(--dur-fast) var(--ease-out);
     opacity: 0;
     transform: scale(0.95);
     animation: windowOpen 0.4s var(--ease-spring) forwards;
@@ -75,7 +76,16 @@ body.is-dragging .window-content { pointer-events: none; }
         var(--glass-edge),
         0 0 48px color-mix(in srgb, var(--accent) 12%, transparent);
     border-color: var(--line-strong);
-    z-index: 150 !important;
+}
+
+.nova-window.is-held {
+    scale: 1.012;
+    box-shadow:
+        var(--shadow-lg),
+        var(--glass-edge),
+        0 20px 56px color-mix(in srgb, black 35%, transparent),
+        0 0 40px color-mix(in srgb, var(--accent) 18%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 36%, var(--line-strong));
 }
 
 /* Windows out of focus step back: quieter title, quieter controls. */
@@ -284,6 +294,9 @@ body.is-dragging .window-content { pointer-events: none; }
         display: none;
         width: auto !important;
         height: auto !important;
+        scale: none !important;
+        translate: none !important;
+        rotate: none !important;
         border-radius: var(--window-radius);
         animation: windowOpen var(--dur-slow) var(--ease-out) forwards;
     }
