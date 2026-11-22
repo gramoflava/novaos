@@ -79,10 +79,11 @@ class Horizon {
         return -44;
     }
 
-    // The flight console's outline (fractions of the view): it rises a little
-    // above the dash lip and runs out of the bottom of the view, wider toward
-    // the pilot.
-    static get CONSOLE() { return [[0.32, 0.66], [0.68, 0.66], [0.722, 1.04], [0.278, 1.04]]; }
+    // The low-profile faceted chevron coaming (fractions of the view): sits low
+    // enough (y = 0.775) to leave the entire lower accretion disc unobstructed.
+    static get CONSOLE() {
+        return [[0.285, 0.798], [0.355, 0.775], [0.645, 0.775], [0.715, 0.798], [0.745, 1.04], [0.255, 1.04]];
+    }
 
     // log10 of how many home seconds pass per cockpit second: for a static
     // observer, dt_home/dτ = 1/√(1 − rs/r).
@@ -209,7 +210,7 @@ class Horizon {
             <div class="hz-shade"></div>
             <section class="hz-cockpit">
                 <header class="hz-head">
-                    <span class="hz-title">Single-seat craft · holding above the horizon</span>
+                    <span class="hz-title">Delta-1 · above the horizon</span>
                     <div class="hz-clock">
                         <span class="hz-clock__label">Home time</span>
                         <b class="hz-clock__value"></b>
@@ -538,11 +539,12 @@ class Horizon {
             ctx.drawImage(img, 0, 0, W, H);
         }
 
-        // ── The craft: a white wireframe cockpit ──
+        // ── The craft: a primitivistic triangular glass canopy ──
         // Inside the horizon the tide grows as 1/r³: it stretches the craft
         // along the fall — the line of sight — and squeezes it across, so
         // the hull closes in around the pilot.
         const tide = h.tide || 0;
+        const discAlive = 1 - this.s(ly, 7, 9.5);
         ctx.save();
         if (tide > 0) {
             const k = 1 - 0.15 * tide;
@@ -550,88 +552,153 @@ class Horizon {
             ctx.scale(k, k);
             ctx.translate(-W / 2, -H * 0.42);
         }
+        // Subtle sub-pixel engine vibration while holding under high strain;
+        // goes abruptly dead still the instant free fall begins.
+        if (!h.falling && h.strain > 0.35) {
+            const amp = (h.strain - 0.35) * 1.15 * u;
+            ctx.translate(Math.sin(t * 73) * amp, Math.cos(t * 91) * amp * 0.85);
+        }
+        this.drawInstruments(ctx, W, H, u, t, outside, discAlive);
         ctx.drawImage(this.cockpitFrame(W, H, u), -Horizon.HULL_MARGIN * W, -Horizon.HULL_MARGIN * H);
-        this.drawInstruments(ctx, W, H, u, t, outside);
 
-        // ── Readouts, on the console ──
+        // ── Readouts, on the low coaming ──
         this.drawConsole(ctx, W, H, u, t, fall);
         ctx.restore();
     }
 
-    // Distance and status on the left of the console; thrust and the shift of
-    // the light from home on the right; a caution light when the engine fails.
-    // The home clock stays in the top corner, as a head-up readout.
+    // Backlit annunciator strip along the coaming lip; distance & status on the
+    // left; triangular ship attitude chevron in the center; 12-segment phosphor
+    // thrust bar, Doppler light scale and load/tide on the right.
     drawConsole(ctx, W, H, u, t, fall) {
         const h = this.hud;
-        const mono = (sz, w = 400) => `${w} ${Math.round(sz * u)}px "JetBrains Mono", ui-monospace, monospace`;
-        const warn = '#ff937a', calm = 'rgba(235, 241, 255, 0.94)', dim = 'rgba(212, 224, 246, 0.62)';
+        const mono = (sz, w = 500) => `${w} ${Math.round(sz * u)}px "JetBrains Mono", ui-monospace, monospace`;
+        const warn = '#ff6a4a', amber = '#ffb35c', calm = 'rgba(235, 241, 255, 0.94)', dim = 'rgba(198, 214, 242, 0.58)';
         const alarm = h.falling || h.strain > 0.7;
         ctx.save();
-        // left column
-        // content block (~70u tall) centred in the visible console (y 0.66…1 of H)
-        const lx = W * 0.335, top = H * 0.8325 - 41 * u;
+
+        // Backlit annunciator tiles along the top lip of the coaming
+        const tiles = [
+            { label: 'HOLD', on: !h.falling && h.strain > 0.05, col: h.strain > 0.7 ? amber : '#8ab4ff' },
+            { label: 'THRUST', on: !h.falling, col: h.dropout || h.strain > 0.7 ? amber : '#8ab4ff' },
+            { label: 'TIDE', on: h.falling && h.tide > 0.02, col: warn },
+            { label: 'WARN', on: alarm || h.dropout, col: h.falling ? warn : amber, blink: h.falling || h.dropout }
+        ];
+        const tileW = W * 0.062, tileH = 12 * u, tileGap = W * 0.008;
+        const stripX = W * 0.5 - ((tiles.length * tileW + (tiles.length - 1) * tileGap) / 2);
+        const stripY = H * 0.79;
+        tiles.forEach((tl, idx) => {
+            const tx = stripX + idx * (tileW + tileGap);
+            const lit = tl.on && (!tl.blink || Math.floor(t * 4.5) % 2 === 0);
+            ctx.fillStyle = lit
+                ? (tl.col === warn ? 'rgba(255, 80, 56, 0.22)' : tl.col === amber ? 'rgba(255, 178, 88, 0.18)' : 'rgba(130, 180, 255, 0.14)')
+                : 'rgba(220, 234, 255, 0.04)';
+            ctx.strokeStyle = lit ? tl.col : 'rgba(220, 234, 255, 0.16)';
+            ctx.lineWidth = 0.8 * u;
+            ctx.fillRect(tx, stripY, tileW, tileH);
+            ctx.strokeRect(tx, stripY, tileW, tileH);
+            ctx.fillStyle = lit ? tl.col : 'rgba(200, 215, 240, 0.32)';
+            ctx.font = mono(7, 600);
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(tl.label, tx + tileW / 2, stripY + tileH / 2 + 0.5 * u);
+        });
+        ctx.textBaseline = 'alphabetic';
+
+        // Left column: DISTANCE + STATUS
+        const lx = W * 0.305, rowY = H * 0.875;
         ctx.textAlign = 'left';
-        ctx.fillStyle = dim; ctx.font = mono(8.5);
-        ctx.fillText('DISTANCE', lx, top + 20 * u);
-        ctx.fillStyle = h.falling ? warn : calm; ctx.font = mono(11.5, 500);
-        ctx.fillText(h.radius, lx, top + 36 * u);
-        ctx.fillStyle = alarm ? warn : dim; ctx.font = mono(8.5);
-        ctx.fillText(h.status.toUpperCase(), lx, top + 52 * u);
-        // right column
-        const rx = W * 0.54, bw = W * 0.13;
-        const bar = (y, label, v, colour) => {
-            ctx.fillStyle = dim; ctx.font = mono(8.5);
-            ctx.fillText(label, rx, y - 5 * u);
-            ctx.fillStyle = 'rgba(235,240,255,0.15)'; ctx.fillRect(rx, y, bw, 2 * u);
-            ctx.fillStyle = colour; ctx.fillRect(rx, y, bw * Math.max(0, Math.min(1, v)), 2 * u);
-        };
-        bar(top + 24 * u, `THRUST ${Math.round(h.thrust * 100)}%`, h.thrust, h.falling ? warn : calm);
+        ctx.fillStyle = dim; ctx.font = mono(7.5, 400);
+        ctx.fillText('DISTANCE', lx, rowY - 12 * u);
+        ctx.fillStyle = h.falling ? warn : calm; ctx.font = mono(10.8, 600);
+        ctx.fillText(h.radius, lx, rowY + 3 * u);
+        ctx.fillStyle = h.falling ? warn : alarm || h.dropout ? amber : dim; ctx.font = mono(7.5, 500);
+        ctx.fillText(h.status.toUpperCase(), lx, rowY + 18 * u);
+
+        // Center: primitivistic triangular ship attitude chevron
+        const acx = W * 0.5, acy = H * 0.905;
+        ctx.strokeStyle = 'rgba(210, 226, 255, 0.25)';
+        ctx.lineWidth = 0.9 * u;
+        ctx.beginPath();
+        ctx.moveTo(acx - 22 * u, acy); ctx.lineTo(acx - 10 * u, acy);
+        ctx.moveTo(acx + 10 * u, acy); ctx.lineTo(acx + 22 * u, acy);
+        ctx.stroke();
+        ctx.save();
+        ctx.translate(acx, acy + (h.falling ? 3 * u : 0));
+        ctx.rotate(h.falling ? 0.14 * Math.sin(t * 1.4) : h.strain * 0.04 * Math.sin(t * 28));
+        ctx.strokeStyle = h.falling ? warn : calm;
+        ctx.lineWidth = 1.3 * u;
+        ctx.beginPath();
+        ctx.moveTo(0, -8 * u); ctx.lineTo(7 * u, 6 * u); ctx.lineTo(0, 3 * u); ctx.lineTo(-7 * u, 6 * u); ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+
+        // Right column: 12-segment phosphor THRUST bargraph + LIGHT Doppler scale + LOAD
+        const rx = W * 0.56, bw = W * 0.135;
+        ctx.fillStyle = dim; ctx.font = mono(7.5, 400);
+        ctx.fillText(`THRUST ${Math.round(h.thrust * 100)}%`, rx, rowY - 12 * u);
+        const segs = 12, segGap = 1.6 * u, segW = (bw - segGap * (segs - 1)) / segs;
+        const litSegs = Math.round(Math.max(0, Math.min(1, h.thrust)) * segs);
+        for (let i = 0; i < segs; i++) {
+            const flicker = (h.dropout || h.strain > 0.78) && !h.falling && i >= 10 && Math.sin(t * 37 + i) > 0.2;
+            const on = i < litSegs && !flicker;
+            ctx.fillStyle = on ? (h.falling ? warn : i >= 9 ? amber : calm) : 'rgba(220, 234, 255, 0.12)';
+            ctx.fillRect(rx + i * (segW + segGap), rowY - 7 * u, segW, 5 * u);
+        }
+
         const shift = h.lr >= 0 ? 0.5 - 0.5 * Math.min(1, h.lr / 22) : 0.5 + 0.5 * Math.min(1, -h.lr / 1.5);
-        ctx.fillStyle = dim; ctx.font = mono(8.5);
-        ctx.fillText(h.lr > 0.13 ? 'LIGHT · BLUE' : h.lr < -0.13 ? 'LIGHT · RED' : 'LIGHT', rx, top + 46 * u);
+        ctx.fillStyle = dim; ctx.font = mono(7.5, 400);
+        ctx.fillText(h.lr > 0.13 ? 'LIGHT · BLUE' : h.lr < -0.13 ? 'LIGHT · RED' : 'LIGHT', rx, rowY + 9 * u);
         const sg = ctx.createLinearGradient(rx, 0, rx + bw, 0);
         sg.addColorStop(0, '#6b8cff'); sg.addColorStop(0.5, '#e8ecf8'); sg.addColorStop(1, '#ff4a2a');
-        ctx.globalAlpha = 0.7; ctx.fillStyle = sg; ctx.fillRect(rx, top + 51 * u, bw, 2 * u); ctx.globalAlpha = 1;
-        ctx.fillStyle = '#fff'; ctx.fillRect(rx + bw * shift - 1 * u, top + 48 * u, 2 * u, 8 * u);
-        // what the pilot weighs while holding; in free fall nothing, only the tide
-        ctx.fillStyle = dim; ctx.font = mono(8.5);
-        ctx.fillText(h.loadLabel, rx, top + 70 * u);
+        ctx.globalAlpha = 0.78; ctx.fillStyle = sg; ctx.fillRect(rx, rowY + 13 * u, bw, 2.5 * u); ctx.globalAlpha = 1;
+        ctx.fillStyle = '#fff'; ctx.fillRect(rx + bw * shift - 1 * u, rowY + 10 * u, 2 * u, 8.5 * u);
+
+        ctx.fillStyle = dim; ctx.font = mono(7.5, 400);
+        ctx.fillText(h.loadLabel, rx, rowY + 29 * u);
         ctx.textAlign = 'right';
         ctx.fillStyle = h.falling ? warn : calm;
-        ctx.fillText(h.load, rx + bw, top + 70 * u);
-        ctx.textAlign = 'left';
-        // caution light, top right of the console, only in the fall
-        if (h.falling && Math.floor(t * 4) % 2 === 0) {
-            ctx.fillStyle = warn; ctx.shadowColor = warn; ctx.shadowBlur = 10 * u;
-            ctx.beginPath(); ctx.arc(W * 0.665, H * 0.66 + 12 * u, 3 * u, 0, Math.PI * 2); ctx.fill();
+        ctx.fillText(h.load, rx + bw, rowY + 29 * u);
+
+        // Diegetic crown callout right below the top faceted seam (rib-free zone)
+        const P = Horizon.P;
+        let callout = '';
+        if (h.falling) callout = h.tide > 0.05 ? 'TIDAL SHEAR · SINGULARITY' : 'MAIN ENGINE CUTOFF';
+        else if (h.dropout) callout = 'THRUST INSTABILITY';
+        else if (h.strain > 0.7) callout = 'HOLDING · MAXIMUM THRUST';
+        else if (t < P.geomEnd) callout = 'APPROACHING PHOTON SPHERE';
+        if (callout) {
+            ctx.textAlign = 'center';
+            ctx.fillStyle = h.falling ? 'rgba(255, 118, 92, 0.88)' : h.dropout ? 'rgba(255, 179, 92, 0.85)' : 'rgba(210, 226, 255, 0.52)';
+            ctx.font = mono(7.5, 500);
+            ctx.fillText(callout, W * 0.5, H * 0.135);
         }
         ctx.restore();
     }
 
     static get HULL_MARGIN() { return 0.12; }
 
-    // Cockpit geometry, in fractions of the view. The front of the craft is
-    // glass: one wide canopy with nothing solid above the dash. What frames
-    // the view is little — a slim pillar far out on each side, a bow overhead,
-    // the dash curving round the pilot, and the console standing up from it.
+    // Faceted delta glass canopy: slim double-edged ribs angle inward from the
+    // lower footwells to the crown, then flare OUTWARD overhead like ceiling
+    // glass curving back over the pilot's head. Transparent chin panes flank
+    // the low coaming so the whole black hole and lower disc stay unobstructed.
     static get HULL() {
-        // the dash lip: a shallow arc, lowest at the sides
-        const dashY = x => { const t = (x + 0.02) / 1.04; return 0.83 - 0.56 * t * (1 - t); };
-        const footL = [0.10, dashY(0.10)], footR = [0.90, dashY(0.90)];
-        const headL = [-0.07, -0.10], headR = [1.07, -0.10];      // the pillars leave the view at the top
-        return { dashY, footL, footR, headL, headR };
+        return {
+            roofOutL: [0.088, -0.02],
+            roofOutR: [0.912, -0.02],
+            topL: [0.158, 0.105],
+            topR: [0.842, 0.105],
+            sideTopL: [-0.02, 0.185],
+            sideTopR: [1.02, 0.185],
+            footL: [0.068, 0.855],
+            footR: [0.932, 0.855]
+        };
     }
 
-    // The cockpit as white lines, built once per size. Surfaces are a dark
-    // veil, edges white; both fade toward the middle of the view and grow
-    // stronger toward the corners, so the frame reads without getting in the
-    // way.
+    // The faceted glass canopy frame, cached once per size & black hole hue.
     cockpitFrame(W, H, u) {
-        // Drawn with a margin all round (HULL_MARGIN of the view): when the
-        // tide squeezes the frame, there is still hull past the view's edges.
         const M = Horizon.HULL_MARGIN;
         const cw = Math.round(W * (1 + 2 * M)), ch = Math.round(H * (1 + 2 * M));
-        if (this.frameCache && this.frameCache.width === cw && this.frameCache.height === ch) return this.frameCache;
+        if (this.frameCache && this.frameCache.width === cw && this.frameCache.height === ch && this.frameHue === this.hue) return this.frameCache;
         const c = this.frameCache || document.createElement('canvas');
         c.width = cw; c.height = ch;
         const g = c.getContext('2d');
@@ -641,121 +708,139 @@ class Horizon {
         const G = Horizon.HULL;
         const P = (x, y) => [x * W, y * H];
         const Q = pt => P(pt[0], pt[1]);
-        const veil = 'rgba(6, 8, 14, 0.72)';
+        const hue = this.hue || 24;
+        const hsl = (h, s, l, a) => `hsla(${h}, ${s}%, ${l}%, ${a})`;
+
         const poly = (pts, fill) => {
             g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
             for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
             g.closePath(); g.fillStyle = fill; g.fill();
         };
-        // the dash lip as points, running on past both edges of the view
-        const lip = [];
-        for (let i = 0; i <= 40; i++) { const x = -0.02 + 1.04 * i / 40; lip.push(P(x, G.dashY(x))); }
-        const lipWide = [P(-0.3, 0.97), ...lip, P(1.3, 0.97)];
 
-        // A restrained dichroic coating over the whole canopy.
-        const glass = g.createLinearGradient(W * 0.1, 0, W * 0.9, H * 0.8);
-        glass.addColorStop(0, 'rgba(145,225,255,0.04)');
-        glass.addColorStop(0.4, 'rgba(230,245,255,0.006)');
-        glass.addColorStop(0.62, 'rgba(202,166,255,0.03)');
-        glass.addColorStop(1, 'rgba(151,235,230,0.012)');
-        poly([P(-0.3, -0.12), P(1.3, -0.12), ...lipWide.slice().reverse()], glass);
-        // pillars: slim, and far out
-        const thick = 0.016;
-        poly([Q(G.headL), Q(G.footL), P(G.footL[0] - thick, G.dashY(G.footL[0] - thick)), P(G.headL[0] - thick, G.headL[1])], veil);
-        poly([Q(G.headR), Q(G.footR), P(G.footR[0] + thick, G.dashY(G.footR[0] + thick)), P(G.headR[0] + thick, G.headR[1])], veil);
-        // dash and everything below it
-        poly([...lipWide, P(1.3, 1.3), P(-0.3, 1.3)], veil);
-        // the flight console: the readouts live here, on a dark inset display
+        // Low-profile center coaming (leaves left/right chin glass transparent!)
         const panel = Horizon.CONSOLE.map(([x, y]) => P(x, y));
-        const panelGlass = g.createLinearGradient(0, H * 0.66, 0, H * 1.0);
-        panelGlass.addColorStop(0, 'rgba(144,194,228,0.07)');
-        panelGlass.addColorStop(1, 'rgba(8,14,24,0.6)');
-        poly(panel, panelGlass);
+        const dashFill = g.createLinearGradient(0, H * 0.77, 0, H);
+        dashFill.addColorStop(0, 'rgba(12, 18, 28, 0.86)');
+        dashFill.addColorStop(1, 'rgba(4, 7, 13, 0.96)');
+        poly(panel, dashFill);
 
-        // edges
+        // Faint converging triangular nose/prow glimpsed through chin glass
+        g.strokeStyle = 'rgba(205, 224, 255, 0.16)';
+        g.lineWidth = 1.1 * u;
+        g.beginPath();
+        g.moveTo(G.footL[0] * W, G.footL[1] * H); g.lineTo(W * 0.265, H * 0.94);
+        g.moveTo(G.footR[0] * W, G.footR[1] * H); g.lineTo(W * 0.735, H * 0.94);
+        g.stroke();
+
+        // Slim double-edged ribs & faceted seams, catching the hole's disc hue
         g.lineCap = 'round'; g.lineJoin = 'round';
-        const stroke = (a, w) => {
-            const tint = g.createLinearGradient(0, 0, W, H);
-            tint.addColorStop(0, `rgba(123,219,255,${a * 0.45})`);
-            tint.addColorStop(0.48, `rgba(207,179,255,${a * 0.3})`);
-            tint.addColorStop(1, `rgba(144,241,221,${a * 0.4})`);
-            g.strokeStyle = tint; g.lineWidth = (w + 2) * u; g.stroke();
-            g.strokeStyle = `rgba(235, 240, 255, ${a})`; g.lineWidth = w * u; g.stroke();
+        const drawRib = (pts, alpha, width, catchHue = true) => {
+            if (catchHue) {
+                g.strokeStyle = hsl(hue, 85, 68, alpha * 0.34);
+                g.lineWidth = (width + 2.4) * u;
+                g.beginPath();
+                pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y));
+                g.stroke();
+            }
+            g.strokeStyle = `rgba(232, 240, 255, ${alpha})`;
+            g.lineWidth = width * u;
+            g.beginPath();
+            pts.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y));
+            g.stroke();
         };
-        const edge = (pts, a, w) => {
-            g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
-            for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
-            stroke(a, w);
-        };
-        const arc = (from, ctrl, to, a, w) => {
-            g.beginPath(); g.moveTo(from[0], from[1]); g.quadraticCurveTo(ctrl[0], ctrl[1], to[0], to[1]);
-            stroke(a, w);
-        };
-        edge([Q(G.headL), Q(G.footL)], 0.85, 1.2);                                              // pillars
-        edge([Q(G.headR), Q(G.footR)], 0.85, 1.2);
-        edge([P(G.headL[0] - thick, G.headL[1]), P(G.footL[0] - thick, G.dashY(G.footL[0] - thick))], 0.5, 0.9);
-        edge([P(G.headR[0] + thick, G.headR[1]), P(G.footR[0] + thick, G.dashY(G.footR[0] + thick))], 0.5, 0.9);
-        arc(P(-0.12, 0.15), P(0.5, 0.035), P(1.12, 0.15), 0.5, 1.0);                             // the bow overhead
-        // dash lip, broken where the console stands in front of it
-        edge([...lipWide.filter(pt => pt[0] < 0.3145 * W), P(0.3145, G.dashY(0.3145))], 0.8, 1.2);
-        edge([P(0.6855, G.dashY(0.6855)), ...lipWide.filter(pt => pt[0] > 0.6855 * W)], 0.8, 1.2);
-        edge([panel[3], panel[0], panel[1], panel[2]], 0.65, 0.9);                               // flight console: top and sides
-        edge([P(0.5225, 0.69), P(0.5225, 0.975)], 0.22, 0.7);                                   // its two columns
-        // station marks along the dash lip, for scale
-        for (let i = 0; i < 6; i++) {
-            const x = 0.725 + i * 0.027;
-            edge([P(x, G.dashY(x)), P(x, G.dashY(x) + 0.012)], 0.3, 0.8);
-            edge([P(1 - x, G.dashY(x)), P(1 - x, G.dashY(x) + 0.012)], 0.3, 0.8);
-        }
 
-        // fade toward the middle, stronger toward the corners
-        g.globalCompositeOperation = 'destination-in';
-        const m = g.createRadialGradient(W / 2, H * 0.42, Math.min(W, H) * 0.12, W / 2, H * 0.42, Math.hypot(W, H) * 0.55);
-        m.addColorStop(0, 'rgba(0,0,0,0.12)');
-        m.addColorStop(0.45, 'rgba(0,0,0,0.45)');
-        m.addColorStop(1, 'rgba(0,0,0,1)');
-        g.fillStyle = m; g.fillRect(-M * W, -M * H, cw, ch);
-        // The console is a physical dark inset, not another window: exterior
-        // light should not show straight through its instrument display.
-        g.globalCompositeOperation = 'destination-over';
-        poly(panel, 'rgba(4, 8, 16, 0.78)');
-        g.globalCompositeOperation = 'source-over';
+        // Left & right ribs: flare OUTWARD overhead, angle down to chin sill
+        drawRib([Q(G.roofOutL), Q(G.topL), Q(G.footL), P(0.03, 1.04)], 0.76, 1.25, true);
+        drawRib([P(0.074, -0.02), P(0.145, 0.11), P(0.055, 0.858), P(0.015, 1.04)], 0.32, 0.75, false);
+
+        drawRib([Q(G.roofOutR), Q(G.topR), Q(G.footR), P(0.97, 1.04)], 0.76, 1.25, true);
+        drawRib([P(0.926, -0.02), P(0.855, 0.11), P(0.945, 0.858), P(0.985, 1.04)], 0.32, 0.75, false);
+
+        // Faceted 3-segment crown seam
+        drawRib([Q(G.sideTopL), Q(G.topL), Q(G.topR), Q(G.sideTopR)], 0.44, 0.95, true);
+        // Lower chin-glass sill lines
+        drawRib([P(-0.04, 0.89), Q(G.footL), P(0.285, 0.798)], 0.55, 1.0, false);
+        drawRib([P(0.715, 0.798), Q(G.footR), P(1.04, 0.89)], 0.55, 1.0, false);
+        // Center coaming rim
+        drawRib([panel[5], panel[0], panel[1], panel[2], panel[3], panel[4]], 0.72, 1.1, true);
+
         this.frameCache = c;
+        this.frameHue = this.hue;
         return c;
     }
 
-    drawInstruments(ctx, W, H, u, t, outside) {
+    drawInstruments(ctx, W, H, u, t, outside, discAlive = 1) {
         const h = this.hud;
-        // Faint live ghost reflections in the oblique side panes. Reuse the
-        // already-shaded image: no second ray trace, framebuffer or bloom pass.
-        // The forward pane remains clear; the moving highlight is a coating,
-        // not a second bright black hole floating over the pilot's view.
+        const G = Horizon.HULL;
+        const hue = this.hue || 24;
+        const hsl = (hh, s, l, a) => `hsla(${hh}, ${s}%, ${l}%, ${a})`;
+
+        // Faint live ghost reflections in the oblique side panes.
         if (outside) {
-            const G = Horizon.HULL;
             ctx.save(); ctx.beginPath();
-            // outboard of the pillars, where the glass turns away from the pilot
-            ctx.moveTo(-0.12 * W, -0.12 * H); ctx.lineTo(G.headL[0] * W, G.headL[1] * H); ctx.lineTo(G.footL[0] * W, G.footL[1] * H); ctx.lineTo(-0.12 * W, 0.9 * H); ctx.closePath();
-            ctx.moveTo(1.12 * W, -0.12 * H); ctx.lineTo(G.headR[0] * W, G.headR[1] * H); ctx.lineTo(G.footR[0] * W, G.footR[1] * H); ctx.lineTo(1.12 * W, 0.9 * H); ctx.closePath();
+            ctx.moveTo(-0.12 * W, -0.12 * H); ctx.lineTo(G.roofOutL[0] * W, G.roofOutL[1] * H);
+            ctx.lineTo(G.topL[0] * W, G.topL[1] * H); ctx.lineTo(G.footL[0] * W, G.footL[1] * H);
+            ctx.lineTo(-0.12 * W, 0.95 * H); ctx.closePath();
+            ctx.moveTo(1.12 * W, -0.12 * H); ctx.lineTo(G.roofOutR[0] * W, G.roofOutR[1] * H);
+            ctx.lineTo(G.topR[0] * W, G.topR[1] * H); ctx.lineTo(G.footR[0] * W, G.footR[1] * H);
+            ctx.lineTo(1.12 * W, 0.95 * H); ctx.closePath();
             ctx.clip();
-            ctx.globalAlpha = 0.035 + 0.012 * Math.sin(t * 0.37);
+            ctx.globalAlpha = 0.045 + 0.015 * Math.sin(t * 0.37);
             ctx.translate(W, 0); ctx.scale(-1, 1);
             ctx.drawImage(outside, -W * 0.08 + W * 0.025 * Math.sin(t * 0.18), H * 0.025, W * 1.16, H * 0.94);
             ctx.restore();
         }
-        const HULL = Horizon.HULL;
-        const warm = h.strain;
-        // A changing reflection, faint and clipped to the front pane. It lends
-        // the frame glassiness without bloom/post-processing on the ray image.
-        ctx.save();
-        ctx.beginPath(); ctx.moveTo(HULL.headL[0] * W, HULL.headL[1] * H); ctx.lineTo(HULL.headR[0] * W, HULL.headR[1] * H);
-        ctx.lineTo(HULL.footR[0] * W, HULL.footR[1] * H); ctx.lineTo(HULL.footL[0] * W, HULL.footL[1] * H); ctx.closePath(); ctx.clip();
-        const x = W * (0.36 + 0.035 * Math.sin(t * 0.22));
-        const sheen = ctx.createLinearGradient(x, 0, x + W * 0.16, H * 0.2);
-        sheen.addColorStop(0, 'rgba(190,230,255,0)');
-        const glint = Math.exp(-Math.pow((t - 29.5) / 2.3, 2)) * 0.018;
-        sheen.addColorStop(0.5, `rgba(${h.falling ? '255,189,159' : '196,220,255'},${(0.015 + warm * 0.016 + glint) * (1 - this.s(t, Horizon.P.hoverEnd, Horizon.P.fallEnd))})`);
-        sheen.addColorStop(1, 'rgba(219,198,255,0)');
-        ctx.fillStyle = sheen; ctx.fillRect(0, 0, W, H); ctx.restore();
+
+        // Outer side-pane Fresnel sheen tinted by the live accretion disc hue.
+        const sheenL = ctx.createLinearGradient(0, H * 0.14, W * 0.18, H * 0.45);
+        sheenL.addColorStop(0, hsl(hue, 78, 74, 0.11 * discAlive));
+        sheenL.addColorStop(0.5, 'rgba(180, 222, 255, 0.045)');
+        sheenL.addColorStop(1, 'rgba(180, 222, 255, 0)');
+        ctx.fillStyle = sheenL;
+        ctx.beginPath();
+        ctx.moveTo(0, 0); ctx.lineTo(G.roofOutL[0] * W, G.roofOutL[1] * H);
+        ctx.lineTo(G.topL[0] * W, G.topL[1] * H); ctx.lineTo(G.footL[0] * W, G.footL[1] * H);
+        ctx.lineTo(0, H); ctx.closePath(); ctx.fill();
+
+        const sheenR = ctx.createLinearGradient(W, H * 0.14, W * 0.82, H * 0.45);
+        sheenR.addColorStop(0, hsl(hue, 78, 74, 0.11 * discAlive));
+        sheenR.addColorStop(0.5, 'rgba(180, 222, 255, 0.045)');
+        sheenR.addColorStop(1, 'rgba(180, 222, 255, 0)');
+        ctx.fillStyle = sheenR;
+        ctx.beginPath();
+        ctx.moveTo(W, 0); ctx.lineTo(G.roofOutR[0] * W, G.roofOutR[1] * H);
+        ctx.lineTo(G.topR[0] * W, G.topR[1] * H); ctx.lineTo(G.footR[0] * W, G.footR[1] * H);
+        ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+
+        // Overhead ceiling-glass sheen
+        const roofSheen = ctx.createLinearGradient(0, 0, 0, H * 0.11);
+        roofSheen.addColorStop(0, 'rgba(185, 218, 255, 0.065)');
+        roofSheen.addColorStop(1, 'rgba(185, 218, 255, 0)');
+        ctx.fillStyle = roofSheen;
+        ctx.beginPath();
+        ctx.moveTo(G.roofOutL[0] * W, 0); ctx.lineTo(G.roofOutR[0] * W, 0);
+        ctx.lineTo(G.topR[0] * W, G.topR[1] * H); ctx.lineTo(G.topL[0] * W, G.topL[1] * H);
+        ctx.closePath(); ctx.fill();
+
+        // Subtle diagonal upper-left canopy glint (keeps central view 100% clear)
+        const glintShift = Math.sin(t * 0.28) * 0.025;
+        const gBand = ctx.createLinearGradient(W * (0.16 + glintShift), H * 0.08, W * (0.34 + glintShift), H * 0.32);
+        const glintFade = 1 - this.s(t, Horizon.P.hoverEnd, Horizon.P.fallEnd);
+        gBand.addColorStop(0, 'rgba(220, 240, 255, 0)');
+        gBand.addColorStop(0.45, `rgba(220, 240, 255, ${(0.048 * glintFade).toFixed(4)})`);
+        gBand.addColorStop(0.55, hsl(hue, 80, 78, 0.048 * discAlive * glintFade));
+        gBand.addColorStop(1, 'rgba(220, 240, 255, 0)');
+        ctx.fillStyle = gBand;
+        ctx.beginPath();
+        ctx.moveTo(G.topL[0] * W, G.topL[1] * H); ctx.lineTo(G.topR[0] * W, G.topR[1] * H);
+        ctx.lineTo(W * 0.5, H * 0.34); ctx.closePath(); ctx.fill();
+
+        // Dashboard-bounce reflection on lower inner glass
+        const dashGlow = ctx.createRadialGradient(W * 0.5, H * 0.78, W * 0.04, W * 0.5, H * 0.72, W * 0.28);
+        dashGlow.addColorStop(0, h.falling ? 'rgba(255, 86, 62, 0.11)' : h.strain > 0.7 ? 'rgba(255, 185, 95, 0.07)' : 'rgba(135, 200, 255, 0.06)');
+        dashGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = dashGlow;
+        ctx.fillRect(W * 0.2, H * 0.56, W * 0.6, H * 0.24);
     }
 
     updateCockpit(t, years, ly) {
@@ -775,7 +860,7 @@ class Horizon {
         if (falling && !this.el.cockpit.classList.contains('is-falling')) {
             this.el.cockpit.classList.add('is-falling');
             const title = this.root.querySelector('.hz-title');
-            if (title) title.textContent = 'Single-seat craft · falling';
+            if (title) title.textContent = 'Delta-1 · free fall';
         }
         const hold = this.s(t, P.inEnd, P.hoverEnd);
         const inside = falling && fs.inside;
@@ -1175,15 +1260,23 @@ class SchwarzschildView {
                         // few radians per frame its structure averages out.
                         const kep = Math.pow(r / 3, -1.5), om = discTime * 2.2 * kep;
                         const sharp = 1 - smooth(0.6, 3, smear * kep);
-                        const streak = 0.58 + sharp * (0.23 * Math.sin(az * 6 + 7 * Math.log(r) - om) + 0.13 * Math.sin(az * 17 - 11 * r - om * 1.7) + 0.06 * Math.sin(az * 31 + 36 * Math.log(r) - om * 2.3));
-                        const em = Math.pow(rin / r, 3) * (1 - Math.sqrt(rin / r) * 0.92) * 9 * streak * discAlive;
+                        const logR = Math.log(r);
+                        const rings = Math.sin(14 * logR - om * 0.14);
+                        const streak = 0.56 + 0.09 * rings + sharp * (0.20 * Math.sin(az * 3 + 9 * logR - om) + 0.11 * Math.sin(az * 7 + 18 * logR - om * 1.45) + 0.06 * Math.sin(az * 13 + 34 * logR - om * 2.1));
+                        const isco = Math.pow(rin / r, 2.8) * (1 - Math.sqrt(rin / r) * 0.90);
+                        const em = isco * 9.5 * streak * discAlive * (k >= 1 ? 1.35 : 1);
                         const localG = Math.sqrt(1 - 1 / r) * dop;
-                        const I = em * Math.pow(localG, 4) * dimG / (1 + k * 0.6);
-                        const L = 1 - Math.exp(-I * 4);
+                        const I = em * Math.pow(localG, 4) * dimG / (1 + k * 0.45);
+                        const L = 1 - Math.exp(-I * 3.2);
                         const lg = Math.log2(Math.max(1e-3, localG)) + Math.max(-6, Math.min(4.5, logG * 0.60));
                         let cr = base[0], cg = base[1], cbl = base[2];
-                        if (lg > 0) { const m2 = Math.min(0.85, lg / 3.6); cr += (199 - cr) * m2; cg += (224 - cg) * m2; cbl += (255 - cbl) * m2; }
-                        else { const m2 = Math.min(1, -lg / 1.8); cr += (255 - cr) * m2; cg += (50 - cg) * m2; cbl += (24 - cbl) * m2; }
+                        if (lg > 0) { const m2 = Math.min(0.72, lg / 4.2); cr += (199 - cr) * m2; cg += (224 - cg) * m2; cbl += (255 - cbl) * m2; }
+                        else { const m2 = Math.min(0.85, -lg / 2.2); cr += (70 + base[0] * 0.35 - cr) * m2; cg += (10 + base[1] * 0.35 - cg) * m2; cbl += (5 + base[2] * 0.35 - cbl) * m2; }
+                        const hot = smooth(0.45, 2.6, I) * 0.78;
+                        if (hot > 0) {
+                            const gr = 255 * 0.84 + base[0] * 0.16, gg = 255 * 0.84 + base[1] * 0.16, gb = 255 * 0.84 + base[2] * 0.16;
+                            cr += (gr - cr) * hot; cg += (gg - cg) * hot; cbl += (gb - cbl) * hot;
+                        }
                         const a = cover * remain;
                         rC += cr * L * a; gC += cg * L * a; bC += cbl * L * a;
                         remain *= 1 - cover;

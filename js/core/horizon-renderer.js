@@ -250,25 +250,38 @@ class HorizonGPU {
                 float kep = pow(r / 3.0, -1.5);
                 float orbitalTime = discTime * 2.2 * kep;
                 float sharp = 1.0 - smoothstep(0.6, 3.0, smear * kep);
-                // Differential rotation and radial filaments read as flowing
-                // gas. Band-limit the fine layer rather than blur the whole scene.
-                float phase = az * 17.0 - 11.0 * r - orbitalTime * 1.7;
-                float fine = 1.0 - smoothstep(0.6, 2.5, fwidth(phase));
-                float filament = az * 31.0 + 36.0 * log(r) - orbitalTime * 2.3;
-                float filamentAA = 1.0 - smoothstep(0.6, 2.5, fwidth(filament));
-                float flow = 0.58 + sharp * (0.23 * sin(az * 6.0 + 7.0 * log(r) - orbitalTime)
-                           + 0.13 * fine * sin(phase) + 0.06 * filamentAA * sin(filament));
-                float emission = pow(3.0 / r, 3.0) * (1.0 - sqrt(3.0 / r) * 0.92) * 9.0 * flow * discAlive;
+                // Co-rotating Keplerian logarithmic spirals: all harmonics shear
+                // in the same orbital direction (eliminating cross-hatched waffle
+                // artifacts) while band-limiting fine filaments with fwidth().
+                float logR = log(r);
+                float p1 = az * 3.0 + 9.0 * logR - orbitalTime;
+                float p2 = az * 7.0 + 18.0 * logR - orbitalTime * 1.45;
+                float f2 = 1.0 - smoothstep(0.6, 2.4, fwidth(p2));
+                float p3 = az * 13.0 + 34.0 * logR - orbitalTime * 2.1;
+                float f3 = 1.0 - smoothstep(0.6, 2.4, fwidth(p3));
+                float rings = sin(14.0 * logR - orbitalTime * 0.14);
+                float flow = 0.56 + 0.09 * rings + sharp * (
+                    0.20 * sin(p1) + 0.11 * f2 * sin(p2) + 0.06 * f3 * sin(p3)
+                );
+                // Crisp inner ISCO peak + subtle photon-ring boost on higher-order
+                // lensed crossings (k >= 1).
+                float isco = pow(3.0 / r, 2.8) * (1.0 - sqrt(3.0 / r) * 0.90);
+                float photonBoost = k >= 1 ? 1.35 : 1.0;
+                float emission = isco * 9.5 * flow * discAlive * photonBoost;
                 // Exposure compensates only the common observer blueshift;
                 // gravitational/Doppler asymmetry and g^4 radiance stay intact.
                 float shiftDim = logG < 0.0 ? pow(10.0, 4.0 * logG) : min(2.0, 1.0 + logG * 0.12);
-                float intensity = emission * pow(localG, 4.0) * shiftDim / (1.0 + float(k) * 0.6);
-                float luminance = 1.0 - exp(-intensity * 4.0);
-                // Compressed false colour: huge spectral shifts exceed any
-                // display gamut, but still progress from warm to blue-white.
+                float intensity = emission * pow(localG, 4.0) * shiftDim / (1.0 + float(k) * 0.45);
+                float luminance = 1.0 - exp(-intensity * 3.2);
+                // Preserve the desktop black hole's hue while pushing the hot
+                // Doppler-approaching inner edge & photon ring into an incandescent
+                // white-tinted core (mirroring --nova-bh-deep -> warm -> hot -> glare).
                 float lg = log2(max(0.001, localG)) + clamp(logG * 0.60, -6.0, 4.5);
-                vec3 tint = lg > 0.0 ? mix(base, vec3(0.78, 0.88, 1.0), min(0.85, lg / 3.6))
-                                    : mix(base, vec3(1.0, 0.20, 0.09), min(1.0, -lg / 1.8));
+                vec3 shifted = lg > 0.0 ? mix(base, vec3(0.78, 0.88, 1.0), min(0.72, lg / 4.2))
+                                        : mix(base, vec3(0.55, 0.08, 0.04) * 0.5 + base * 0.35, min(0.85, -lg / 2.2));
+                float hot = smoothstep(0.45, 2.6, intensity);
+                vec3 glare = mix(vec3(1.0), base, 0.16);
+                vec3 tint = mix(shifted, glare, hot * 0.78);
                 light += tint * luminance * cover * remain;
                 remain *= 1.0 - cover;
             }
